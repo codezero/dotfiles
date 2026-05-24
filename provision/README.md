@@ -22,6 +22,7 @@ provision/
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
     ├── 36-alacritty.sh       # Alacritty via `cargo install` + desktop integration
+    ├── 37-claude-code.sh     # Claude Code CLI (native installer, stable; as user)
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     └── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks (as user)
 ```
@@ -46,11 +47,15 @@ Everything is idempotent — safe to re-run.
 
 ## Key design points
 
-- **Root vs user.** cloud-init runs as root, but **Homebrew and oh-my-zsh refuse
-  to run as root**. `lib.sh` resolves a `TARGET_USER` (override with
-  `PROVISION_USER`) and runs those steps via `sudo -u "$TARGET_USER"`. Keep the
-  repo somewhere that user can read (their home, or `/opt` with world-read) so
-  `brew bundle` can read the `Brewfile`.
+- **Root vs user.** cloud-init runs as root, but **Homebrew/oh-my-zsh/rustup/
+  Claude Code refuse to or shouldn't run as root**. `lib.sh` resolves a
+  `TARGET_USER` and runs those steps via `sudo -u "$TARGET_USER"`. Keep the repo
+  somewhere that user can read (their home, or `/opt` with world-read) so
+  `brew bundle` can read the `Brewfile`. An explicitly-set `PROVISION_USER` must
+  exist or provisioning aborts with a clear error (a typo'd username won't
+  silently land on the wrong account); an existing user like the AWS AMI default
+  `ubuntu` is honored as-is. Left unset, it falls back to the invoking user, then
+  the uid-1000 user, then `ubuntu`. `--dry-run` only warns, so previews never block.
 - **Silent.** apt runs through `env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a`
   (the `env` wrapper is required so the settings survive `sudo`, which resets the
   environment), with `--force-confdef/--force-confold` to auto-resolve dpkg config

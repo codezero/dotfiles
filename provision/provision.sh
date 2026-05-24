@@ -9,7 +9,7 @@
 #   bash provision.sh --dry-run               # preview only; no changes, no sudo needed
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
-#               · Rust (rustup) + Alacritty · Flatpak+Flathub
+#               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
 #               · zsh/oh-my-zsh/p10k + dotfiles symlinks
 # ============================================================================
 set -uo pipefail
@@ -43,6 +43,7 @@ STEPS=(
   30-brew.sh
   35-rust.sh
   36-alacritty.sh
+  37-claude-code.sh
   50-flatpak.sh
   60-shell.sh
 )

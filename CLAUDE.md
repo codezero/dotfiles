@@ -18,9 +18,9 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `provision/` — **canonical** full-machine replication. `provision.sh` is the entrypoint; numbered step scripts in `provision/steps/` (run 10→60), package lists in `provision/packages/`, shared helpers in `provision/lib.sh`. Details in `provision/README.md`.
 
 ## Architecture
-`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 50-flatpak (adds Flathub remote) → 60-shell. There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
+`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 37-claude-code (native installer, stable channel) → 50-flatpak (adds Flathub remote) → 60-shell. There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
 
-`lib.sh` resolves a non-root `TARGET_USER` (`PROVISION_USER` > `SUDO_USER` > uid 1000 > `ubuntu`) because cloud-init runs as root but **Homebrew and oh-my-zsh refuse to run as root** — those steps drop to that user via `as_user` (a `sudo -u … bash -lc` login shell).
+`lib.sh` resolves a non-root `TARGET_USER` because cloud-init runs as root but **Homebrew, oh-my-zsh, rustup, and Claude Code refuse to / shouldn't run as root** — those steps drop to that user via `as_user` (a `sudo -u … bash -lc` login shell). An explicitly-set `PROVISION_USER` **must exist or `lib.sh` dies** (catches a cloud-init typo before provisioning the wrong account; `--dry-run` only warns). Unset, it falls back `SUDO_USER` > uid 1000 > `ubuntu`.
 
 ### Editing step scripts — the helper contract
 Every mutating action must go through a `lib.sh` helper so `--dry-run` stays accurate and runs stay non-interactive/idempotent. **Calling `apt-get`, `curl … | sudo tee`, etc. directly silently breaks `--dry-run`.**

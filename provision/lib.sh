@@ -11,15 +11,6 @@ DOTFILES_ROOT="$(cd "$PROVISION_DIR/.." && pwd)"
 PKG_DIR="$PROVISION_DIR/packages"
 STEPS_DIR="$PROVISION_DIR/steps"
 
-# Target (human) user for per-user installs: Homebrew, oh-my-zsh, dotfiles.
-# Homebrew refuses to run as root, and cloud-init runs as root — so user-level
-# steps drop to this account. Override with PROVISION_USER=<name>.
-TARGET_USER="${PROVISION_USER:-${SUDO_USER:-$(logname 2>/dev/null || true)}}"
-[ -n "${TARGET_USER:-}" ] && id "$TARGET_USER" >/dev/null 2>&1 || \
-  TARGET_USER="$(getent passwd 1000 2>/dev/null | cut -d: -f1)"
-[ -n "${TARGET_USER:-}" ] || TARGET_USER="ubuntu"
-TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
-
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[err]\033[0m %s\n'  "$*" >&2; exit 1; }
@@ -35,6 +26,33 @@ dry()   { [ "$DRY_RUN" = "1" ]; }
 would() { printf '   \033[2m[would]\033[0m %s\n' "$*"; }
 # Execute a plain command (no pipes/redirects), or just print it in dry-run.
 run()   { if dry; then would "$*"; else "$@"; fi; }
+
+# --- target user resolution -------------------------------------------------
+# Per-user installs (Homebrew, oh-my-zsh, rustup, Claude Code, dotfiles) can't
+# run as root, and cloud-init runs as root — so those steps drop to this user.
+#   - PROVISION_USER set explicitly -> it MUST exist, else die. This catches a
+#     typo in cloud-init before we silently provision the wrong account; an
+#     existing user such as the AWS AMI default `ubuntu` is honored as-is.
+#   - PROVISION_USER unset           -> best-effort: the invoking user
+#     (SUDO_USER / logname), then the uid-1000 user, then literally "ubuntu".
+# (In --dry-run a missing explicit user only warns, so previews never block.)
+if [ -n "${PROVISION_USER:-}" ]; then
+  TARGET_USER="$PROVISION_USER"
+  if ! id "$TARGET_USER" >/dev/null 2>&1; then
+    if dry; then
+      warn "PROVISION_USER='$TARGET_USER' does not exist (continuing for dry-run preview)"
+    else
+      die "PROVISION_USER='$TARGET_USER' does not exist. Create the user first, or unset PROVISION_USER to auto-detect the invoking/uid-1000 user."
+    fi
+  fi
+else
+  TARGET_USER="${SUDO_USER:-$(logname 2>/dev/null || true)}"
+  if [ -z "${TARGET_USER:-}" ] || ! id "$TARGET_USER" >/dev/null 2>&1; then
+    TARGET_USER="$(getent passwd 1000 2>/dev/null | cut -d: -f1)"
+  fi
+  [ -n "${TARGET_USER:-}" ] || TARGET_USER="ubuntu"
+fi
+TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
 
 # Run a command as the target (non-root) user via a login shell.
 as_user() {
