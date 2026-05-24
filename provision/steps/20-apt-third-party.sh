@@ -10,6 +10,16 @@ run $SUDO install -m 0755 -d /etc/apt/keyrings
 apt_get update || true   # ensure apt lists exist if this step is run standalone
 apt_install ca-certificates curl gnupg wget
 
+# Expected repo signing-key fingerprints (the repo add is gated on a match).
+# Docker's is stable + officially documented, so it's pinned. VSCodium/Bruno are
+# NOT pinned by default: their fingerprints couldn't be authoritatively verified
+# here and Bruno is known to rotate/expire its key (usebruno#3569), so a
+# hardcoded pin would break installs. Set VSCODIUM_KEY_FP / BRUNO_KEY_FP to pin
+# them once you've verified the value; unset = require a valid key but don't pin.
+DOCKER_FP="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-}"
+BRUNO_KEY_FP="${BRUNO_KEY_FP:-}"
+
 # ── Docker (official) ───────────────────────────────────────────────────────
 log "Docker: repo + Engine"
 # Remove distro/old Docker packages first — docker.io, the docker snap's deps,
@@ -36,46 +46,72 @@ else
     *)   warn "Docker repo probe inconclusive (HTTP ${dock_status:-000}); keeping '$CODENAME'" ;;
   esac
 fi
+docker_ok=1
 if dry; then
-  would "download Docker GPG key -> /etc/apt/keyrings/docker.asc"
+  would "download + fingerprint-verify ($DOCKER_FP) Docker key -> /etc/apt/keyrings/docker.asc"
   would "add repo: deb [arch=$ARCH] https://download.docker.com/linux/ubuntu $DOCK_CN stable"
 else
-  $SUDO curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
-    $SUDO chmod a+r /etc/apt/keyrings/docker.asc
-  echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${DOCK_CN} stable" \
-    | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+  if $SUDO curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc \
+     && $SUDO chmod a+r /etc/apt/keyrings/docker.asc \
+     && verify_keyring /etc/apt/keyrings/docker.asc "$DOCKER_FP"; then
+    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${DOCK_CN} stable" \
+      | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+  else
+    docker_ok=0
+    $SUDO rm -f /etc/apt/keyrings/docker.asc /etc/apt/sources.list.d/docker.list
+    soft_fail "Docker key download/verify failed — skipping Docker repo + Engine"
+  fi
 fi
-apt_get update || true
-apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
-            docker-compose-plugin docker-ce-rootless-extras uidmap
+if [ "$docker_ok" = 1 ]; then
+  apt_get update || true
+  apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+              docker-compose-plugin docker-ce-rootless-extras uidmap
+fi
 
 # ── VSCodium (official) ──────────────────────────────────────────────────────
 log "VSCodium: repo + codium"
+vscodium_ok=1
+VSCODIUM_KR=/usr/share/keyrings/vscodium-archive-keyring.gpg
 if dry; then
-  would "download VSCodium key -> /usr/share/keyrings/vscodium-archive-keyring.gpg"
+  would "download + verify VSCodium key -> $VSCODIUM_KR (pin: ${VSCODIUM_KEY_FP:-none})"
   would "add repo: deb [...] https://download.vscodium.com/debs vscodium main"
 else
-  wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
-    | gpg --dearmor | $SUDO dd of=/usr/share/keyrings/vscodium-archive-keyring.gpg status=none
-  echo 'deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main' \
-    | $SUDO tee /etc/apt/sources.list.d/vscodium.list >/dev/null
+  if wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
+       | gpg --dearmor 2>/dev/null | $SUDO dd of="$VSCODIUM_KR" status=none 2>/dev/null \
+     && verify_keyring "$VSCODIUM_KR" "$VSCODIUM_KEY_FP"; then
+    echo "deb [arch=amd64,arm64 signed-by=$VSCODIUM_KR] https://download.vscodium.com/debs vscodium main" \
+      | $SUDO tee /etc/apt/sources.list.d/vscodium.list >/dev/null
+  else
+    vscodium_ok=0
+    $SUDO rm -f "$VSCODIUM_KR" /etc/apt/sources.list.d/vscodium.list
+    soft_fail "VSCodium key download/verify failed — skipping VSCodium"
+  fi
 fi
-apt_get update || true
-apt_install codium
+if [ "$vscodium_ok" = 1 ]; then
+  apt_get update || true
+  apt_install codium
+fi
 
 # ── Bruno (official) — apt repo is amd64-only; arm64 uses GitHub .deb ─────────
 log "Bruno: API client"
 if [ "$ARCH" = "amd64" ]; then
+  bruno_ok=1
   if dry; then
-    would "add Bruno key + amd64 repo, then install bruno"
+    would "add + verify Bruno key (pin: ${BRUNO_KEY_FP:-none}) + amd64 repo, then install bruno"
   else
-    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9FA6017ECABE0266" \
-      | gpg --dearmor | $SUDO tee /etc/apt/keyrings/bruno.gpg >/dev/null
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/bruno.gpg] http://debian.usebruno.com/ bruno stable" \
-      | $SUDO tee /etc/apt/sources.list.d/bruno.list >/dev/null
-    apt_get update || true
+    if curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9FA6017ECABE0266" \
+         | gpg --dearmor 2>/dev/null | $SUDO tee /etc/apt/keyrings/bruno.gpg >/dev/null \
+       && verify_keyring /etc/apt/keyrings/bruno.gpg "$BRUNO_KEY_FP"; then
+      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/bruno.gpg] http://debian.usebruno.com/ bruno stable" \
+        | $SUDO tee /etc/apt/sources.list.d/bruno.list >/dev/null
+      apt_get update || true
+    else
+      bruno_ok=0
+      $SUDO rm -f /etc/apt/keyrings/bruno.gpg /etc/apt/sources.list.d/bruno.list
+      soft_fail "Bruno key download/verify failed — skipping Bruno"
+    fi
   fi
-  apt_install bruno
+  if [ "$bruno_ok" = 1 ]; then apt_install bruno; fi
 else
   if dry; then
     would "fetch latest Bruno arm64 .deb from GitHub releases and install"

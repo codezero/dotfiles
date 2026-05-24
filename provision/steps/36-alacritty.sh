@@ -38,8 +38,14 @@ as_user 'set -e; . "$HOME/.cargo/env"; \
   || warn "alacritty desktop integration incomplete — continuing"
 
 # Color themes — alacritty.toml imports one from here. Clone the upstream repo
-# rather than vendoring ~190 theme files into the dotfiles repo.
-# Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).
-as_user 'd="$HOME/.config/alacritty/themes"; \
-  test -d "$d/.git" || { rm -rf "$d"; git clone --depth=1 https://github.com/alacritty/alacritty-theme "$d"; }' \
+# rather than vendoring ~190 theme files. Skip if already a checkout; clone if
+# empty/missing; but DON'T wipe a non-empty non-git dir (could be custom themes).
+as_user 'set -e; d="$HOME/.config/alacritty/themes"; \
+  if [ -d "$d/.git" ]; then exit 0; fi; \
+  if [ -e "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ]; then \
+    echo "[warn] $d is not a git checkout — leaving it (theme import may be missing)" >&2; exit 0; fi; \
+  rm -rf "$d"; git clone --depth=1 https://github.com/alacritty/alacritty-theme "$d"' \
   || soft_fail "alacritty theme clone failed"
+# Confirm the theme that alacritty.toml imports actually resolved.
+as_user 'test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"' \
+  || warn "alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"

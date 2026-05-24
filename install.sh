@@ -91,14 +91,21 @@ mapfile -t _dotfiles < <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_DIR/dotfiles.l
 for f in "${_dotfiles[@]}"; do link "$f"; done
 
 # Alacritty's alacritty.toml imports a theme from this repo (don't vendor ~190 files).
-# Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).
+# Skip if already a checkout; clone if empty/missing; leave a non-empty non-git
+# dir alone (could be your own themes).
 themes_dir="$HOME/.config/alacritty/themes"
-if [ ! -d "$themes_dir/.git" ]; then
+if [ -d "$themes_dir/.git" ]; then
+  :  # already a theme checkout
+elif [ -e "$themes_dir" ] && [ -n "$(ls -A "$themes_dir" 2>/dev/null)" ]; then
+  echo "    alacritty themes dir exists and isn't a git checkout — leaving it"
+else
   rm -rf "$themes_dir"
   git clone --depth=1 https://github.com/alacritty/alacritty-theme "$themes_dir" 2>/dev/null \
     && echo "    cloned alacritty themes" \
-    || echo "    (alacritty theme clone skipped/failed)"
+    || echo "    (alacritty theme clone failed)"
 fi
+[ -f "$themes_dir/themes/catppuccin_mocha.toml" ] || \
+  echo "    note: alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"
 
 echo "==> [7/7] Make zsh the default shell"
 if [ "${SHELL:-}" != "$(command -v zsh)" ]; then

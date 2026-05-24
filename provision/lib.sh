@@ -111,6 +111,22 @@ apt_get() {
 }
 apt_install() { apt_get install -y "$@" || soft_fail "apt: some of [$*] failed to install"; }
 
+# Validate a keyring file holds a usable GPG key before we trust its repo. If
+# `expected_fp` is non-empty, the primary-key fingerprint must match it. Returns
+# non-zero (so callers can GATE the repo add) on an empty/garbage key or a
+# fingerprint mismatch — prevents adding a repo behind a failed/tampered key.
+verify_keyring() {
+  local kr="$1" want="${2:-}" got
+  [ -s "$kr" ] || { warn "GPG keyring $kr is empty/missing"; return 1; }
+  got="$(gpg --show-keys --with-colons "$kr" 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}')"
+  [ -n "$got" ] || { warn "no GPG key found in $kr"; return 1; }
+  if [ -n "$want" ] && [ "$got" != "$want" ]; then
+    warn "GPG fingerprint mismatch in $kr: got $got expected $want"
+    return 1
+  fi
+  return 0
+}
+
 load_brew() {
   [ -x /home/linuxbrew/.linuxbrew/bin/brew ] && \
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
