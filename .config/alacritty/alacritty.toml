@@ -1,0 +1,32 @@
+[env]
+XCURSOR_THEME = "Yaru"
+XCURSOR_SIZE = "24"
+
+[window]
+dimensions = { columns = 100, lines = 60 }
+opacity = 0.9
+blur = true
+
+[terminal.shell]
+program = "/bin/zsh"
+args = ["-l"]
+
+[font]
+size = 12
+
+[cursor]
+style = { shape = "Underline", blinking = "On" }
+vi_mode_style = "None"
+
+[scrolling]
+history = 30000
+
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001B\r"
+
+[general]
+import = [
+  "~/.config/alacritty/themes/themes/catppuccin_mocha.toml"
+]

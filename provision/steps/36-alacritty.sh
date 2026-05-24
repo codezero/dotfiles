@@ -36,3 +36,9 @@ as_user 'set -e; . "$HOME/.cargo/env"; \
   curl -fsSL "$base/logo/alacritty-term.svg" -o "$icondir/Alacritty.svg"; \
   curl -fsSL "$base/linux/Alacritty.desktop" -o "$appdir/Alacritty.desktop"' \
   || warn "alacritty desktop integration incomplete — continuing"
+
+# Color themes — alacritty.toml imports one from here. Clone the upstream repo
+# rather than vendoring ~190 theme files into the dotfiles repo.
+as_user 'test -d "$HOME/.config/alacritty/themes/.git" || \
+  git clone --depth=1 https://github.com/alacritty/alacritty-theme "$HOME/.config/alacritty/themes"' \
+  || warn "alacritty theme clone failed"

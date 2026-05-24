@@ -10,6 +10,7 @@
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
+#               · GNOME dconf settings (desktop only)
 #               · zsh/oh-my-zsh/p10k + dotfiles symlinks
 # ============================================================================
 set -uo pipefail
@@ -45,6 +46,7 @@ STEPS=(
   36-alacritty.sh
   37-claude-code.sh
   50-flatpak.sh
+  55-gnome-dconf.sh
   60-shell.sh
 )
 

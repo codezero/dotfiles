@@ -16,14 +16,17 @@ provision/
 │   ├── apt.list          # apt packages (base/desktop/boot excluded)
 │   ├── flatpak.list      # Flathub app IDs
 │   └── Brewfile          # Homebrew formulae (the CLI toolchain)
+├── gnome/
+│   └── dconf-settings.ini # curated GNOME settings (loaded by step 55, desktop-only)
 └── steps/
     ├── 10-apt.sh             # base apt packages
     ├── 20-apt-third-party.sh # Docker · VSCodium · Bruno · Cursor (official repos)
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
-    ├── 36-alacritty.sh       # Alacritty via `cargo install` + desktop integration
+    ├── 36-alacritty.sh       # Alacritty via `cargo install` + theme clone + desktop integration
     ├── 37-claude-code.sh     # Claude Code CLI (native installer, stable; as user)
     ├── 50-flatpak.sh         # flatpak + Flathub remote
+    ├── 55-gnome-dconf.sh     # GNOME dconf settings (only with INSTALL_DESKTOP=1)
     └── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks (as user)
 ```
 

@@ -58,6 +58,8 @@ link() {
   local name="$1"
   local src="$DOTFILES_DIR/$name"
   local dest="$HOME/$name"
+  [ -e "$src" ] || { echo "    skip (missing in repo): $name"; return; }
+  mkdir -p "$(dirname "$dest")"
   if [ -e "$dest" ] && [ ! -L "$dest" ]; then
     mv "$dest" "$dest.backup.$(date +%s)"
     echo "    backed up existing $dest"
@@ -68,6 +70,17 @@ link() {
 link .zshrc
 link .p10k.zsh
 link .gitconfig
+link .config/alacritty/alacritty.toml
+link .claude/settings.json
+link .claude/statusline-command.sh
+
+# Alacritty's alacritty.toml imports a theme from this repo (don't vendor ~190 files).
+if [ ! -d "$HOME/.config/alacritty/themes/.git" ]; then
+  git clone --depth=1 https://github.com/alacritty/alacritty-theme \
+    "$HOME/.config/alacritty/themes" 2>/dev/null \
+    && echo "    cloned alacritty themes" \
+    || echo "    (alacritty theme clone skipped/failed)"
+fi
 
 echo "==> [7/7] Make zsh the default shell"
 if [ "${SHELL:-}" != "$(command -v zsh)" ]; then

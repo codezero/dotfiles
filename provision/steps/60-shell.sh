@@ -17,12 +17,17 @@ as_user 'ZC="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"; \
   git clone --depth=1 https://github.com/romkatv/powerlevel10k "$ZC/themes/powerlevel10k"' \
   || warn "powerlevel10k clone failed"
 
-# Symlink dotfiles from the repo into the target user's home.
-for f in .zshrc .p10k.zsh .gitconfig; do
+# Symlink dotfiles from the repo into the target user's home (nested paths too).
+for f in .zshrc .p10k.zsh .gitconfig \
+         .config/alacritty/alacritty.toml \
+         .claude/settings.json .claude/statusline-command.sh; do
   src="$DOTFILES_ROOT/$f"
   dst="$TARGET_HOME/$f"
   [ -e "$src" ] || { warn "missing $src — skipping"; continue; }
   if dry; then would "symlink $dst -> $src"; continue; fi
+  parent="$(dirname "$dst")"
+  $SUDO mkdir -p "$parent"
+  $SUDO chown "$TARGET_USER":"$TARGET_USER" "$parent" 2>/dev/null || true
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi

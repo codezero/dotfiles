@@ -20,13 +20,32 @@ id_*
 .ssh/
 .gnupg/
 
-# Claude Code state (may contain API keys / project history)
-.claude/
+# Claude Code — ignore all state/creds, but DO track the two configs we port
+.claude/*
+!.claude/settings.json
+!.claude/statusline-command.sh
+.claude.json
 
 # Cloud / tool credentials
 .config/gh/hosts.yml
 .aws/
 .config/gcloud/
+
+# AI / API tool auth + state (live OAuth tokens, account info, history)
+**/auth.json
+**/.credentials.json
+.codex/
+.config/bruno/cookies.json
+.config/remmina/
+.config/goa-1.0/
+.config/go/telemetry/
+
+# Local state databases / machine identifiers
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+**/installation_id
+**/machineid
 
 # ──────────────────────────────────────────────────────────────
 # Generated / cache / noise

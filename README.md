@@ -9,6 +9,7 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 | `.zshrc` | Zsh config: oh-my-zsh, plugins, aliases, brew/nvm/zoxide |
 | `.p10k.zsh` | Powerlevel10k prompt (from `p10k configure`) |
 | `.gitconfig` | Git identity — **set your real name/email** |
+| `.config/`, `.claude/` | Ported app configs symlinked into `$HOME`: Alacritty (`alacritty.toml` + cloned theme repo), Claude Code (`settings.json`, `statusline-command.sh`) |
 | `.gitignore` | Keeps secrets/credentials out of the repo |
 | `install.sh` | Lightweight bootstrap: shell + dotfiles only |
 | `provision/` | Full-machine replication (Docker, editors, Rust+Alacritty, Flatpak, Brewfile); cloud-init ready |
