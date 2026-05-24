@@ -16,6 +16,19 @@ set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Link vs. override: symlink the dotfiles by default (repo stays the source of
+# truth), or copy them in with DOTFILES_COPY=1 / --copy (self-contained — the
+# repo can then be deleted, but edits no longer flow back). Same knob as
+# provision's GOLDEN_IMAGE/DOTFILES_COPY.
+DOTFILES_COPY="${DOTFILES_COPY:-0}"
+for a in "$@"; do
+  case "$a" in
+    --copy) DOTFILES_COPY=1 ;;
+    -h|--help) echo "usage: [DOTFILES_COPY=1] bash install.sh [--copy]"; exit 0 ;;
+    *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
+  esac
+done
+
 echo "==> [1/7] Base apt packages"
 sudo apt update
 sudo apt install -y \
@@ -54,7 +67,7 @@ echo "==> [5/7] CLI tools via brew (nvm, eza, bat, zoxide, jq)"
 brew install nvm eza bat zoxide jq
 mkdir -p "$HOME/.nvm"   # required by brew's nvm
 
-echo "==> [6/7] Symlink dotfiles (+ Alacritty theme) into \$HOME"
+echo "==> [6/7] Install dotfiles (+ Alacritty theme) into \$HOME ($([ "$DOTFILES_COPY" = 1 ] && echo copy || echo symlink) mode)"
 link() {
   local name="$1"
   local src="$DOTFILES_DIR/$name"
@@ -65,15 +78,17 @@ link() {
     mv "$dest" "$dest.backup.$(date +%s)"
     echo "    backed up existing $dest"
   fi
-  ln -sfn "$src" "$dest"
-  echo "    linked  $dest -> $src"
+  if [ "$DOTFILES_COPY" = "1" ]; then
+    rm -f "$dest"; cp -f "$src" "$dest"
+    echo "    copied  $dest <- $src"
+  else
+    ln -sfn "$src" "$dest"
+    echo "    linked  $dest -> $src"
+  fi
 }
-link .zshrc
-link .p10k.zsh
-link .gitconfig
-link .config/alacritty/alacritty.toml
-link .claude/settings.json
-link .claude/statusline-command.sh
+# File set = the shared manifest at the repo root (also read by provision step 60).
+mapfile -t _dotfiles < <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_DIR/dotfiles.list")
+for f in "${_dotfiles[@]}"; do link "$f"; done
 
 # Alacritty's alacritty.toml imports a theme from this repo (don't vendor ~190 files).
 # Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).

@@ -17,15 +17,20 @@ as_user 'ZC="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"; \
   git clone --depth=1 https://github.com/romkatv/powerlevel10k "$ZC/themes/powerlevel10k"' \
   || soft_fail "powerlevel10k clone failed"
 
-# Symlink dotfiles from the repo into the target user's home (nested paths too).
-for f in .zshrc .p10k.zsh .gitconfig \
-         .config/alacritty/alacritty.toml \
-         .claude/settings.json .claude/statusline-command.sh; do
+# Install dotfiles from the repo into the target user's home (nested paths too).
+# File set = the shared manifest at the repo root (also read by install.sh, so
+# the two can't drift). GOLDEN_IMAGE or DOTFILES_COPY=1 -> COPY (self-contained)
+# instead of symlinking back to the repo path.
+copy_mode=0
+{ [ "${GOLDEN_IMAGE:-0}" = "1" ] || [ "${DOTFILES_COPY:-0}" = "1" ]; } && copy_mode=1
+mapfile -t dotfiles < <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_ROOT/dotfiles.list")
+
+for f in "${dotfiles[@]}"; do
   src="$DOTFILES_ROOT/$f"
   dst="$TARGET_HOME/$f"
   [ -e "$src" ] || { warn "missing $src — skipping"; continue; }
   if dry; then
-    if [ "${GOLDEN_IMAGE:-0}" = "1" ]; then would "copy $src -> $dst (golden image, self-contained)"; \
+    if [ "$copy_mode" = "1" ]; then would "copy $src -> $dst (self-contained)"; \
     else would "symlink $dst -> $src"; fi
     continue
   fi
@@ -45,9 +50,9 @@ for f in .zshrc .p10k.zsh .gitconfig \
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi
-  if [ "${GOLDEN_IMAGE:-0}" = "1" ]; then
-    $SUDO rm -f "$dst"             # drop any pre-existing symlink before copying
-    $SUDO cp -f "$src" "$dst"      # self-contained image: copy, not a repo-path symlink
+  if [ "$copy_mode" = "1" ]; then
+    $SUDO rm -f "$dst"            # drop any pre-existing symlink before copying
+    $SUDO cp -f "$src" "$dst"     # self-contained: copy, not a repo-path symlink
   else
     $SUDO ln -sfn "$src" "$dst"
   fi

@@ -1,0 +1,17 @@
+# Dotfiles installed into $HOME — the SINGLE SOURCE OF TRUTH for the file set,
+# read by both install.sh and provision/steps/60-shell.sh (so the two can't drift).
+# One repo-relative path per line; it mirrors the same path under $HOME.
+# Blank lines and #-comments are ignored.
+#
+# How they're installed is the caller's choice:
+#   - symlink (default): repo is the source of truth; editing ~/<file> edits the
+#     repo copy. Requires the repo to stay at its path.
+#   - copy / override (DOTFILES_COPY=1, or GOLDEN_IMAGE=1, or install.sh --copy):
+#     self-contained; the repo can be deleted afterwards, but edits no longer
+#     flow back to the repo.
+.zshrc
+.p10k.zsh
+.gitconfig
+.config/alacritty/alacritty.toml
+.claude/settings.json
+.claude/statusline-command.sh
