@@ -126,10 +126,10 @@ else
       # mktemp (unpredictable, 0600) avoids a /tmp symlink/TOCTOU swap of the
       # .deb that apt then installs as root.
       deb="$(mktemp /tmp/bruno.XXXXXX.deb)"
-      curl -fsSL "$url" -o "$deb" && apt_install "$deb"
+      curl -fsSL "$url" -o "$deb" && apt_install "$deb" || soft_fail "Bruno arm64 .deb download failed"
       rm -f "$deb"
     else
-      warn "Could not resolve a Bruno arm64 .deb — skipping."
+      soft_fail "Could not resolve a Bruno arm64 .deb — skipping."
     fi
   fi
 fi
@@ -154,10 +154,10 @@ if [ -n "$CPLAT" ]; then
       # mktemp (unpredictable, 0600) avoids a /tmp symlink/TOCTOU swap of the
       # .deb that apt then installs as root.
       deb="$(mktemp /tmp/cursor.XXXXXX.deb)"
-      curl -fsSL "$curl_url" -o "$deb" && apt_install "$deb"
+      curl -fsSL "$curl_url" -o "$deb" && apt_install "$deb" || soft_fail "Cursor .deb download failed"
       rm -f "$deb"
     else
-      warn "Could not resolve Cursor .deb URL — skipping."
+      soft_fail "Could not resolve Cursor .deb URL — skipping."
     fi
   fi
 fi

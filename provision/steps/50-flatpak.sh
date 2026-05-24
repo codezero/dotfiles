@@ -9,7 +9,7 @@ if dry; then
   would "flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
 else
   $SUDO flatpak remote-add --if-not-exists flathub \
-    https://flathub.org/repo/flathub.flatpakrepo || warn "could not add flathub remote"
+    https://flathub.org/repo/flathub.flatpakrepo || soft_fail "could not add flathub remote"
 fi
 
 # Install any apps listed (none by default).
@@ -17,5 +17,5 @@ while read -r app || [ -n "${app:-}" ]; do
   case "${app:-}" in ""|\#*) continue ;; esac
   if dry; then would "flatpak install flathub $app"; continue; fi
   $SUDO flatpak install -y --noninteractive flathub "$app" \
-    || warn "flatpak: failed to install '$app'"
+    || soft_fail "flatpak: failed to install '$app'"
 done < "$PKG_DIR/flatpak.list"

@@ -57,7 +57,7 @@ done
 if [ "${#pkgs[@]}" -gt 0 ]; then
   if ! apt_get install -y "${pkgs[@]}"; then
     warn "batch install failed — retrying packages individually"
-    for p in "${pkgs[@]}"; do apt_get install -y "$p" || warn "could not install $p"; done
+    for p in "${pkgs[@]}"; do apt_get install -y "$p" || soft_fail "apt: could not install $p"; done
   fi
 fi
 

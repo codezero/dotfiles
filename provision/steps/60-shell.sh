@@ -53,10 +53,12 @@ for f in "${dotfiles[@]}"; do
   if [ "$copy_mode" = "1" ]; then
     $SUDO rm -rf "$dst"           # drop any pre-existing symlink/dir before copying
     $SUDO cp -a "$src" "$dst"     # self-contained copy; -a handles files AND dirs (nvim)
+    # cp -a preserves the repo's ownership, so re-own the WHOLE tree, not just top.
+    $SUDO chown -R "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
   else
     $SUDO ln -sfn "$src" "$dst"   # dir-capable (replaces an existing symlink)
+    $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
   fi
-  $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
 done
 
 # Make zsh the login shell — only if it isn't already, so re-runs are a no-op.

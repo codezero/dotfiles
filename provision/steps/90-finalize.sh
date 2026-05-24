@@ -12,15 +12,27 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 log "GOLDEN IMAGE finalize — stripping identity, caches, logs, history"
 
 if dry; then
-  would "apt-get clean; rm -rf /var/lib/apt/lists/*"
+  would "apt-get autoremove + clean; rm -rf /var/lib/apt/lists/*"
+  would "scrub $TARGET_USER creds: .gnupg/.aws/.config/{gh,gcloud}/.codex/.claude creds+history, .ssh private keys"
   would "truncate /etc/machine-id to empty (regenerated per clone); rm /var/lib/dbus/machine-id"
   would "rm /etc/ssh/ssh_host_* (unique host keys regenerated on first boot)"
   would "cloud-init clean --logs --seed; rm -rf /var/lib/cloud/* (re-runs on clone)"
   would "truncate /var/log/* ; clear systemd journal"
   would "rm root + $TARGET_USER bash/zsh history; clear /tmp and /var/tmp"
 else
+  $SUDO apt-get autoremove -y >/dev/null 2>&1 || true   # before log-clear, so finalize stays last
   $SUDO apt-get clean 2>/dev/null || true
   $SUDO rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+
+  # Scrub the build user's credential/token stores so they aren't baked into the
+  # image (defense-in-depth — the build box should already be pristine). Keeps
+  # ~/.ssh/authorized_keys (login) and .docker/config.json (rootless context).
+  for p in .gnupg .aws .config/gh .config/gcloud .codex \
+           .claude/.credentials.json .claude/projects .claude/sessions \
+           .claude/history.jsonl .claude/shell-snapshots; do
+    $SUDO rm -rf "$TARGET_HOME/$p" 2>/dev/null || true
+  done
+  $SUDO rm -f "$TARGET_HOME"/.ssh/id_* "$TARGET_HOME"/.ssh/known_hosts 2>/dev/null || true
 
   # machine-id MUST stay an EMPTY file so systemd regenerates a unique id per
   # clone on first boot (deleting the file can break boot). dbus id is removed.

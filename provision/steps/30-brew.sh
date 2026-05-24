@@ -30,7 +30,7 @@ else
 
   as_user "eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"; \
            brew update --quiet || true; \
-           brew bundle --file='$FILTERED' || true" \
+           brew bundle --file='$FILTERED'" \
     || soft_fail "brew bundle reported issues"
 
   rm -f "$FILTERED" 2>/dev/null || true

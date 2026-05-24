@@ -71,8 +71,13 @@ for s in "${STEPS[@]}"; do
   fi
 done
 
-log "Tidying apt"
-apt_get autoremove -y >/dev/null 2>&1 || true
+# Normal runs tidy here. In GOLDEN_IMAGE mode the finalize step (90) owns cleanup
+# and must run LAST (it autoremoves + clears logs), so don't rewrite apt/dpkg
+# state after it.
+if [ "${GOLDEN_IMAGE:-0}" != "1" ]; then
+  log "Tidying apt"
+  apt_get autoremove -y >/dev/null 2>&1 || true
+fi
 
 soft_n=0
 if [ -n "${SOFT_FAIL_LOG:-}" ] && [ -f "$SOFT_FAIL_LOG" ]; then
