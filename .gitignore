@@ -1,0 +1,45 @@
+# ──────────────────────────────────────────────────────────────
+# Secrets / credentials — NEVER commit these
+# ──────────────────────────────────────────────────────────────
+*.key
+*.pem
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+id_*
+.netrc
+.npmrc
+.env
+.env.*
+**/*secret*
+**/*credential*
+**/*token*
+
+# SSH / GPG private material
+.ssh/
+.gnupg/
+
+# Claude Code state (may contain API keys / project history)
+.claude/
+
+# Cloud / tool credentials
+.config/gh/hosts.yml
+.aws/
+.config/gcloud/
+
+# ──────────────────────────────────────────────────────────────
+# Generated / cache / noise
+# ──────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
+*.swo
+*~
+.zcompdump*
+*.zwc
+.zsh_history
+.bash_history
+.lesshst
+
+# Local install backups created by install.sh
+*.backup.*
