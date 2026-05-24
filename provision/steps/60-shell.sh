@@ -24,7 +24,11 @@ for f in .zshrc .p10k.zsh .gitconfig \
   src="$DOTFILES_ROOT/$f"
   dst="$TARGET_HOME/$f"
   [ -e "$src" ] || { warn "missing $src — skipping"; continue; }
-  if dry; then would "symlink $dst -> $src"; continue; fi
+  if dry; then
+    if [ "${GOLDEN_IMAGE:-0}" = "1" ]; then would "copy $src -> $dst (golden image, self-contained)"; \
+    else would "symlink $dst -> $src"; fi
+    continue
+  fi
   # Create any parent dirs and make the whole NEW chain user-owned. Everything
   # under $HOME should belong to the user, so re-chowning dirs that already
   # existed is a harmless no-op; this just avoids leaving a root-owned ~/.config
@@ -41,7 +45,12 @@ for f in .zshrc .p10k.zsh .gitconfig \
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi
-  $SUDO ln -sfn "$src" "$dst"
+  if [ "${GOLDEN_IMAGE:-0}" = "1" ]; then
+    $SUDO rm -f "$dst"             # drop any pre-existing symlink before copying
+    $SUDO cp -f "$src" "$dst"      # self-contained image: copy, not a repo-path symlink
+  else
+    $SUDO ln -sfn "$src" "$dst"
+  fi
   $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
 done
 

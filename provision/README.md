@@ -27,7 +27,8 @@ provision/
     ├── 37-claude-code.sh     # Claude Code CLI (native installer, stable; as user)
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     ├── 55-gnome-dconf.sh     # GNOME dconf settings (only with INSTALL_DESKTOP=1)
-    └── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks (as user)
+    ├── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks/copies (as user)
+    └── 90-finalize.sh        # image cleanup: machine-id/ssh-key/log reset (only GOLDEN_IMAGE=1)
 ```
 
 ## Usage
@@ -44,9 +45,53 @@ bash provision.sh --dry-run
 sudo bash provision.sh
 # target a specific user:        sudo PROVISION_USER=alice bash provision.sh
 # also install the desktop set:  sudo INSTALL_DESKTOP=1 bash provision.sh
+# build a reusable golden image: sudo GOLDEN_IMAGE=1 bash provision.sh
 ```
 
 Everything is idempotent — safe to re-run.
+
+## Building a golden image
+
+`GOLDEN_IMAGE=1` turns the provisioner into a strict, self-finalizing image
+builder. It changes three things versus a normal run:
+
+- **Strict** — the first real failure aborts the whole run, so a partial image
+  is never captured. (A normal run is failure-tolerant and merely exits
+  non-zero, recording soft failures.)
+- **Self-contained dotfiles** — step 60 *copies* the dotfiles into `$HOME`
+  instead of symlinking them to the repo, so the image doesn't depend on the
+  repo path surviving.
+- **Finalize (step 90)** — strips machine-specific identity + build cruft:
+  empties `/etc/machine-id` (regenerated uniquely per clone), removes SSH host
+  keys, resets cloud-init state, and clears apt caches, logs, the journal, and
+  shell history.
+
+### Take-path: fresh Ubuntu 26.04 → image
+
+```bash
+# 1. On a throwaway build box, get the repo somewhere temporary (it is NOT
+#    needed at runtime once the dotfiles are copied in).
+git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles/provision
+
+# 2. Preview, then build strictly. PROVISION_USER targets the image's login
+#    user; add INSTALL_DESKTOP=1 for a desktop image.
+sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh --dry-run
+sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh
+
+# 3. (optional) rm -rf /tmp/dotfiles so the repo isn't baked into the image.
+# 4. Power off and capture:
+#      cloud (AWS/GCP/Azure) : create an image/AMI from the stopped instance
+#      Packer                : run provision.sh as the provisioner
+#      local VM              : export/snapshot the disk
+```
+
+Each booted clone regenerates a unique machine-id + SSH host keys and re-runs
+cloud-init on first boot.
+
+> **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
+> and history — only run it on a throwaway build box, never your daily machine.
+> For a *full* image use `provision.sh`; `install.sh` only sets up shell +
+> dotfiles and is for an existing box you don't want to fully provision.
 
 ## Key design points
 

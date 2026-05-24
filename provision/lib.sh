@@ -27,13 +27,23 @@ would() { printf '   \033[2m[would]\033[0m %s\n' "$*"; }
 # Execute a plain command (no pipes/redirects), or just print it in dry-run.
 run()   { if dry; then would "$*"; else "$@"; fi; }
 
+# --- strict / golden-image mode ---------------------------------------------
+# GOLDEN_IMAGE=1 builds a reusable image: it implies STRICT (fail hard on the
+# first real failure instead of warn-and-continue) and turns on the finalize
+# step (90) + self-contained dotfile copies (step 60). STRICT may also be set
+# on its own for a fail-fast run without the image finalize.
+GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"
+STRICT="${STRICT:-$GOLDEN_IMAGE}"
+strict() { [ "$STRICT" = "1" ]; }
+
 # --- soft-failure tracking --------------------------------------------------
 # Tolerant helpers (apt_install, installer steps) call soft_fail on a REAL
-# failure: it warns AND records to $SOFT_FAIL_LOG (set by provision.sh), so a
-# run can finish every step yet still exit non-zero — automation / golden-image
-# builds must not treat a partial install as success.
+# failure. Normally it warns + records to $SOFT_FAIL_LOG so the run finishes
+# every step yet still exits non-zero. Under STRICT it dies on the first failure
+# (so a golden image is never captured from a partial/broken provision).
 SOFT_FAIL_LOG="${SOFT_FAIL_LOG:-}"
 soft_fail() {
+  strict && die "$*"
   warn "$*"
   [ -n "$SOFT_FAIL_LOG" ] && printf '%s\n' "$*" >> "$SOFT_FAIL_LOG" 2>/dev/null || true
 }

@@ -18,7 +18,7 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `provision/` — **canonical** full-machine replication. `provision.sh` is the entrypoint; numbered step scripts in `provision/steps/` (run 10→60), package lists in `provision/packages/`, shared helpers in `provision/lib.sh`. Details in `provision/README.md`.
 
 ## Architecture
-`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 37-claude-code (native installer, stable channel) → 50-flatpak (adds Flathub remote) → 55-gnome-dconf (desktop-only) → 60-shell. There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
+`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 37-claude-code (native installer, stable channel) → 50-flatpak (adds Flathub remote) → 55-gnome-dconf (desktop-only) → 60-shell → 90-finalize (only `GOLDEN_IMAGE=1`). There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
 
 `lib.sh` resolves a non-root `TARGET_USER` because cloud-init runs as root but **Homebrew, oh-my-zsh, rustup, and Claude Code refuse to / shouldn't run as root** — those steps drop to that user via `as_user` (a `sudo -u … bash -lc` login shell). An explicitly-set `PROVISION_USER` **must exist or `lib.sh` dies** (catches a cloud-init typo before provisioning the wrong account; `--dry-run` only warns). Unset, it falls back `SUDO_USER` > uid 1000 > `ubuntu`.
 
@@ -32,6 +32,12 @@ Every mutating action must go through a `lib.sh` helper so `--dry-run` stays acc
 
 ### Ported dotfiles & configs
 Both `install.sh` and step 60 symlink a shared set into `$HOME`: `.zshrc`, `.p10k.zsh`, `.gitconfig`, `.config/alacritty/alacritty.toml`, and `.claude/{settings.json,statusline-command.sh}` (the repo mirrors `$HOME` layout; nested parents are created). The Alacritty theme repo is **cloned, not vendored** (step 36 / install.sh → `~/.config/alacritty/themes`). GNOME settings live in `provision/gnome/dconf-settings.ini`, applied by step 55 via `dconf load` **only when `INSTALL_DESKTOP=1`**. `.gitignore` keeps `.claude/` ignored *except* those two tracked files, and blocks the AI/API token files the config audit surfaced (`**/auth.json`, `**/.credentials.json`, `.claude.json`, `.codex/`, bruno cookies, etc.). Configs with hardcoded `/home/<user>` paths are templated to `$HOME` so they survive a different target username.
+
+### Modes (env flags)
+- `--dry-run`/`-n` — preview only, no changes, no sudo, no network.
+- `INSTALL_DESKTOP=1` — also install the desktop/locale/IME apt set + run the GNOME dconf step (55).
+- `GOLDEN_IMAGE=1` — build a reusable image: implies **STRICT** (first real failure aborts), step 60 **copies** dotfiles instead of symlinking (self-contained), and the **finalize** step (90) resets machine-id / SSH host keys / cloud-init state / logs / history. Destructive — throwaway build box only.
+- Failure handling: tolerant helpers call `soft_fail` → warns + records to `$SOFT_FAIL_LOG`; a normal run completes every step but **exits non-zero** if any soft failure occurred. Under `STRICT`/`GOLDEN_IMAGE`, `soft_fail` and a failing step **die** immediately. `lib.sh` refuses a root/uid-0 `TARGET_USER`.
 
 ## Conventions / gotchas
 - `provision.sh` is cloud-init-ready: root, idempotent, failure-tolerant. `--dry-run` previews with no changes and no sudo.

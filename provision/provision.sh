@@ -7,6 +7,7 @@
 #   sudo bash provision.sh                    # auto-detect the target user
 #   sudo PROVISION_USER=alice bash provision.sh
 #   bash provision.sh --dry-run               # preview only; no changes, no sudo needed
+#   sudo GOLDEN_IMAGE=1 bash provision.sh     # strict build + finalize, ready to snapshot
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
@@ -20,12 +21,13 @@ DRY_RUN=0
 for a in "$@"; do
   case "$a" in
     --dry-run|-n) DRY_RUN=1 ;;
-    -h|--help) echo "usage: [sudo] bash provision.sh [--dry-run|-n]"; exit 0 ;;
+    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
     *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
   esac
 done
 export DRY_RUN
 export INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"   # 1 = also install the desktop/locale/IME set
+export GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"         # 1 = strict build + finalize + self-contained dotfile copies
 
 source "$HERE/lib.sh"
 
@@ -48,6 +50,7 @@ STEPS=(
   50-flatpak.sh
   55-gnome-dconf.sh
   60-shell.sh
+  90-finalize.sh
 )
 
 # Soft-failure log: tolerant helpers (apt_install, installer steps) append real
@@ -59,6 +62,7 @@ failed=()
 for s in "${STEPS[@]}"; do
   echo; log "──────── step: $s ────────"
   if ! bash "$STEPS_DIR/$s"; then
+    strict && die "step '$s' failed (STRICT/GOLDEN_IMAGE — aborting before any image capture)"
     warn "step '$s' exited non-zero — continuing"
     failed+=("$s")
   fi
