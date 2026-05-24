@@ -52,4 +52,12 @@ Both `install.sh` and step 60 install a shared set into `$HOME` — the file set
 - **Never committed** (see `.gitignore`): SSH/GPG keys, `~/.claude/`, cloud creds, shell history. `.gitconfig` ships a placeholder identity — set the real one.
 
 ## Open TODOs
-- [ ] Smoke-test Cursor + Bruno install on a real arm64 box (URL parsing was hardened but not run live).
+- [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor/Bruno `.deb` fetches, and a full `sudo GOLDEN_IMAGE=1 bash provision.sh`.
+- [ ] **Docker rootless user service** — `~/.config/systemd/user/docker.service` (rootless Docker, enabled via `default.target.wants/`) is NOT ported yet; deliberately deferred by the owner. Likely belongs as a provision step running `dockerd-rootless-setuptool.sh install` / `systemctl --user enable` rather than symlinking the generated unit (its `Environment=PATH` hardcodes nvm/cargo paths). Ties into step 20 + the `usermod -aG docker` follow-up.
+- [ ] **Pin VSCodium + Bruno signing keys** — currently verified-but-unpinned (step 20). On a real box, `gpg --show-keys` the downloaded keys and set `VSCODIUM_KEY_FP` / `BRUNO_KEY_FP`. Bruno's key rotates/expires (usebruno#3569), so re-check before pinning.
+
+## Project direction & philosophy
+- **Two entry points, both first-class:** `install.sh` = lightweight shell+dotfiles on an *existing* box; `provision/` = full machine / cloud-init / golden image. They share the dotfile set via `dotfiles.list`.
+- **Bring-to-latest is intentional, not a gap:** brew / `cargo install` / `rustup` / Claude+Cursor stable channels / Bruno latest all float. "Reproducible" here means *re-runnable to the same state* (idempotent), **not** version-pinned. Don't add default version pins — bit-for-bit pinning, if ever wanted, belongs at a future **packer** layer.
+- **The repo's dual role is permanent** (even after a possible future packer + chezmoi split): (1) fresh Ubuntu → clean, cred-free state — no golden image is built from the owner's daily box because it holds creds; (2) a re-runnable "bring-to-latest" layer on top of an existing golden image to keep it current.
+- **No creds/PII ever** — enforced by `.gitignore` + the package-names-only `inventory-export.sh`.
