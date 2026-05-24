@@ -21,6 +21,7 @@ provision/
 └── steps/
     ├── 10-apt.sh             # base apt packages
     ├── 20-apt-third-party.sh # Docker · VSCodium · Bruno · Cursor (official repos)
+    ├── 25-docker-rootless.sh # rootless Docker via setuptool (only DOCKER_ROOTLESS=1)
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
     ├── 36-alacritty.sh       # Alacritty via `cargo install` + theme clone + desktop integration
@@ -174,6 +175,9 @@ cloud-init `write_files` instead of cloning, or (c) pull from a private store
 using the instance's existing cloud IAM/SSM role (no static secret). Logs land
 in `/var/log/provision.log`.
 
-> Heads-up: rootless Docker and anything needing unprivileged user namespaces
-> may not work on hosts that restrict nested userns (the same limitation seen on
-> the source VM). Rootful Docker is installed and works regardless.
+> Heads-up: `DOCKER_ROOTLESS=1` wires up rootless Docker for the user (step 25 —
+> the official setuptool + `loginctl enable-linger` so it survives logout + the
+> `rootless` context). It — and anything needing unprivileged user namespaces —
+> won't work on hosts that restrict nested userns (the same limitation seen on
+> the source VM); there it soft-fails and rootful Docker still works. For
+> rootless you do **not** `usermod -aG docker` (that group is root-equivalent).

@@ -64,8 +64,11 @@ else
 fi
 if [ "$docker_ok" = 1 ]; then
   apt_get update || true
+  # uidmap + docker-ce-rootless-extras + dbus-user-session are the rootless
+  # prerequisites (dbus-user-session is required for `systemctl --user`; step 25
+  # wires it up when DOCKER_ROOTLESS=1).
   apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
-              docker-compose-plugin docker-ce-rootless-extras uidmap
+              docker-compose-plugin docker-ce-rootless-extras uidmap dbus-user-session
 fi
 
 # ── VSCodium (official) ──────────────────────────────────────────────────────

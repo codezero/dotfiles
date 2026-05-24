@@ -8,6 +8,7 @@
 #   sudo PROVISION_USER=alice bash provision.sh
 #   bash provision.sh --dry-run               # preview only; no changes, no sudo needed
 #   sudo GOLDEN_IMAGE=1 bash provision.sh     # strict build + finalize, ready to snapshot
+#   sudo DOCKER_ROOTLESS=1 bash provision.sh  # also set up rootless Docker for the user
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
@@ -21,13 +22,14 @@ DRY_RUN=0
 for a in "$@"; do
   case "$a" in
     --dry-run|-n) DRY_RUN=1 ;;
-    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
+    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] [DOCKER_ROOTLESS=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
     *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
   esac
 done
 export DRY_RUN
 export INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"   # 1 = also install the desktop/locale/IME set
 export GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"         # 1 = strict build + finalize + self-contained dotfile copies
+export DOCKER_ROOTLESS="${DOCKER_ROOTLESS:-0}"   # 1 = set up rootless Docker for the target user (step 25)
 
 source "$HERE/lib.sh"
 
@@ -43,6 +45,7 @@ log "Target user: $TARGET_USER   home: ${TARGET_HOME:-<unknown>}"
 STEPS=(
   10-apt.sh
   20-apt-third-party.sh
+  25-docker-rootless.sh
   30-brew.sh
   35-rust.sh
   36-alacritty.sh
@@ -99,8 +102,13 @@ Manual follow-ups (need an interactive login session):
   • Install a Nerd Font for the prompt glyphs (e.g. MesloLGS NF) and select it
     in your terminal: https://github.com/romkatv/powerlevel10k#fonts
   • Set your real git identity in ~/.gitconfig.
-  • (optional, security trade-off) docker without sudo:
-        sudo usermod -aG docker $TARGET_USER   # 'docker' group == root-equivalent
+  • Docker access for $TARGET_USER — choose ONE:
+      – rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:
+          dockerd-rootless-setuptool.sh install && systemctl --user enable --now docker
+          sudo loginctl enable-linger $TARGET_USER   # survive logout (headless)
+          docker context use rootless
+      – rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
+          sudo usermod -aG docker $TARGET_USER
 EOF
 
 # Every step ran regardless of failures; this only sets the exit code so that

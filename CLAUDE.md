@@ -18,7 +18,7 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `provision/` — **canonical** full-machine replication. `provision.sh` is the entrypoint; numbered step scripts in `provision/steps/` (run 10→60), package lists in `provision/packages/`, shared helpers in `provision/lib.sh`. Details in `provision/README.md`.
 
 ## Architecture
-`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 37-claude-code (native installer, stable channel) → 50-flatpak (adds Flathub remote) → 55-gnome-dconf (desktop-only) → 60-shell → 90-finalize (only `GOLDEN_IMAGE=1`). There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
+`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 25-docker-rootless (only `DOCKER_ROOTLESS=1`) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 37-claude-code (native installer, stable channel) → 50-flatpak (adds Flathub remote) → 55-gnome-dconf (desktop-only) → 60-shell → 90-finalize (only `GOLDEN_IMAGE=1`). There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
 
 `lib.sh` resolves a non-root `TARGET_USER` because cloud-init runs as root but **Homebrew, oh-my-zsh, rustup, and Claude Code refuse to / shouldn't run as root** — those steps drop to that user via `as_user` (a `sudo -u … bash -lc` login shell). An explicitly-set `PROVISION_USER` **must exist or `lib.sh` dies** (catches a cloud-init typo before provisioning the wrong account; `--dry-run` only warns). Unset, it falls back `SUDO_USER` > uid 1000 > `ubuntu`.
 
@@ -38,6 +38,7 @@ Both `install.sh` and step 60 install a shared set into `$HOME` — the file set
 - `INSTALL_DESKTOP=1` — also install the desktop/locale/IME apt set + run the GNOME dconf step (55).
 - `GOLDEN_IMAGE=1` — build a reusable image: implies **STRICT** (first real failure aborts), step 60 **copies** dotfiles instead of symlinking (self-contained), and the **finalize** step (90) resets machine-id / SSH host keys / cloud-init state / logs / history. Destructive — throwaway build box only.
 - `DOTFILES_COPY=1` (or `install.sh --copy`) — copy dotfiles into `$HOME` instead of symlinking, *without* the rest of golden-image mode (`GOLDEN_IMAGE` implies it).
+- `DOCKER_ROOTLESS=1` — set up rootless Docker for `TARGET_USER` (step 25): runs the official `dockerd-rootless-setuptool.sh` as the user, enables linger + the `--user` service, and sets the `rootless` context. Needs the step-20 prereqs (`uidmap`, `docker-ce-rootless-extras`, `dbus-user-session`) and **unprivileged user namespaces** (host-dependent — soft-fails where userns is restricted; rootful Docker still works). Do **not** also `usermod -aG docker` (that's the root-equivalent rootful path).
 - Failure handling: tolerant helpers call `soft_fail` → warns + records to `$SOFT_FAIL_LOG`; a normal run completes every step but **exits non-zero** if any soft failure occurred. Under `STRICT`/`GOLDEN_IMAGE`, `soft_fail` and a failing step **die** immediately. `lib.sh` refuses a root/uid-0 `TARGET_USER`.
 
 ## Conventions / gotchas
@@ -52,8 +53,7 @@ Both `install.sh` and step 60 install a shared set into `$HOME` — the file set
 - **Never committed** (see `.gitignore`): SSH/GPG keys, `~/.claude/`, cloud creds, shell history. `.gitconfig` ships a placeholder identity — set the real one.
 
 ## Open TODOs
-- [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor/Bruno `.deb` fetches, and a full `sudo GOLDEN_IMAGE=1 bash provision.sh`.
-- [ ] **Docker rootless user service** — `~/.config/systemd/user/docker.service` (rootless Docker, enabled via `default.target.wants/`) is NOT ported yet; deliberately deferred by the owner. Likely belongs as a provision step running `dockerd-rootless-setuptool.sh install` / `systemctl --user enable` rather than symlinking the generated unit (its `Environment=PATH` hardcodes nvm/cargo paths). Ties into step 20 + the `usermod -aG docker` follow-up.
+- [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor/Bruno `.deb` fetches, rootless Docker (`DOCKER_ROOTLESS=1` — needs unprivileged userns; the headless setuptool + linger path is the least-exercised), and a full `sudo GOLDEN_IMAGE=1 bash provision.sh`.
 - [ ] **Pin VSCodium + Bruno signing keys** — currently verified-but-unpinned (step 20). On a real box, `gpg --show-keys` the downloaded keys and set `VSCODIUM_KEY_FP` / `BRUNO_KEY_FP`. Bruno's key rotates/expires (usebruno#3569), so re-check before pinning.
 
 ## Project direction & philosophy
