@@ -53,7 +53,7 @@ echo "==> [5/7] CLI tools via brew (nvm, eza, bat, zoxide)"
 brew install nvm eza bat zoxide
 mkdir -p "$HOME/.nvm"   # required by brew's nvm
 
-echo "==> [6/7] Symlink dotfiles into \$HOME"
+echo "==> [6/7] Symlink dotfiles (+ Alacritty theme) into \$HOME"
 link() {
   local name="$1"
   local src="$DOTFILES_DIR/$name"
@@ -75,9 +75,11 @@ link .claude/settings.json
 link .claude/statusline-command.sh
 
 # Alacritty's alacritty.toml imports a theme from this repo (don't vendor ~190 files).
-if [ ! -d "$HOME/.config/alacritty/themes/.git" ]; then
-  git clone --depth=1 https://github.com/alacritty/alacritty-theme \
-    "$HOME/.config/alacritty/themes" 2>/dev/null \
+# Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).
+themes_dir="$HOME/.config/alacritty/themes"
+if [ ! -d "$themes_dir/.git" ]; then
+  rm -rf "$themes_dir"
+  git clone --depth=1 https://github.com/alacritty/alacritty-theme "$themes_dir" 2>/dev/null \
     && echo "    cloned alacritty themes" \
     || echo "    (alacritty theme clone skipped/failed)"
 fi

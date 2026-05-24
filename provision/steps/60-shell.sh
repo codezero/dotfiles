@@ -25,9 +25,19 @@ for f in .zshrc .p10k.zsh .gitconfig \
   dst="$TARGET_HOME/$f"
   [ -e "$src" ] || { warn "missing $src — skipping"; continue; }
   if dry; then would "symlink $dst -> $src"; continue; fi
-  parent="$(dirname "$dst")"
-  $SUDO mkdir -p "$parent"
-  $SUDO chown "$TARGET_USER":"$TARGET_USER" "$parent" 2>/dev/null || true
+  # Create any parent dirs and make the whole NEW chain user-owned. Everything
+  # under $HOME should belong to the user, so re-chowning dirs that already
+  # existed is a harmless no-op; this just avoids leaving a root-owned ~/.config
+  # or ~/.claude behind when mkdir -p has to create them.
+  rel="${f%/*}"
+  if [ "$rel" != "$f" ]; then
+    $SUDO mkdir -p "$TARGET_HOME/$rel"
+    d="$rel"
+    while [ "$d" != "." ] && [ "$d" != "/" ]; do
+      $SUDO chown "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/$d" 2>/dev/null || true
+      d="$(dirname "$d")"
+    done
+  fi
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi

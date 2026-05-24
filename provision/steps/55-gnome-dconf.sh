@@ -14,17 +14,30 @@ FRAG="$PROVISION_DIR/gnome/dconf-settings.ini"
 log "GNOME dconf settings for '$TARGET_USER'"
 command -v dconf >/dev/null 2>&1 || apt_install dconf-cli
 
-# Prefer a throwaway session bus so dconf can persist without a live login.
-LOADER="dconf load /"
-command -v dbus-run-session >/dev/null 2>&1 && LOADER="dbus-run-session -- dconf load /"
+# Bus selection: reuse a LIVE session bus when one exists (a running GNOME
+# session then picks the change up immediately); otherwise spin up a throwaway
+# bus so the load still persists to the user's dconf db when provisioning
+# headlessly (cloud-init / packer). Root reads the fragment; the user's db
+# receives it. (`< "$FRAG"` is evaluated by the current shell, so repo perms for
+# the target user don't matter.)
+uid="$(id -u "$TARGET_USER" 2>/dev/null || true)"
+runtime_bus="/run/user/${uid}/bus"
 
 if dry; then
-  would "(as $TARGET_USER) $LOADER < $FRAG"
+  would "(as $TARGET_USER) dconf load / < $FRAG   (live bus if present, else dbus-run-session)"
 elif [ "$(id -un)" = "$TARGET_USER" ]; then
-  # shellcheck disable=SC2086  # LOADER is an intentional multi-word command
-  $LOADER < "$FRAG" || warn "dconf load failed (need a desktop/session bus?)"
+  if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    dconf load / < "$FRAG" || warn "dconf load failed"
+  elif command -v dbus-run-session >/dev/null 2>&1; then
+    dbus-run-session -- dconf load / < "$FRAG" || warn "dconf load failed"
+  else
+    dconf load / < "$FRAG" || warn "dconf load failed (no session bus)"
+  fi
+elif [ -n "$uid" ] && [ -S "$runtime_bus" ]; then
+  sudo -u "$TARGET_USER" -H env "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime_bus" \
+    dconf load / < "$FRAG" || warn "dconf load failed"
+elif command -v dbus-run-session >/dev/null 2>&1; then
+  sudo -u "$TARGET_USER" -H dbus-run-session -- dconf load / < "$FRAG" || warn "dconf load failed"
 else
-  # Root reads the fragment; the user's dconf db receives it via the session bus.
-  # shellcheck disable=SC2086
-  sudo -u "$TARGET_USER" -H $LOADER < "$FRAG" || warn "dconf load failed (need a desktop/session bus?)"
+  sudo -u "$TARGET_USER" -H dconf load / < "$FRAG" || warn "dconf load failed (no session bus)"
 fi

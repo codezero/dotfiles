@@ -39,6 +39,7 @@ as_user 'set -e; . "$HOME/.cargo/env"; \
 
 # Color themes — alacritty.toml imports one from here. Clone the upstream repo
 # rather than vendoring ~190 theme files into the dotfiles repo.
-as_user 'test -d "$HOME/.config/alacritty/themes/.git" || \
-  git clone --depth=1 https://github.com/alacritty/alacritty-theme "$HOME/.config/alacritty/themes"' \
+# Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).
+as_user 'd="$HOME/.config/alacritty/themes"; \
+  test -d "$d/.git" || { rm -rf "$d"; git clone --depth=1 https://github.com/alacritty/alacritty-theme "$d"; }' \
   || warn "alacritty theme clone failed"
