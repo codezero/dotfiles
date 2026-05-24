@@ -3,6 +3,9 @@
 # ----------------------------------------------------------------------------
 
 # Repo layout: this file lives in <repo>/provision/lib.sh
+# These vars are consumed by the step scripts that SOURCE this file, so shellcheck
+# can't see their use when it lints lib.sh in isolation.
+# shellcheck disable=SC2034
 PROVISION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "$PROVISION_DIR/.." && pwd)"
 PKG_DIR="$PROVISION_DIR/packages"

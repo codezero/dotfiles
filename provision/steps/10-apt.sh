@@ -47,7 +47,7 @@ for p in "${raw[@]}"; do
   p="${p//[[:space:]]/}"            # package names carry no spaces; drop stray whitespace
   [ -z "$p" ] && continue
   if is_denied "$p"; then skipped+=("$p"); continue; fi
-  if is_desktop "$p" && [ "$INSTALL_DESKTOP" != "1" ]; then skipped+=("$p[desktop]"); continue; fi
+  if is_desktop "$p" && [ "$INSTALL_DESKTOP" != "1" ]; then skipped+=("${p}[desktop]"); continue; fi
   pkgs+=("$p")
 done
 [ "${#skipped[@]}" -gt 0 ] && log "skipped (boot/kernel/third-party/desktop): ${skipped[*]}"
