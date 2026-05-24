@@ -14,14 +14,14 @@ provision/
 ├── lib.sh                # shared helpers (logging, target-user, apt, as_user)
 ├── packages/
 │   ├── apt.list          # apt packages (base/desktop/boot excluded)
-│   ├── snap.list         # user-added snaps (baseline Ubuntu snaps excluded)
-│   ├── flatpak.list      # Flathub app IDs (empty — none were installed)
+│   ├── flatpak.list      # Flathub app IDs
 │   └── Brewfile          # Homebrew formulae (the CLI toolchain)
 └── steps/
     ├── 10-apt.sh             # base apt packages
     ├── 20-apt-third-party.sh # Docker · VSCodium · Bruno · Cursor (official repos)
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
-    ├── 40-snap.sh            # snaps
+    ├── 35-rust.sh            # rustup + stable toolchain (as user)
+    ├── 36-alacritty.sh       # Alacritty via `cargo install` + desktop integration
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     └── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks (as user)
 ```
@@ -86,17 +86,16 @@ The committed lists were seeded by inspecting on-disk state and **may not be
 exhaustive** (Homebrew especially). Regenerate them exactly:
 
 ```bash
-bash inventory-export.sh      # writes packages/{apt.list,snap.list,flatpak.list,Brewfile}
+bash inventory-export.sh      # writes packages/{apt.list,flatpak.list,Brewfile}
 ```
 The exporter now self-cleans the **Brewfile** (moves `flatpak` entries into
 `flatpak.list`, strips `npm`/`mas`/`vscode`, warns about Linux-unsupported casks),
 so the duplication doesn't recur on re-export.
 
-`snap.list` still captures the **baseline Ubuntu snaps** (`core*`, `snapd`,
-`gnome-*`, `mesa-*`, `gtk-common-themes`, `firefox`, `thunderbird`, `snap-store`,
-…). Re-installing them is a harmless no-op on a desktop, but you may want to trim
-them so a server target doesn't pull desktop snaps. `apt.list` keeps the full
-`showmanual` set on purpose — step 10 filters it (see above), so you don't have to.
+`apt.list` keeps the full `showmanual` set on purpose — step 10 filters it (see
+above), so you don't have to. **Snaps are not exported or installed**: Alacritty
+— the only user snap — is built from crates.io via cargo in step 36, so the
+machine needs no snapd.
 
 ## cloud-init wiring
 

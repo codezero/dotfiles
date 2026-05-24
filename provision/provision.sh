@@ -9,7 +9,8 @@
 #   bash provision.sh --dry-run               # preview only; no changes, no sudo needed
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
-#               · snaps · Flatpak+Flathub · zsh/oh-my-zsh/p10k + dotfiles symlinks
+#               · Rust (rustup) + Alacritty · Flatpak+Flathub
+#               · zsh/oh-my-zsh/p10k + dotfiles symlinks
 # ============================================================================
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,7 +41,8 @@ STEPS=(
   10-apt.sh
   20-apt-third-party.sh
   30-brew.sh
-  40-snap.sh
+  35-rust.sh
+  36-alacritty.sh
   50-flatpak.sh
   60-shell.sh
 )

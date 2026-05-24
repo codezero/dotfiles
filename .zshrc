@@ -118,6 +118,9 @@ export NVM_DIR="$HOME/.nvm"
   [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
+# Rust toolchain (rustup) — installed per-user under ~/.cargo (provision step 35).
+[ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
 alias ls="eza --icons=always"
 eval "$(zoxide init zsh)"
 alias cat="bat"

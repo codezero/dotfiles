@@ -9,8 +9,8 @@
 #
 # SCOPE: this is the lightweight "shell + dotfiles" bootstrap (zsh, oh-my-zsh,
 # Powerlevel10k, the core brew CLI tools, and the dotfile symlinks). For a FULL
-# machine replication (Docker, VSCodium, Cursor, Bruno, snaps, Flatpak, the whole
-# Brewfile, cloud-init support) use provision/provision.sh instead.
+# machine replication (Docker, VSCodium, Cursor, Bruno, Rust+Alacritty, Flatpak,
+# the whole Brewfile, cloud-init support) use provision/provision.sh instead.
 # ──────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 

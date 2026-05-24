@@ -31,11 +31,9 @@ else
   echo "    apt-mark not found; skipping"
 fi
 
-echo "==> snap: installed snaps"
-if command -v snap >/dev/null 2>&1; then
-  snap list 2>/dev/null | awk 'NR>1 {print $1}' > "$OUT/snap.list"
-  echo "    -> $OUT/snap.list  (review: prune baseline snaps like core*, gnome-*, mesa-*)"
-fi
+# NOTE: snaps are intentionally NOT exported. This machine is provisioned without
+# snap (Alacritty — the only user snap — is built via cargo in step 36). If you
+# ever reintroduce snaps, re-add a `snap list` export here and a snap step.
 
 echo "==> flatpak: installed apps"
 if command -v flatpak >/dev/null 2>&1; then
@@ -67,5 +65,4 @@ else
 fi
 
 echo
-echo "Done. Review packages/ then commit. Note: snap.list will include baseline"
-echo "Ubuntu snaps — trim them so you don't reinstall the default desktop set."
+echo "Done. Review packages/ then commit."

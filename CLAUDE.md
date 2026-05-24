@@ -9,7 +9,7 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, oh-my-zsh, p10k, core brew CLI, symlinks).
 - `bash provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
 - `sudo bash provision.sh` — full machine replication. `sudo PROVISION_USER=alice bash …` targets a user; `sudo INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set.
-- `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,snap.list,flatpak.list,Brewfile}` from live state.
+- `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,flatpak.list,Brewfile}` from live state.
 - Scripts are **not** executable — always invoke with `bash <script>`. Lint with `bash -n <script>` / `shellcheck` if available.
 
 ## Layout
@@ -18,7 +18,7 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `provision/` — **canonical** full-machine replication. `provision.sh` is the entrypoint; numbered step scripts in `provision/steps/` (run 10→60), package lists in `provision/packages/`, shared helpers in `provision/lib.sh`. Details in `provision/README.md`.
 
 ## Architecture
-`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 40-snap → 50-flatpak (adds Flathub remote) → 60-shell.
+`provision.sh` sources `lib.sh`, then runs `steps/*.sh` in numeric order, tolerating per-step failure and printing a summary. Order is load-bearing: 10-apt (base) → 20-apt-third-party (Docker/VSCodium/Bruno/Cursor repos) → 30-brew → 35-rust (rustup) → 36-alacritty (`cargo install` + desktop integration) → 50-flatpak (adds Flathub remote) → 60-shell. There is **no snap step** — Alacritty (the only user snap) is built via cargo, so the machine needs no snapd.
 
 `lib.sh` resolves a non-root `TARGET_USER` (`PROVISION_USER` > `SUDO_USER` > uid 1000 > `ubuntu`) because cloud-init runs as root but **Homebrew and oh-my-zsh refuse to run as root** — those steps drop to that user via `as_user` (a `sudo -u … bash -lc` login shell).
 

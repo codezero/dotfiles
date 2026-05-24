@@ -11,7 +11,7 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 | `.gitconfig` | Git identity — **set your real name/email** |
 | `.gitignore` | Keeps secrets/credentials out of the repo |
 | `install.sh` | Lightweight bootstrap: shell + dotfiles only |
-| `provision/` | Full-machine replication (Docker, editors, snaps, Flatpak, Brewfile); cloud-init ready |
+| `provision/` | Full-machine replication (Docker, editors, Rust+Alacritty, Flatpak, Brewfile); cloud-init ready |
 
 > **Never committed:** SSH/GPG keys, `~/.claude/`, cloud creds, shell history
 > (see `.gitignore`). `.bashrc` is the stock Ubuntu default, so it's omitted.
