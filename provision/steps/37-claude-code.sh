@@ -8,4 +8,4 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 log "Claude Code (native installer, stable channel) for '$TARGET_USER'"
 as_user 'command -v claude >/dev/null 2>&1 || test -x "$HOME/.local/bin/claude" || \
   curl -fsSL https://claude.ai/install.sh | bash -s stable' \
-  || warn "Claude Code install failed"
+  || soft_fail "Claude Code install failed"

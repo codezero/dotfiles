@@ -22,8 +22,20 @@ else
   done
 fi
 DOCK_CN="$CODENAME"
-curl -fsSL "https://download.docker.com/linux/ubuntu/dists/${DOCK_CN}/Release" >/dev/null 2>&1 \
-  || { warn "Docker has no '$CODENAME' repo yet; falling back to 'noble'"; DOCK_CN="noble"; }
+# Fall back to 'noble' ONLY when the repo is confirmed absent (HTTP 404). A
+# network/TLS blip must not silently downgrade a supported release (26.04
+# 'resolute' is published). Skip the probe entirely under --dry-run.
+if dry; then
+  would "probe Docker repo for '$CODENAME' (fall back to 'noble' only on HTTP 404)"
+else
+  dock_status="$(curl -sS -o /dev/null -w '%{http_code}' \
+    "https://download.docker.com/linux/ubuntu/dists/${DOCK_CN}/Release" 2>/dev/null || true)"
+  case "${dock_status:-000}" in
+    200) : ;;
+    404) warn "Docker has no '$CODENAME' repo; falling back to 'noble'"; DOCK_CN="noble" ;;
+    *)   warn "Docker repo probe inconclusive (HTTP ${dock_status:-000}); keeping '$CODENAME'" ;;
+  esac
+fi
 if dry; then
   would "download Docker GPG key -> /etc/apt/keyrings/docker.asc"
   would "add repo: deb [arch=$ARCH] https://download.docker.com/linux/ubuntu $DOCK_CN stable"

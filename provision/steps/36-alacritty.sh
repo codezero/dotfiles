@@ -20,7 +20,7 @@ apt_install cmake pkg-config libfreetype6-dev libfontconfig1-dev \
 # cargo comes from step 35. Source ~/.cargo/env because rustup --no-modify-path
 # means cargo isn't on PATH in a fresh non-login shell yet.
 as_user 'set -e; . "$HOME/.cargo/env"; cargo install alacritty --locked' \
-  || warn "cargo install alacritty failed"
+  || soft_fail "cargo install alacritty failed"
 
 # Desktop integration from the tag matching the installed version (terminfo,
 # .desktop, icon). Best-effort: a failure here warns but never aborts the run.
@@ -42,4 +42,4 @@ as_user 'set -e; . "$HOME/.cargo/env"; \
 # Re-clone if the dir exists but isn't a git checkout (a partial/interrupted clone).
 as_user 'd="$HOME/.config/alacritty/themes"; \
   test -d "$d/.git" || { rm -rf "$d"; git clone --depth=1 https://github.com/alacritty/alacritty-theme "$d"; }' \
-  || warn "alacritty theme clone failed"
+  || soft_fail "alacritty theme clone failed"

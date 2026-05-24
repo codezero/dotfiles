@@ -17,7 +17,7 @@ else
   # Install Homebrew non-interactively if missing.
   as_user 'test -x /home/linuxbrew/.linuxbrew/bin/brew || \
     NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
-    || warn "Homebrew install step failed"
+    || soft_fail "Homebrew install step failed"
 
   # `brew bundle dump` also records flatpak/npm/mas/vscode entries. Keep only the
   # Homebrew-native ones (tap/brew/cask) so bundling can't (a) install flatpaks
@@ -31,7 +31,7 @@ else
   as_user "eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"; \
            brew update --quiet || true; \
            brew bundle --file='$FILTERED' || true" \
-    || warn "brew bundle reported issues"
+    || soft_fail "brew bundle reported issues"
 
   rm -f "$FILTERED" 2>/dev/null || true
 

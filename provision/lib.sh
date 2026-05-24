@@ -27,6 +27,17 @@ would() { printf '   \033[2m[would]\033[0m %s\n' "$*"; }
 # Execute a plain command (no pipes/redirects), or just print it in dry-run.
 run()   { if dry; then would "$*"; else "$@"; fi; }
 
+# --- soft-failure tracking --------------------------------------------------
+# Tolerant helpers (apt_install, installer steps) call soft_fail on a REAL
+# failure: it warns AND records to $SOFT_FAIL_LOG (set by provision.sh), so a
+# run can finish every step yet still exit non-zero — automation / golden-image
+# builds must not treat a partial install as success.
+SOFT_FAIL_LOG="${SOFT_FAIL_LOG:-}"
+soft_fail() {
+  warn "$*"
+  [ -n "$SOFT_FAIL_LOG" ] && printf '%s\n' "$*" >> "$SOFT_FAIL_LOG" 2>/dev/null || true
+}
+
 # --- target user resolution -------------------------------------------------
 # Per-user installs (Homebrew, oh-my-zsh, rustup, Claude Code, dotfiles) can't
 # run as root, and cloud-init runs as root — so those steps drop to this user.
@@ -54,6 +65,17 @@ else
 fi
 TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
 
+# Per-user installs (Homebrew/oh-my-zsh/rustup) must NOT run as root and
+# shouldn't land in /root. Refuse a root/uid-0 target (covers SUDO_USER=root,
+# PROVISION_USER=root, or a uid-1000 that happens to be root). Dry-run only warns.
+if [ "$(id -u "$TARGET_USER" 2>/dev/null || true)" = "0" ]; then
+  if dry; then
+    warn "TARGET_USER '$TARGET_USER' is root (uid 0) — per-user steps would fail; set PROVISION_USER to a normal user"
+  else
+    die "Refusing to target root (uid 0): set PROVISION_USER to a non-root user — Homebrew/oh-my-zsh won't run as root."
+  fi
+fi
+
 # Run a command as the target (non-root) user via a login shell.
 as_user() {
   if dry; then would "(as $TARGET_USER) $*"; return 0; fi
@@ -77,7 +99,7 @@ apt_get() {
     apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
             -o DPkg::Lock::Timeout=600 "$@"
 }
-apt_install() { apt_get install -y "$@" || warn "apt: some of [$*] failed to install"; }
+apt_install() { apt_get install -y "$@" || soft_fail "apt: some of [$*] failed to install"; }
 
 load_brew() {
   [ -x /home/linuxbrew/.linuxbrew/bin/brew ] && \

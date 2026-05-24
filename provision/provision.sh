@@ -50,6 +50,11 @@ STEPS=(
   60-shell.sh
 )
 
+# Soft-failure log: tolerant helpers (apt_install, installer steps) append real
+# failures here so the run finishes every step yet still exits non-zero —
+# automation / golden-image builds must not bake a partial install as success.
+if ! dry; then SOFT_FAIL_LOG="$(mktemp)"; export SOFT_FAIL_LOG; fi
+
 failed=()
 for s in "${STEPS[@]}"; do
   echo; log "──────── step: $s ────────"
@@ -62,13 +67,22 @@ done
 log "Tidying apt"
 apt_get autoremove -y >/dev/null 2>&1 || true
 
+soft_n=0
+if [ -n "${SOFT_FAIL_LOG:-}" ] && [ -f "$SOFT_FAIL_LOG" ]; then
+  soft_n="$(wc -l < "$SOFT_FAIL_LOG" | tr -d ' ')"
+fi
+
 echo
 if dry; then
   log "DRY RUN finished — nothing was changed. Re-run without --dry-run to apply."
-elif [ "${#failed[@]}" -eq 0 ]; then
-  log "✅ Provisioning complete — no step-level failures."
+elif [ "${#failed[@]}" -eq 0 ] && [ "$soft_n" -eq 0 ]; then
+  log "✅ Provisioning complete — no failures."
 else
-  warn "Completed, but these steps had issues: ${failed[*]}"
+  [ "${#failed[@]}" -gt 0 ] && warn "steps that exited non-zero: ${failed[*]}"
+  if [ "$soft_n" -gt 0 ]; then
+    warn "$soft_n soft failure(s) recorded:"
+    sed 's/^/    - /' "$SOFT_FAIL_LOG" >&2
+  fi
 fi
 
 cat <<EOF
@@ -84,3 +98,10 @@ Manual follow-ups (need an interactive login session):
   • (optional, security trade-off) docker without sudo:
         sudo usermod -aG docker $TARGET_USER   # 'docker' group == root-equivalent
 EOF
+
+# Every step ran regardless of failures; this only sets the exit code so that
+# image-build automation can detect a partial/failed provision.
+[ -n "${SOFT_FAIL_LOG:-}" ] && rm -f "$SOFT_FAIL_LOG"
+if ! dry && { [ "${#failed[@]}" -gt 0 ] || [ "${soft_n:-0}" -gt 0 ]; }; then
+  exit 1
+fi

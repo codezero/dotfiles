@@ -9,13 +9,13 @@ log "Shell setup for '$TARGET_USER'"
 # oh-my-zsh (unattended; don't let it run zsh or overwrite our .zshrc).
 as_user 'test -d "$HOME/.oh-my-zsh" || \
   RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended' \
-  || warn "oh-my-zsh install failed"
+  || soft_fail "oh-my-zsh install failed"
 
 # Powerlevel10k theme.
 as_user 'ZC="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"; \
   test -d "$ZC/themes/powerlevel10k" || \
   git clone --depth=1 https://github.com/romkatv/powerlevel10k "$ZC/themes/powerlevel10k"' \
-  || warn "powerlevel10k clone failed"
+  || soft_fail "powerlevel10k clone failed"
 
 # Symlink dotfiles from the repo into the target user's home (nested paths too).
 for f in .zshrc .p10k.zsh .gitconfig \

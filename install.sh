@@ -47,10 +47,11 @@ if [ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
     "$ZSH_CUSTOM/themes/powerlevel10k"
 fi
 
-echo "==> [5/7] CLI tools via brew (nvm, eza, bat, zoxide)"
+echo "==> [5/7] CLI tools via brew (nvm, eza, bat, zoxide, jq)"
 # Installed via brew on purpose: brew's 'bat' binary is named `bat`, so the
 # `alias cat="bat"` in .zshrc works. Ubuntu's apt 'bat' is named `batcat`.
-brew install nvm eza bat zoxide
+# jq is required by the Claude Code statusline script symlinked below.
+brew install nvm eza bat zoxide jq
 mkdir -p "$HOME/.nvm"   # required by brew's nvm
 
 echo "==> [6/7] Symlink dotfiles (+ Alacritty theme) into \$HOME"
