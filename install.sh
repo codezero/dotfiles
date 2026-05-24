@@ -79,10 +79,10 @@ link() {
     echo "    backed up existing $dest"
   fi
   if [ "$DOTFILES_COPY" = "1" ]; then
-    rm -f "$dest"; cp -f "$src" "$dest"
+    rm -rf "$dest"; cp -a "$src" "$dest"   # -a/-rf so files AND dirs (e.g. nvim) work
     echo "    copied  $dest <- $src"
   else
-    ln -sfn "$src" "$dest"
+    ln -sfn "$src" "$dest"                 # dir-capable (replaces an existing symlink)
     echo "    linked  $dest -> $src"
   fi
 }

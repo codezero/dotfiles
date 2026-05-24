@@ -1,6 +1,7 @@
 # Dotfiles installed into $HOME — the SINGLE SOURCE OF TRUTH for the file set,
 # read by both install.sh and provision/steps/60-shell.sh (so the two can't drift).
 # One repo-relative path per line; it mirrors the same path under $HOME.
+# Entries may be files OR directories (a dir is linked/copied whole).
 # Blank lines and #-comments are ignored.
 #
 # How they're installed is the caller's choice:
@@ -13,5 +14,6 @@
 .p10k.zsh
 .gitconfig
 .config/alacritty/alacritty.toml
+.config/nvim
 .claude/settings.json
 .claude/statusline-command.sh

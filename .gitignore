@@ -47,6 +47,10 @@ id_*
 **/installation_id
 **/machineid
 
+# Neovim (LazyVim): track the config tree, but not the plugin lockfile (we track
+# latest, per the bring-to-latest policy) — LazyVim rewrites it through the symlink.
+.config/nvim/lazy-lock.json
+
 # ──────────────────────────────────────────────────────────────
 # Generated / cache / noise
 # ──────────────────────────────────────────────────────────────

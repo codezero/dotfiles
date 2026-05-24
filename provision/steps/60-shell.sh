@@ -51,10 +51,10 @@ for f in "${dotfiles[@]}"; do
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi
   if [ "$copy_mode" = "1" ]; then
-    $SUDO rm -f "$dst"            # drop any pre-existing symlink before copying
-    $SUDO cp -f "$src" "$dst"     # self-contained: copy, not a repo-path symlink
+    $SUDO rm -rf "$dst"           # drop any pre-existing symlink/dir before copying
+    $SUDO cp -a "$src" "$dst"     # self-contained copy; -a handles files AND dirs (nvim)
   else
-    $SUDO ln -sfn "$src" "$dst"
+    $SUDO ln -sfn "$src" "$dst"   # dir-capable (replaces an existing symlink)
   fi
   $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
 done
