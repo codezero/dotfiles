@@ -17,6 +17,7 @@ is_denied() {
     linux-generic*|linux-image-*|linux-headers-*|linux-modules-*|linux-*-hwe-*|linux-hwe-*) return 0 ;;
     docker-ce|docker-ce-cli|docker-ce-rootless-extras|docker-buildx-plugin|docker-compose-plugin|containerd.io|uidmap) return 0 ;;
     codium|cursor|bruno) return 0 ;;
+    flatpak|gnome-software-plugin-flatpak) return 0 ;;   # owned by step 50 (CLI flatpak)
   esac
   return 1
 }
@@ -24,7 +25,7 @@ is_denied() {
 # Desktop / localization / input-method packages (only with INSTALL_DESKTOP=1).
 is_desktop() {
   case "$1" in
-    ubuntu-desktop|ubuntu-desktop-minimal|ubuntu-standard|ubuntu-minimal) return 0 ;;
+    ubuntu-desktop|ubuntu-desktop-minimal|ubuntu-standard|ubuntu-minimal|ubuntu-restricted-addons) return 0 ;;
     language-pack-*|libreoffice-*|hyphen-*|mythes-*|ibus-*|libchewing*|libpinyin*) return 0 ;;
     libm17n*|m17n-db|libmarisa*|libopencc*|libotf1|thunderbird-locale-*|ubuntu-wallpapers) return 0 ;;
   esac

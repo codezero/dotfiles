@@ -26,6 +26,13 @@ if command -v apt-mark >/dev/null 2>&1; then
     apt-mark showmanual | sort -u > "$OUT/apt.list"
   fi
   rm -f "$base"
+  # Also drop Essential:yes / Priority:required packages — always present on any
+  # Ubuntu, so listing them is pure noise (step 10 would just no-op them).
+  ess="$(mktemp)"
+  dpkg-query -W -f='${Package} ${Essential} ${Priority}\n' 2>/dev/null \
+    | awk '$2=="yes" || $3=="required"{print $1}' | sort -u > "$ess"
+  comm -23 "$OUT/apt.list" "$ess" > "$OUT/apt.list.tmp" && mv "$OUT/apt.list.tmp" "$OUT/apt.list"
+  rm -f "$ess"
   echo "    -> $OUT/apt.list  ($(wc -l < "$OUT/apt.list") packages)"
 else
   echo "    apt-mark not found; skipping"

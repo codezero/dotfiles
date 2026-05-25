@@ -4,7 +4,11 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 log "Ensuring Flatpak + Flathub remote"
-apt_install flatpak gnome-software-plugin-flatpak
+apt_install flatpak
+# gnome-software-plugin-flatpak is GUI-only (shows flatpaks in the Software app)
+# and its configure can stall on a live desktop session (AppStream rebuild). We
+# install flatpaks via the CLI below, so it's only needed for a desktop image.
+[ "${INSTALL_DESKTOP:-0}" = "1" ] && apt_install gnome-software-plugin-flatpak
 if dry; then
   would "flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
 else
