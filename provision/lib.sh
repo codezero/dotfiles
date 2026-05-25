@@ -105,9 +105,12 @@ apt_get() {
   if dry; then would "apt-get $*"; return 0; fi
   # DPkg::Lock::Timeout makes apt WAIT for the lock instead of failing — essential
   # on cloud-init first boot where unattended-upgrades often holds it.
+  # </dev/null: detach stdin so a maintainer script / trigger that reads the
+  # terminal gets EOF instead of blocking or stopping the run on a tty (the
+  # job-control "T (stopped)" symptom seen on an interactive run).
   $SUDO env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a NEEDRESTART_SUSPEND=1 \
     apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
-            -o DPkg::Lock::Timeout=600 "$@"
+            -o DPkg::Lock::Timeout=600 "$@" </dev/null
 }
 apt_install() { apt_get install -y "$@" || soft_fail "apt: some of [$*] failed to install"; }
 
