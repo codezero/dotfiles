@@ -2,17 +2,28 @@
 XCURSOR_THEME = "Yaru"
 XCURSOR_SIZE = "24"
 
+[general]
+# Reload on save (live_config_reload) and expose the IPC socket so
+# `alacritty msg` + the CreateNewWindow keybinding below work.
+live_config_reload = true
+ipc_socket = true
+import = [
+  "~/.config/alacritty/themes/themes/catppuccin_mocha.toml"
+]
+
 [window]
 dimensions = { columns = 100, lines = 60 }
+padding = { x = 8, y = 6 }
+dynamic_padding = true
 opacity = 0.9
 blur = true
 
-[terminal.shell]
-program = "/bin/zsh"
-args = ["-l"]
-
 [font]
 size = 12
+normal = { family = "MesloLGS NF", style = "Regular" }
+bold = { family = "MesloLGS NF", style = "Bold" }
+italic = { family = "MesloLGS NF", style = "Italic" }
+bold_italic = { family = "MesloLGS NF", style = "Bold Italic" }
 
 [cursor]
 style = { shape = "Underline", blinking = "On" }
@@ -21,12 +32,63 @@ vi_mode_style = "None"
 [scrolling]
 history = 30000
 
+[selection]
+save_to_clipboard = true
+
+[bell]
+# TUIs ring the bell constantly — make it a no-op.
+duration = 0
+
+[mouse]
+hide_when_typing = true
+
+[terminal]
+# Let apps (nvim, tmux) drive the system clipboard via OSC 52 — the big
+# win for yanking over SSH. Pairs with tmux `allow-passthrough on`.
+osc52 = "CopyPaste"
+
+[terminal.shell]
+program = "/bin/zsh"
+args = ["-l"]
+
+# ── Keybindings ──────────────────────────────────────────────────────────
+# Keep Shift+Enter → ESC+CR so Claude Code (and other REPLs) get a newline.
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"
 chars = "\u001B\r"
 
-[general]
-import = [
-  "~/.config/alacritty/themes/themes/catppuccin_mocha.toml"
-]
+# Alacritty has no tabs; new window / new instance are the closest thing.
+[[keyboard.bindings]]
+key = "N"
+mods = "Control|Shift"
+action = "CreateNewWindow"
+
+[[keyboard.bindings]]
+key = "N"
+mods = "Control|Alt"
+action = "SpawnNewInstance"
+
+[[keyboard.bindings]]
+key = "Space"
+mods = "Control|Shift"
+action = "ToggleViMode"
+
+[[keyboard.bindings]]
+key = "F"
+mods = "Control|Shift"
+action = "SearchForward"
+
+[[keyboard.bindings]]
+key = "B"
+mods = "Control|Shift"
+action = "SearchBackward"
+
+[[keyboard.bindings]]
+key = "K"
+mods = "Control|Shift"
+action = "ClearHistory"
+
+[[keyboard.bindings]]
+key = "F11"
+action = "ToggleFullscreen"

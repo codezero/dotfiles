@@ -13,6 +13,7 @@
 .zshrc
 .p10k.zsh
 .gitconfig
+.tmux.conf
 .config/alacritty/alacritty.toml
 .config/nvim
 .claude/settings.json
