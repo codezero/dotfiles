@@ -61,7 +61,11 @@ else
       "alacritty.fish|/usr/share/fish/vendor_completions.d/alacritty.fish"; do
       src="${pair%%|*}"; dest="${pair##*|}"; t="$(mktemp)"
       if curl -fsSL "$cbase/$src" -o "$t"; then
-        $SUDO mkdir -p "$(dirname "$dest")" && $SUDO cp "$t" "$dest" \
+        # install -m 0644 (NOT cp): the mktemp source is 0600, and cp would carry
+        # that mode into the system dir → root-only, so a normal user's zsh
+        # compinit fails with "permission denied". 0644 = world-readable, like a
+        # packaged completion (and 0644 root-owned is still compaudit-secure).
+        $SUDO mkdir -p "$(dirname "$dest")" && $SUDO install -m 0644 "$t" "$dest" \
           || warn "alacritty completion install failed: $dest"
       else
         warn "alacritty completion fetch failed: $src"
