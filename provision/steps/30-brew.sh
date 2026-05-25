@@ -22,7 +22,11 @@ else
   # then sees a writable prefix and needs no sudo at all.
   if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
     $SUDO mkdir -p /home/linuxbrew
-    $SUDO chown -R "$TARGET_USER":"$TARGET_USER" /home/linuxbrew
+    # Homebrew is single-user by design (docs.brew.sh: "designed for single-user
+    # use, does not work well in multi-user"). The prefix is owned by the
+    # installing user + that user's PRIMARY group, perms 0755 — so only the owner
+    # manages brew, but all users can read/exec the installed binaries. Match it.
+    $SUDO chown -R "$TARGET_USER:$(id -gn "$TARGET_USER")" /home/linuxbrew
   fi
   # Install Homebrew non-interactively if missing.
   as_user 'test -x /home/linuxbrew/.linuxbrew/bin/brew || \
