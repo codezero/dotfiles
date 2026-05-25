@@ -56,6 +56,9 @@ STEPS=(
   90-finalize.sh
 )
 
+# Pause the background apt updaters before any step touches apt (fresh-boot race).
+apt_preflight
+
 # Soft-failure log: tolerant helpers (apt_install, installer steps) append real
 # failures here so the run finishes every step yet still exits non-zero —
 # automation / golden-image builds must not bake a partial install as success.

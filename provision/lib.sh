@@ -127,6 +127,29 @@ verify_keyring() {
   return 0
 }
 
+# Fresh-boot apt preflight. On first boot Ubuntu's apt-daily timers + unattended-
+# upgrades fire and hold the dpkg lock, so our first apt-get blocks and looks
+# frozen (and may fail if the upgrade runs > Lock::Timeout). STOP those units for
+# this run (temporary — `stop` resumes on next boot; we don't disable/mask), then
+# WAIT for any in-flight run to finish via a transient systemd unit ordered After
+# them (the modern way — no brittle lock-file polling). apt_get's
+# DPkg::Lock::Timeout=600 is the final backstop. Verified current for 26.04/APT 3.x.
+apt_preflight() {
+  if dry; then
+    would "pause apt-daily/unattended-upgrades/packagekit units, then wait for any in-flight run"
+    return 0
+  fi
+  log "apt preflight: pausing background updaters for this run (they resume on next boot)"
+  for u in unattended-upgrades.service apt-daily.service apt-daily-upgrade.service \
+           apt-daily.timer apt-daily-upgrade.timer packagekit.service; do
+    $SUDO systemctl stop "$u" 2>/dev/null || true
+  done
+  command -v systemd-run >/dev/null 2>&1 && \
+    $SUDO systemd-run --quiet --collect --wait \
+      --property="After=apt-daily.service apt-daily-upgrade.service unattended-upgrades.service" \
+      /bin/true 2>/dev/null || true
+}
+
 load_brew() {
   [ -x /home/linuxbrew/.linuxbrew/bin/brew ] && \
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
