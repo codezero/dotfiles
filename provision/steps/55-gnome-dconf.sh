@@ -27,17 +27,17 @@ if dry; then
   would "(as $TARGET_USER) dconf load / < $FRAG   (live bus if present, else dbus-run-session)"
 elif [ "$(id -un)" = "$TARGET_USER" ]; then
   if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-    dconf load / < "$FRAG" || warn "dconf load failed"
+    dconf load / < "$FRAG" || soft_fail "dconf load failed"
   elif command -v dbus-run-session >/dev/null 2>&1; then
-    dbus-run-session -- dconf load / < "$FRAG" || warn "dconf load failed"
+    dbus-run-session -- dconf load / < "$FRAG" || soft_fail "dconf load failed"
   else
-    dconf load / < "$FRAG" || warn "dconf load failed (no session bus)"
+    dconf load / < "$FRAG" || soft_fail "dconf load failed (no session bus)"
   fi
 elif [ -n "$uid" ] && [ -S "$runtime_bus" ]; then
   sudo -u "$TARGET_USER" -H env "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime_bus" \
-    dconf load / < "$FRAG" || warn "dconf load failed"
+    dconf load / < "$FRAG" || soft_fail "dconf load failed"
 elif command -v dbus-run-session >/dev/null 2>&1; then
-  sudo -u "$TARGET_USER" -H dbus-run-session -- dconf load / < "$FRAG" || warn "dconf load failed"
+  sudo -u "$TARGET_USER" -H dbus-run-session -- dconf load / < "$FRAG" || soft_fail "dconf load failed"
 else
-  sudo -u "$TARGET_USER" -H dconf load / < "$FRAG" || warn "dconf load failed (no session bus)"
+  sudo -u "$TARGET_USER" -H dconf load / < "$FRAG" || soft_fail "dconf load failed (no session bus)"
 fi

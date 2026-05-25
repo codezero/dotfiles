@@ -166,10 +166,16 @@ machine needs no snapd.
 ```yaml
 #cloud-config
 package_update: true
+packages: [git]          # ensure git exists before the clone (don't assume it)
 runcmd:
-  - [ bash, -lc, "git clone https://github.com/<you>/dotfiles /opt/dotfiles && chmod -R a+rX /opt/dotfiles" ]
-  - [ bash, -lc, "PROVISION_USER=ubuntu bash /opt/dotfiles/provision/provision.sh 2>&1 | tee /var/log/provision.log" ]
+  # Pin a TAG or COMMIT for image builds — never run a mutable branch as root.
+  - [ bash, -lc, "git clone --branch <tag-or-commit> --depth=1 https://github.com/<you>/dotfiles /opt/dotfiles && chmod -R a+rX /opt/dotfiles" ]
+  # `set -o pipefail` so a provision failure isn't masked by tee's exit 0.
+  - [ bash, -lc, "set -o pipefail; PROVISION_USER=ubuntu bash /opt/dotfiles/provision/provision.sh 2>&1 | tee /var/log/provision.log" ]
 ```
+
+For reproducible images, pin the clone to a reviewed tag/commit (above) rather
+than the default branch, and verify it (signed tag / known SHA) before running.
 
 **Private repo + "no credentials":** don't bake a token into cloud-init.
 Either (a) make the dotfiles repo **public**, or (b) ship the files via

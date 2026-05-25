@@ -91,6 +91,14 @@ if [ "${GOLDEN_IMAGE:-0}" != "1" ]; then
   apt_get autoremove -y >/dev/null 2>&1 || true
 fi
 
+# GOLDEN: finalize (step 90) is the LAST guest-side action — it wiped logs,
+# history, and tmp. Print/write NOTHING after it (the summary + per-clone manual
+# follow-ups below could otherwise be captured into the image). A golden run is
+# STRICT, so any failure already aborted; reaching here means success.
+if [ "${GOLDEN_IMAGE:-0}" = "1" ] && ! dry; then
+  exit 0
+fi
+
 soft_n=0
 if [ -n "${SOFT_FAIL_LOG:-}" ] && [ -f "$SOFT_FAIL_LOG" ]; then
   soft_n="$(wc -l < "$SOFT_FAIL_LOG" | tr -d ' ')"

@@ -33,7 +33,11 @@ run()   { if dry; then would "$*"; else "$@"; fi; }
 # step (90) + self-contained dotfile copies (step 60). STRICT may also be set
 # on its own for a fail-fast run without the image finalize.
 GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"
-STRICT="${STRICT:-$GOLDEN_IMAGE}"
+# GOLDEN_IMAGE HARD-forces STRICT — never let an explicit STRICT=0 weaken a
+# golden build (a soft failure must abort before an image is ever captured).
+# STRICT may still be set on its own for a fail-fast run without the finalize.
+STRICT="${STRICT:-0}"
+[ "$GOLDEN_IMAGE" = "1" ] && STRICT=1
 strict() { [ "$STRICT" = "1" ]; }
 
 # --- soft-failure tracking --------------------------------------------------

@@ -25,6 +25,14 @@ copy_mode=0
 { [ "${GOLDEN_IMAGE:-0}" = "1" ] || [ "${DOTFILES_COPY:-0}" = "1" ]; } && copy_mode=1
 mapfile -t dotfiles < <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_ROOT/dotfiles.list")
 
+# True if src and dst already hold identical content (file OR whole dir tree).
+# Lets copy-mode reruns skip the backup + re-copy of unchanged dotfiles instead
+# of churning out a fresh $dst.backup.<ts> every time.
+unchanged() {
+  if [ -d "$1" ]; then diff -rq "$1" "$2" >/dev/null 2>&1
+  else cmp -s "$1" "$2"; fi
+}
+
 for f in "${dotfiles[@]}"; do
   # Reject unsafe manifest entries before any root-backed mkdir/cp/chown/symlink.
   case "$f" in ""|/*|*..*) warn "skip unsafe dotfiles.list entry: '$f'"; continue ;; esac
@@ -50,15 +58,21 @@ for f in "${dotfiles[@]}"; do
     done
   fi
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
+    # Existing REAL file/dir. If it already matches what we install (a previous
+    # copy-mode run), leave it — no backup, no re-copy. Only a genuinely
+    # DIFFERENT pre-existing file gets backed up (once per content change).
+    if unchanged "$src" "$dst"; then continue; fi
     $SUDO mv "$dst" "$dst.backup.$(date +%s)"
   fi
   if [ "$copy_mode" = "1" ]; then
     $SUDO rm -rf "$dst"           # drop any pre-existing symlink/dir before copying
-    $SUDO cp -a "$src" "$dst"     # self-contained copy; -a handles files AND dirs (nvim)
+    # -a handles files AND dirs (nvim). soft_fail => STRICT/golden aborts rather
+    # than capturing an image with a dotfile silently missing.
+    $SUDO cp -a "$src" "$dst" || { soft_fail "dotfile copy failed: $f"; continue; }
     # cp -a preserves the repo's ownership, so re-own the WHOLE tree, not just top.
     $SUDO chown -R "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
   else
-    $SUDO ln -sfn "$src" "$dst"   # dir-capable (replaces an existing symlink)
+    $SUDO ln -sfn "$src" "$dst" || { soft_fail "dotfile symlink failed: $f"; continue; }
     $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
   fi
 done

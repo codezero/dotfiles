@@ -30,6 +30,7 @@ id_*
 .config/gh/hosts.yml
 .aws/
 .config/gcloud/
+.kube/
 
 # AI / API tool auth + state (live OAuth tokens, account info, history)
 **/auth.json

@@ -11,7 +11,9 @@ apt_install curl   # the rustup installer fetches over curl — ensure it, don't
 # Install rustup + the stable toolchain if cargo isn't already present.
 # --no-modify-path: .zshrc owns PATH (it sources ~/.cargo/env), so don't let
 # rustup edit untracked profile files (~/.profile, ~/.zshenv).
-as_user 'test -x "$HOME/.cargo/bin/cargo" || command -v cargo >/dev/null 2>&1 || \
+# Gate on the RUSTUP-managed cargo specifically (~/.cargo/bin/cargo) — a stray
+# distro/apt `cargo` on PATH must NOT make us skip the rustup install we want.
+as_user 'test -x "$HOME/.cargo/bin/cargo" || \
   curl --proto "=https" --tlsv1.2 -fsSL https://sh.rustup.rs \
     | sh -s -- -y --no-modify-path --default-toolchain stable' \
   || soft_fail "rustup install failed"

@@ -43,9 +43,11 @@ duration = 0
 hide_when_typing = true
 
 [terminal]
-# Let apps (nvim, tmux) drive the system clipboard via OSC 52 — the big
-# win for yanking over SSH. Pairs with tmux `allow-passthrough on`.
-osc52 = "CopyPaste"
+# Let apps (nvim, tmux) WRITE the system clipboard via OSC 52 — the big win for
+# yanking over SSH. "OnlyCopy" (not "CopyPaste") deliberately refuses OSC 52
+# clipboard *reads*, so a program/remote host can't exfiltrate your clipboard by
+# emitting a read query. Pairs with tmux `allow-passthrough on`.
+osc52 = "OnlyCopy"
 
 [terminal.shell]
 program = "/bin/zsh"

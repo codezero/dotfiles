@@ -60,7 +60,7 @@ else
   fi
 fi
 if [ "$docker_ok" = 1 ]; then
-  apt_get update || true
+  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
   # uidmap + docker-ce-rootless-extras + dbus-user-session are the rootless
   # prerequisites (dbus-user-session is required for `systemctl --user`; step 25
   # wires it up when DOCKER_ROOTLESS=1).
@@ -88,7 +88,7 @@ else
   fi
 fi
 if [ "$vscodium_ok" = 1 ]; then
-  apt_get update || true
+  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
   apt_install codium
 fi
 
@@ -120,6 +120,6 @@ elif [ "$cursor_ok" = 1 ]; then
   fi
 fi
 if [ "$cursor_ok" = 1 ]; then
-  apt_get update || true
+  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
   apt_install cursor
 fi

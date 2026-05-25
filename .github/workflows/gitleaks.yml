@@ -3,6 +3,10 @@ on:
   push:
   pull_request:
 
+# Least privilege for GITHUB_TOKEN — the scan only needs to read the repo.
+permissions:
+  contents: read
+
 jobs:
   scan:
     runs-on: ubuntu-latest

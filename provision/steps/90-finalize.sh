@@ -13,8 +13,9 @@ log "GOLDEN IMAGE finalize — stripping identity, credentials, caches, logs, hi
 
 # Credential/token stores scrubbed from BOTH the target user and root — never
 # needed in a shared image (reconfigure per-clone; cloud-init re-injects SSH).
-# NOTE: .docker/config.json is intentionally kept (rootless context; auths are
-# empty on a pristine build box — don't `docker login` on the builder).
+# NOTE: .docker/config.json is KEPT but credential-SCRUBBED below — its
+# currentContext pointer is useful (rootless), but any auths/credHelpers a stray
+# `docker login` wrote are stripped so they can't bake into a shared image.
 CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .codex \
   .claude/.credentials.json .claude/projects .claude/sessions \
   .claude/history.jsonl .claude/shell-snapshots)
@@ -23,10 +24,12 @@ if dry; then
   would "apt-get autoremove + clean; rm -rf /var/lib/apt/lists/*"
   would "rm -rf ~/.cargo/registry/{cache,src} for $TARGET_USER + root (re-downloadable crate cache)"
   would "scrub creds from $TARGET_USER + root: ${CRED_PATHS[*]}"
-  would "rm SSH private keys + known_hosts (+ authorized_keys if cloud-init re-injects)"
+  would "scrub auths/credHelpers from ~/.docker/config.json (keep currentContext; rm file if unscrubbable)"
+  would "rm ALL private keys in ~/.ssh (id_* + any file containing 'PRIVATE KEY') + known_hosts (+ authorized_keys if cloud-init re-injects)"
   would "truncate /etc/machine-id; rm /var/lib/dbus/machine-id; rm /etc/ssh/ssh_host_*"
   would "cloud-init clean --logs --seed; rm -rf /var/lib/cloud/*"
   would "LAST: truncate /var/log/* + journal, rm shell history, clear /tmp & /var/tmp (incl. hidden)"
+  would "verify (STRICT): machine-id empty, no host keys, no cred dirs / private keys remain — else die"
   exit 0
 fi
 
@@ -51,7 +54,27 @@ for home in "$TARGET_HOME" /root; do
   # cloud-init is present (it re-injects from instance metadata on first boot);
   # otherwise keep it so a non-cloud image isn't locked out.
   $SUDO rm -f "$home"/.ssh/id_* "$home"/.ssh/known_hosts 2>/dev/null || true
+  # Catch CUSTOM-named private keys too (not just id_*): any ~/.ssh file whose
+  # contents declare a private key. -I skips binaries; -maxdepth 1 stays shallow.
+  [ -d "$home/.ssh" ] && $SUDO find "$home/.ssh" -maxdepth 1 -type f \
+    -exec grep -qI 'PRIVATE KEY' {} \; -delete 2>/dev/null || true
   command -v cloud-init >/dev/null 2>&1 && $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
+done
+
+# Docker: strip registry creds a stray `docker login` may have written, but KEEP
+# the rest (e.g. currentContext for rootless). If we can't scrub it cleanly, drop
+# the file outright — never bake auths into a shared image.
+for home in "$TARGET_HOME" /root; do
+  [ -n "$home" ] || continue
+  dc="$home/.docker/config.json"
+  [ -f "$dc" ] || continue
+  if command -v jq >/dev/null 2>&1 \
+     && $SUDO sh -c 'jq "del(.auths,.credsStore,.credHelpers,.HttpHeaders)" "$1" >"$1.tmp"' _ "$dc" 2>/dev/null; then
+    $SUDO mv "$dc.tmp" "$dc"
+    [ "$home" = "$TARGET_HOME" ] && $SUDO chown "$TARGET_USER":"$TARGET_USER" "$dc" 2>/dev/null || true
+  else
+    $SUDO rm -f "$dc" "$dc.tmp" 2>/dev/null || true
+  fi
 done
 
 # machine-id stays an EMPTY file (systemd regenerates a unique id per clone;
@@ -75,3 +98,20 @@ for home in /root "$TARGET_HOME"; do
   [ -n "$home" ] && $SUDO rm -f "$home/.bash_history" "$home/.zsh_history" 2>/dev/null || true
 done
 $SUDO find /tmp /var/tmp -mindepth 1 -delete 2>/dev/null || true
+
+# Verify the image is actually clean. All the cleanup above is best-effort
+# (|| true) so one failure can't wedge the wipe — but under STRICT/golden a
+# residue is unacceptable, so FAIL HARD here rather than capture a dirty image.
+if strict; then
+  probs=()
+  [ -s /etc/machine-id ] && probs+=("/etc/machine-id not empty")
+  ls /etc/ssh/ssh_host_* >/dev/null 2>&1 && probs+=("/etc/ssh host keys present")
+  for home in "$TARGET_HOME" /root; do
+    [ -n "$home" ] || continue
+    for p in .aws .gnupg .kube .config/gh .config/gcloud .npmrc; do
+      [ -e "$home/$p" ] && probs+=("$home/$p remains")
+    done
+    ls "$home"/.ssh/id_* >/dev/null 2>&1 && probs+=("$home/.ssh private keys remain")
+  done
+  [ "${#probs[@]}" -eq 0 ] || die "finalize verification FAILED — image not clean: ${probs[*]}"
+fi

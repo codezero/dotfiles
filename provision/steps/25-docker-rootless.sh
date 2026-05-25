@@ -53,6 +53,12 @@ as_user "export XDG_RUNTIME_DIR=/run/user/$uid; \
 as_user "export XDG_RUNTIME_DIR=/run/user/$uid; systemctl --user is-active --quiet docker" \
   || soft_fail "rootless Docker service not active after setup (unprivileged userns restricted?)"
 
+# Validate the CLI default context is actually 'rootless' (the `context use`
+# above is best-effort) — otherwise `docker` would silently talk to the rootful
+# daemon and the rootless setup would be a no-op from the user's POV.
+as_user "export XDG_RUNTIME_DIR=/run/user/$uid; [ \"\$(docker context show 2>/dev/null)\" = rootless ]" \
+  || soft_fail "docker context is not 'rootless' after setup (CLI would default to the rootful daemon)"
+
 log "Rootless Docker configured (socket unix:///run/user/$uid/docker.sock)."
 log "System (rootful) Docker is left installed but unused; to remove it:"
 log "  sudo systemctl disable --now docker.service docker.socket"

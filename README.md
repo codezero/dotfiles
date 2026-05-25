@@ -37,8 +37,12 @@ bash install.sh        # not chmod +x in the repo, so invoke with bash
 exec zsh
 ```
 
-Installs zsh + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then symlinks
-`.zshrc`/`.p10k.zsh`/`.gitconfig` into `$HOME` (existing files are backed up). Idempotent.
+Installs zsh + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
+the dotfiles listed in `dotfiles.list` into `$HOME` — `.zshrc`, `.p10k.zsh`,
+`.gitconfig`, `.tmux.conf`, `.config/alacritty/alacritty.toml` (+ theme clone),
+`.config/nvim/` (LazyVim) and the tracked `.claude/` configs — symlinked by
+default (`--copy` to copy instead), plus the MesloLGS NF Nerd Font. Existing
+files are backed up. Idempotent.
 
 ## What `.zshrc` needs (install.sh handles all of it)
 

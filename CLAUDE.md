@@ -7,8 +7,8 @@ Everything here is Bash + config files — there is no build system, test suite,
 
 ## Commands
 - `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, oh-my-zsh, p10k, core brew CLI, symlinks).
-- `bash provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
-- `sudo bash provision.sh` — full machine replication. `sudo PROVISION_USER=alice bash …` targets a user; `sudo INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set.
+- `bash provision/provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
+- `sudo bash provision/provision.sh` — full machine replication. `sudo PROVISION_USER=alice bash …` targets a user; `sudo INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set.
 - `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,flatpak.list,Brewfile}` from live state.
 - Scripts are **not** executable — always invoke with `bash <script>`. Lint with `bash -n <script>` / `shellcheck` if available.
 
@@ -53,7 +53,7 @@ Both `install.sh` and step 60 install a shared set into `$HOME` — the file set
 - **Secret scanning** (defense-in-depth beyond the filename-based `.gitignore`): `gitleaks` (in the Brewfile) scans content. A versioned pre-commit hook lives in `.githooks/` — enable per clone with `git config core.hooksPath .githooks`. CI runs `.github/workflows/gitleaks.yml` on push/PR. `.gitleaks.toml` allowlists the pinned public key fingerprints (Docker/Cursor/VSCodium). The hook prefers `gitleaks git --staged`; CI scans full history.
 
 ## Open TODOs
-- [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor signed-repo install, rootless Docker (`DOCKER_ROOTLESS=1` — needs unprivileged userns; the headless setuptool + linger path is the least-exercised), and a full `sudo GOLDEN_IMAGE=1 bash provision.sh`.
+- [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor signed-repo install, rootless Docker (`DOCKER_ROOTLESS=1` — needs unprivileged userns; the headless setuptool + linger path is the least-exercised), the vendored MesloLGS NF font copy + `fc-cache` (step 36 → `/usr/local/share/fonts`, `install.sh` → `~/.local/share/fonts`), the Alacritty shell-completions fetch (step 36 — needs the `alacritty --version` probe + GitHub `extra/completions` for that tag), the cargo-registry-cache prune (step 90), and a full `sudo GOLDEN_IMAGE=1 bash provision/provision.sh`.
 
 ## Project direction & philosophy
 - **Two entry points, both first-class:** `install.sh` = lightweight shell+dotfiles on an *existing* box; `provision/` = full machine / cloud-init / golden image. They share the dotfile set via `dotfiles.list`.

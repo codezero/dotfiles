@@ -30,6 +30,10 @@ terms for this public repo.
 
 ## Provenance (sha256)
 
+These hashes ARE the pin — the exact vendored bytes, with no fetch at build time.
+If you ever re-fetch these from upstream, also record the source
+`romkatv/powerlevel10k-media` commit/release here.
+
 ```
 d97946186e97f8d7c0139e8983abf40a1d2d086924f2c5dbf1c29bd8f2c6e57d  MesloLGS NF Regular.ttf
 b6c0199cf7c7483c8343ea020658925e6de0aeb318b89908152fcb4d19226003  MesloLGS NF Bold.ttf

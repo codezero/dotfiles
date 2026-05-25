@@ -6,8 +6,16 @@
 # gitleaks comes from the Brewfile (brew install gitleaks).
 set -euo pipefail
 
+# Best-effort by design: if gitleaks is absent we SKIP (and say so loudly) rather
+# than block — the CI workflow scans full history on every push/PR, so it's the
+# authoritative gate. Set GITLEAKS_PRECOMMIT_STRICT=1 to fail closed locally.
 if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "[pre-commit] gitleaks not installed — skipping secret scan (brew install gitleaks)" >&2
+  msg="[pre-commit] gitleaks not installed — local secret scan SKIPPED (brew install gitleaks). CI still scans on push/PR."
+  if [ "${GITLEAKS_PRECOMMIT_STRICT:-0}" = "1" ]; then
+    echo "$msg Refusing to commit (GITLEAKS_PRECOMMIT_STRICT=1)." >&2
+    exit 1
+  fi
+  echo "$msg" >&2
   exit 0
 fi
 

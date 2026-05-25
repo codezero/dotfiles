@@ -68,6 +68,9 @@ brew install nvm eza bat zoxide jq
 mkdir -p "$HOME/.nvm"   # required by brew's nvm
 
 echo "==> [6/7] Install dotfiles (+ Alacritty theme) into \$HOME ($([ "$DOTFILES_COPY" = 1 ] && echo copy || echo symlink) mode)"
+unchanged() {  # identical content? (file or dir tree) — avoids --copy backup churn
+  if [ -d "$1" ]; then diff -rq "$1" "$2" >/dev/null 2>&1; else cmp -s "$1" "$2"; fi
+}
 link() {
   local name="$1"
   case "$name" in ""|/*|*..*) echo "    skip (unsafe dotfiles.list entry): $name"; return ;; esac
@@ -76,6 +79,9 @@ link() {
   [ -e "$src" ] || { echo "    skip (missing in repo): $name"; return; }
   mkdir -p "$(dirname "$dest")"
   if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+    # Already-identical real file/dir (e.g. a previous --copy run)? Leave it —
+    # don't churn out a fresh .backup.<ts> on every rerun.
+    if unchanged "$src" "$dest"; then return; fi
     mv "$dest" "$dest.backup.$(date +%s)"
     echo "    backed up existing $dest"
   fi

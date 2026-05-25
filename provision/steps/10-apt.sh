@@ -34,7 +34,9 @@ is_desktop() {
 }
 
 log "apt update"
-apt_get update || warn "apt-get update reported issues"
+# soft_fail (not bare warn): a stale index would install wrong/old packages, so
+# under STRICT/golden this aborts; a normal run records it and continues.
+apt_get update || soft_fail "apt-get update failed"
 
 # Pre-accept the msttcorefonts EULA (harmless if the package isn't pulled in).
 if ! dry; then
