@@ -10,10 +10,20 @@ apt_install build-essential procps curl file git
 if dry; then
   n="$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$PKG_DIR/Brewfile" 2>/dev/null || true)"
   n="${n:-0}"
+  would "pre-create /home/linuxbrew owned by $TARGET_USER (so the non-root brew installer needs no sudo)"
   would "install Homebrew (if missing) as $TARGET_USER"
   would "brew bundle: $n formulae/casks from Brewfile (flatpak/npm/mas/vscode lines ignored)"
   as_user 'mkdir -p "$HOME/.nvm"'
 else
+  # Homebrew won't run as root, but its FIRST install needs root to create
+  # /home/linuxbrew (which lives in root-owned /home). Run as the non-root user,
+  # the installer's sudo check fails with "insufficient permissions". Fix: we're
+  # root here, so pre-create the prefix owned by the target user — the installer
+  # then sees a writable prefix and needs no sudo at all.
+  if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    $SUDO mkdir -p /home/linuxbrew
+    $SUDO chown -R "$TARGET_USER":"$TARGET_USER" /home/linuxbrew
+  fi
   # Install Homebrew non-interactively if missing.
   as_user 'test -x /home/linuxbrew/.linuxbrew/bin/brew || \
     NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
