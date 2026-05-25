@@ -21,6 +21,7 @@ CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .codex \
 
 if dry; then
   would "apt-get autoremove + clean; rm -rf /var/lib/apt/lists/*"
+  would "rm -rf ~/.cargo/registry/{cache,src} for $TARGET_USER + root (re-downloadable crate cache)"
   would "scrub creds from $TARGET_USER + root: ${CRED_PATHS[*]}"
   would "rm SSH private keys + known_hosts (+ authorized_keys if cloud-init re-injects)"
   would "truncate /etc/machine-id; rm /var/lib/dbus/machine-id; rm /etc/ssh/ssh_host_*"
@@ -32,6 +33,15 @@ fi
 $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
 $SUDO apt-get clean 2>/dev/null || true
 $SUDO rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+
+# Cargo download cache (~/.cargo/registry/{cache,src}) — re-downloadable crate
+# tarballs + extracted sources left by `cargo install` in step 36. Drop them from
+# the image; the toolchain (~/.rustup, ~/.cargo/bin) stays. Keep registry/index
+# so a later `cargo install` doesn't re-fetch the whole index.
+for home in "$TARGET_HOME" /root; do
+  [ -n "$home" ] || continue
+  $SUDO rm -rf "$home/.cargo/registry/cache" "$home/.cargo/registry/src" 2>/dev/null || true
+done
 
 # Scrub credential stores from the target user AND root.
 for home in "$TARGET_HOME" /root; do
