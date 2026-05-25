@@ -78,6 +78,7 @@ if dry; then
 else
   if wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
        | gpg --dearmor 2>/dev/null | $SUDO dd of="$VSCODIUM_KR" status=none 2>/dev/null \
+     && $SUDO chmod a+r "$VSCODIUM_KR" \
      && verify_keyring "$VSCODIUM_KR" "$VSCODIUM_KEY_FP"; then
     echo "deb [arch=amd64,arm64 signed-by=$VSCODIUM_KR] https://download.vscodium.com/debs vscodium main" \
       | $SUDO tee /etc/apt/sources.list.d/vscodium.list >/dev/null
@@ -110,6 +111,7 @@ if [ "$cursor_ok" = 1 ] && dry; then
 elif [ "$cursor_ok" = 1 ]; then
   if curl -fsSL https://downloads.cursor.com/keys/anysphere.asc \
        | gpg --dearmor 2>/dev/null | $SUDO tee "$CURSOR_KR" >/dev/null \
+     && $SUDO chmod a+r "$CURSOR_KR" \
      && verify_keyring "$CURSOR_KR" "$CURSOR_FP"; then
     printf 'Types: deb\nURIs: https://downloads.cursor.com/aptrepo\nSuites: stable\nComponents: main\nArchitectures: amd64,arm64\nSigned-By: %s\n' \
       "$CURSOR_KR" | $SUDO tee /etc/apt/sources.list.d/cursor.sources >/dev/null

@@ -11,6 +11,17 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 log "GOLDEN IMAGE finalize — stripping identity, credentials, caches, logs, history"
 
+# Will cloud-init actually re-inject SSH keys on the clone? Require it INSTALLED
+# and ENABLED and not explicitly disabled — "merely installed" isn't enough (a
+# disabled / masked / no-datasource cloud-init never re-adds keys, so dropping
+# authorized_keys would lock the image out). Unsure => return false => keep keys.
+cloud_init_reinjects() {
+  command -v cloud-init >/dev/null 2>&1 || return 1
+  [ -e /etc/cloud/cloud-init.disabled ] && return 1
+  systemctl is-enabled --quiet cloud-init.service 2>/dev/null \
+    || systemctl is-enabled --quiet cloud-init.target 2>/dev/null
+}
+
 # Credential/token stores scrubbed from BOTH the target user and root — never
 # needed in a shared image (reconfigure per-clone; cloud-init re-injects SSH).
 # NOTE: .docker/config.json is KEPT but credential-SCRUBBED below — its
@@ -50,15 +61,16 @@ done
 for home in "$TARGET_HOME" /root; do
   [ -n "$home" ] || continue
   for p in "${CRED_PATHS[@]}"; do $SUDO rm -rf "$home/$p" 2>/dev/null || true; done
-  # SSH: always drop private keys + known_hosts. Drop authorized_keys too only if
-  # cloud-init is present (it re-injects from instance metadata on first boot);
-  # otherwise keep it so a non-cloud image isn't locked out.
+  # SSH: always drop private keys + known_hosts.
   $SUDO rm -f "$home"/.ssh/id_* "$home"/.ssh/known_hosts 2>/dev/null || true
   # Catch CUSTOM-named private keys too (not just id_*): any ~/.ssh file whose
   # contents declare a private key. -I skips binaries; -maxdepth 1 stays shallow.
   [ -d "$home/.ssh" ] && $SUDO find "$home/.ssh" -maxdepth 1 -type f \
     -exec grep -qI 'PRIVATE KEY' {} \; -delete 2>/dev/null || true
-  command -v cloud-init >/dev/null 2>&1 && $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
+  # authorized_keys: drop ONLY when cloud-init will actually re-inject keys on the
+  # clone (see cloud_init_reinjects) — not merely when it's installed — so a local
+  # / disabled-cloud-init image isn't locked out.
+  cloud_init_reinjects && $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
 done
 
 # Docker: strip registry creds a stray `docker login` may have written, but KEEP
@@ -111,7 +123,10 @@ if strict; then
     for p in .aws .gnupg .kube .config/gh .config/gcloud .npmrc; do
       [ -e "$home/$p" ] && probs+=("$home/$p remains")
     done
-    ls "$home"/.ssh/id_* >/dev/null 2>&1 && probs+=("$home/.ssh private keys remain")
+    if [ -d "$home/.ssh" ] && { ls "$home"/.ssh/id_* >/dev/null 2>&1 \
+         || $SUDO find "$home/.ssh" -maxdepth 1 -type f -exec grep -qI 'PRIVATE KEY' {} \; -print 2>/dev/null | grep -q .; }; then
+      probs+=("$home/.ssh still has a private key")
+    fi
   done
   [ "${#probs[@]}" -eq 0 ] || die "finalize verification FAILED — image not clean: ${probs[*]}"
 fi

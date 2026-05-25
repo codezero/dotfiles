@@ -71,7 +71,12 @@ apt_preflight
 # Soft-failure log: tolerant helpers (apt_install, installer steps) append real
 # failures here so the run finishes every step yet still exits non-zero —
 # automation / golden-image builds must not bake a partial install as success.
-if ! dry; then SOFT_FAIL_LOG="$(mktemp)"; export SOFT_FAIL_LOG; fi
+if ! dry; then
+  # die on mktemp failure: without this log we can't track soft failures, so the
+  # run could exit 0 despite them — honest exit codes are the whole point.
+  SOFT_FAIL_LOG="$(mktemp)" || die "could not create soft-failure log (mktemp failed)"
+  export SOFT_FAIL_LOG
+fi
 
 failed=()
 for s in "${STEPS[@]}"; do
