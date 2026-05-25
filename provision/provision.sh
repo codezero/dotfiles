@@ -116,8 +116,8 @@ Manual follow-ups (need an interactive login session):
   • Node:  nvm install --lts
   • corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
-  • Install a Nerd Font for the prompt glyphs (e.g. MesloLGS NF) and select it
-    in your terminal: https://github.com/romkatv/powerlevel10k#fonts
+  • MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
+    OTHER terminal, select "MesloLGS NF" in its font settings.
   • Set your real git identity in ~/.gitconfig.
   • Docker access for $TARGET_USER — choose ONE:
       – rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:

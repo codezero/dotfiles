@@ -108,6 +108,21 @@ fi
 [ -f "$themes_dir/themes/catppuccin_mocha.toml" ] || \
   echo "    note: alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"
 
+# MesloLGS NF — the Nerd Font p10k (nerdfont-v3) and alacritty.toml's font family
+# both expect. A fresh Ubuntu doesn't ship it; without it prompt/TUI glyphs are
+# tofu. The TTFs are vendored in the repo (fonts/MesloLGS-NF) — copy them into the
+# user font dir (no network). Idempotent.
+font_src="$DOTFILES_DIR/fonts/MesloLGS-NF"
+font_dir="$HOME/.local/share/fonts"
+if [ -d "$font_src" ]; then
+  echo "    installing MesloLGS NF (vendored Nerd Font) into $font_dir"
+  mkdir -p "$font_dir"
+  cp -f "$font_src"/*.ttf "$font_dir/" || echo "    (failed to copy MesloLGS NF)"
+  command -v fc-cache >/dev/null 2>&1 && fc-cache -f "$font_dir" >/dev/null 2>&1 || true
+else
+  echo "    note: vendored fonts dir missing ($font_src) — install MesloLGS NF manually"
+fi
+
 echo "==> [7/7] Make zsh the default shell"
 if [ "${SHELL:-}" != "$(command -v zsh)" ]; then
   chsh -s "$(command -v zsh)" || \
@@ -118,9 +133,9 @@ cat <<'EOF'
 
 ✅ Done. A few things you must still do by hand:
 
-  1. Install a Nerd Font (the prompt icons need it), e.g. MesloLGS NF:
-     https://github.com/romkatv/powerlevel10k#fonts
-     Then select that font in your terminal emulator's settings.
+  1. MesloLGS NF (Nerd Font) was installed for you (~/.local/share/fonts).
+     Alacritty already uses it; in any OTHER terminal, select "MesloLGS NF"
+     in its font settings.
 
   2. Edit ~/.gitconfig — set your real name and email (it ships with a
      placeholder identity).

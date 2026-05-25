@@ -24,7 +24,7 @@ provision/
     ├── 25-docker-rootless.sh # rootless Docker via setuptool (only DOCKER_ROOTLESS=1)
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
-    ├── 36-alacritty.sh       # Alacritty via `cargo install` + theme clone + desktop integration
+    ├── 36-alacritty.sh       # Alacritty via `cargo install` + theme clone + desktop integration + MesloLGS NF font
     ├── 37-claude-code.sh     # Claude Code CLI (native installer, stable; as user)
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     ├── 55-gnome-dconf.sh     # GNOME dconf settings (only with INSTALL_DESKTOP=1)

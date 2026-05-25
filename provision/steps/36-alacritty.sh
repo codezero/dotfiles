@@ -18,7 +18,7 @@ log "Alacritty: build deps + cargo install (as '$TARGET_USER')"
 # — otherwise a missing compiler surfaces as a cryptic cargo/link error, and the
 # step can't run standalone.
 apt_install build-essential curl git cmake pkg-config libfreetype6-dev \
-            libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev python3
+            libfontconfig1-dev fontconfig libxcb-xfixes0-dev libxkbcommon-dev python3
 
 # cargo comes from step 35. Source ~/.cargo/env because rustup --no-modify-path
 # means cargo isn't on PATH in a fresh non-login shell yet.
@@ -52,3 +52,25 @@ as_user 'set -e; d="$HOME/.config/alacritty/themes"; \
 # Confirm the theme that alacritty.toml imports actually resolved.
 as_user 'test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"' \
   || soft_fail "alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"
+
+# MesloLGS NF — the Nerd Font that .p10k.zsh (POWERLEVEL9K_MODE=nerdfont-v3) and
+# alacritty.toml's `[font].family` both require. A fresh Ubuntu doesn't ship it,
+# and without it the prompt + TUI glyphs render as tofu. The TTFs are VENDORED in
+# the repo (fonts/MesloLGS-NF) — no network fetch, works offline — and copied
+# SYSTEM-WIDE so the font is available to every user (survives a different
+# PROVISION_USER in a golden image). fc-cache comes from fontconfig (above).
+fontsrc="$DOTFILES_ROOT/fonts/MesloLGS-NF"
+fontdir="/usr/local/share/fonts/MesloLGS-NF"
+if [ -d "$fontsrc" ]; then
+  log "MesloLGS NF: install system-wide from vendored $fontsrc"
+  run mkdir -p "$fontdir"
+  if dry; then
+    would "cp '$fontsrc'/*.ttf -> '$fontdir/' && fc-cache -f '$fontdir'"
+  else
+    cp -f "$fontsrc"/*.ttf "$fontdir/" \
+      && fc-cache -f "$fontdir" >/dev/null 2>&1 \
+      || soft_fail "MesloLGS NF install (copy/fc-cache) failed"
+  fi
+else
+  soft_fail "vendored fonts dir missing: $fontsrc — MesloLGS NF not installed (prompt/TUI glyphs will be tofu)"
+fi

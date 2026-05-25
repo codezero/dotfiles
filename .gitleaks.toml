@@ -11,3 +11,8 @@ regexes = [
   '''380FF4BCDC34A4BD92A3565342A1772E62E492D6''',   # Cursor (Anysphere)
   '''1302DE60231889FE1EBACADC54678CF75A278D9C''',   # VSCodium
 ]
+# Vendored binary fonts (MesloLGS NF) — not secrets; skip so the content
+# scanner doesn't false-positive on high-entropy bytes in the TTFs.
+paths = [
+  '''fonts/.*\.ttf$''',
+]
