@@ -10,16 +10,15 @@ run $SUDO install -m 0755 -d /etc/apt/keyrings
 apt_get update || true   # ensure apt lists exist if this step is run standalone
 apt_install ca-certificates curl gnupg wget
 
-# Expected repo signing-key fingerprints (the repo add is gated on a match).
-# Docker's is stable + officially documented, so it's pinned. VSCodium/Bruno are
-# NOT pinned by default: their fingerprints couldn't be authoritatively verified
-# here and Bruno is known to rotate/expire its key (usebruno#3569), so a
-# hardcoded pin would break installs. Set VSCODIUM_KEY_FP / BRUNO_KEY_FP to pin
-# them once you've verified the value; unset = require a valid key but don't pin.
+# Expected repo signing-key fingerprints — the repo add is gated on a match.
+# Docker, Cursor, and VSCodium are PINNED (each verified against its live key).
+# Bruno stays UNPINNED by default: its key rotates/expires and the keyserver
+# returns multiple keys (usebruno#3569), so a hardcoded pin would break installs.
+# A mismatch soft_fails + skips that vendor (never bricks); all are env-overridable
+# (e.g. set BRUNO_KEY_FP to pin Bruno yourself, or clear VSCODIUM_KEY_FP).
 DOCKER_FP="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
-# Cursor's is pinned too — verified against its live signed apt repo (Anysphere).
 CURSOR_FP="380FF4BCDC34A4BD92A3565342A1772E62E492D6"
-VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-}"
+VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-1302DE60231889FE1EBACADC54678CF75A278D9C}"
 BRUNO_KEY_FP="${BRUNO_KEY_FP:-}"
 
 # ── Docker (official) ───────────────────────────────────────────────────────

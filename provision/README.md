@@ -132,11 +132,11 @@ cloud-init on first boot.
   download-URL API to `downloads.cursor.com/aptrepo`).
 - **Signing keys are verified + gated.** Each repo add + install only proceeds
   after `verify_keyring` confirms a valid, non-empty GPG key landed (no
-  half-configured repo behind a failed/tampered key). Docker's and Cursor's
-  fingerprints are **pinned** (verified against their live repos);
-  VSCodium/Bruno are verified-but-unpinned by default (set
-  `VSCODIUM_KEY_FP` / `BRUNO_KEY_FP` to pin — Bruno rotates its key, so a
-  hardcoded pin would break). A bad key skips just that vendor.
+  half-configured repo behind a failed/tampered key). Docker, Cursor, and
+  VSCodium fingerprints are **pinned** (each verified against the live key);
+  only Bruno is verified-but-unpinned — its key rotates and the keyserver returns
+  several keys (`usebruno#3569`), so a pin would break; set `BRUNO_KEY_FP` to pin
+  it yourself. A failed/mismatched key skips just that vendor (never bricks).
 - **Arch-aware.** Docker codename auto-falls back to `noble` if the repo lacks
   your release; Bruno falls back to a GitHub `arm64` .deb (its apt repo is
   amd64-only). Cursor's signed apt repo serves both arches (`stable` suite).
