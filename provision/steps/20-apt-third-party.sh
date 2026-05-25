@@ -17,6 +17,8 @@ apt_install ca-certificates curl gnupg wget
 # hardcoded pin would break installs. Set VSCODIUM_KEY_FP / BRUNO_KEY_FP to pin
 # them once you've verified the value; unset = require a valid key but don't pin.
 DOCKER_FP="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+# Cursor's is pinned too — verified against its live signed apt repo (Anysphere).
+CURSOR_FP="380FF4BCDC34A4BD92A3565342A1772E62E492D6"
 VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-}"
 BRUNO_KEY_FP="${BRUNO_KEY_FP:-}"
 
@@ -134,30 +136,34 @@ else
   fi
 fi
 
-# ── Cursor (official download API → .deb; self-updates in-app) ───────────────
-log "Cursor: AI editor"
+# ── Cursor (official SIGNED apt repo) ────────────────────────────────────────
+# Cursor publishes a proper signed apt repo (amd64,arm64). Add it the same way
+# its own .deb does (key at /usr/share/keyrings/anysphere.gpg + deb822 source) so
+# 'cursor' installs + self-updates via apt with NO download-URL scraping. The
+# suite is 'stable' (not Ubuntu-codename-specific), so this is version-agnostic.
+log "Cursor: AI editor (signed apt repo)"
+cursor_ok=1
+CURSOR_KR=/usr/share/keyrings/anysphere.gpg
 case "$ARCH" in
-  arm64) CPLAT="linux-arm64-deb" ;;
-  amd64) CPLAT="linux-x64-deb" ;;
-  *)     CPLAT="" ; warn "unsupported arch for Cursor: $ARCH" ;;
+  amd64|arm64) : ;;
+  *) cursor_ok=0; warn "Cursor: unsupported arch '$ARCH' — skipping" ;;
 esac
-if [ -n "$CPLAT" ]; then
-  if dry; then
-    would "fetch latest Cursor .deb ($CPLAT) from cursor.com API and install"
+if [ "$cursor_ok" = 1 ] && dry; then
+  would "download + fingerprint-verify ($CURSOR_FP) Cursor key -> $CURSOR_KR"
+  would "add repo: deb822 https://downloads.cursor.com/aptrepo stable main"
+elif [ "$cursor_ok" = 1 ]; then
+  if curl -fsSL https://downloads.cursor.com/keys/anysphere.asc \
+       | gpg --dearmor 2>/dev/null | $SUDO tee "$CURSOR_KR" >/dev/null \
+     && verify_keyring "$CURSOR_KR" "$CURSOR_FP"; then
+    printf 'Types: deb\nURIs: https://downloads.cursor.com/aptrepo\nSuites: stable\nComponents: main\nArchitectures: amd64,arm64\nSigned-By: %s\n' \
+      "$CURSOR_KR" | $SUDO tee /etc/apt/sources.list.d/cursor.sources >/dev/null
   else
-    api_json="$(curl -fsSL "https://www.cursor.com/api/download?platform=${CPLAT}&releaseTrack=stable")"
-    # Cursor's download URL has no reliable .deb suffix, so take the JSON
-    # downloadUrl/url field (fallback: first https URL in the response).
-    curl_url="$(printf '%s' "$api_json" | grep -oE '"(downloadUrl|url)"[[:space:]]*:[[:space:]]*"https://[^"]+"' | grep -oE 'https://[^"]+' | head -n1)"
-    [ -n "$curl_url" ] || curl_url="$(printf '%s' "$api_json" | grep -oE 'https://[^"]+' | head -n1)"
-    if [ -n "${curl_url:-}" ]; then
-      # mktemp (unpredictable, 0600) avoids a /tmp symlink/TOCTOU swap of the
-      # .deb that apt then installs as root.
-      deb="$(mktemp /tmp/cursor.XXXXXX.deb)"
-      curl -fsSL "$curl_url" -o "$deb" && apt_install "$deb" || soft_fail "Cursor .deb download failed"
-      rm -f "$deb"
-    else
-      soft_fail "Could not resolve Cursor .deb URL — skipping."
-    fi
+    cursor_ok=0
+    $SUDO rm -f "$CURSOR_KR" /etc/apt/sources.list.d/cursor.sources
+    soft_fail "Cursor key download/verify failed — skipping Cursor"
   fi
+fi
+if [ "$cursor_ok" = 1 ]; then
+  apt_get update || true
+  apt_install cursor
 fi

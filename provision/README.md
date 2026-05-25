@@ -127,18 +127,19 @@ cloud-init on first boot.
   any macOS-only cask simply fails-soft. `corepack` is a manual follow-up.
 - **Tolerant.** Each step and each apt batch is wrapped so failures warn and
   continue; `provision.sh` prints a summary of any steps that had issues.
-- **Official sources, verified 2026-05-24.** Docker, VSCodium, and Bruno use
-  their official signed apt repos. Cursor uses its official download **API → .deb**
-  (arch-aware, self-updating) because it has no documented apt key.
+- **Official sources, verified 2026-05-24.** Docker, VSCodium, Bruno, and Cursor
+  all use their official **signed apt repos** (Cursor moved off the old
+  download-URL API to `downloads.cursor.com/aptrepo`).
 - **Signing keys are verified + gated.** Each repo add + install only proceeds
   after `verify_keyring` confirms a valid, non-empty GPG key landed (no
-  half-configured repo behind a failed/tampered key). Docker's fingerprint is
-  **pinned**; VSCodium/Bruno are verified-but-unpinned by default (set
+  half-configured repo behind a failed/tampered key). Docker's and Cursor's
+  fingerprints are **pinned** (verified against their live repos);
+  VSCodium/Bruno are verified-but-unpinned by default (set
   `VSCODIUM_KEY_FP` / `BRUNO_KEY_FP` to pin — Bruno rotates its key, so a
   hardcoded pin would break). A bad key skips just that vendor.
 - **Arch-aware.** Docker codename auto-falls back to `noble` if the repo lacks
   your release; Bruno falls back to a GitHub `arm64` .deb (its apt repo is
-  amd64-only); Cursor picks `linux-arm64`/`linux-x64` automatically.
+  amd64-only). Cursor's signed apt repo serves both arches (`stable` suite).
 
 ## Refreshing the lists (do this on the source machine)
 
