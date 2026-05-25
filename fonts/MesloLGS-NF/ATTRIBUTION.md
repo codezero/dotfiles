@@ -21,9 +21,12 @@ glyphs added, distributed for use with Powerlevel10k:
 - Powerlevel10k font docs: https://github.com/romkatv/powerlevel10k#fonts
 - Meslo LG source: https://github.com/andreberg/Meslo-Font
 
-Meslo LG is licensed under the **Apache License 2.0**, so redistribution is
-permitted with attribution. **TODO before making this repo public:** drop the
-upstream `LICENSE` (Apache-2.0 text) next to these files for full compliance.
+Meslo LG is licensed under the **Apache License 2.0** (confirmed from upstream:
+*Copyright 2009, 2010, 2013 André Berg*), so redistribution is permitted with
+attribution. The full Apache-2.0 text is in **`LICENSE`**, and the attribution
+chain (Meslo LG → Apple Menlo → Bitstream Vera / DejaVu, plus the Nerd Font
+patch) is in **`NOTICE`** — together these satisfy the license's redistribution
+terms for this public repo.
 
 ## Provenance (sha256)
 

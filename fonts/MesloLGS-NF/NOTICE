@@ -1,0 +1,22 @@
+MesloLGS NF — NOTICE
+====================
+
+This directory vendors the MesloLGS NF font for offline, reproducible
+provisioning (see ATTRIBUTION.md). It is distributed under the Apache License,
+Version 2.0 — the full text is in the LICENSE file in this directory.
+
+Meslo LG
+  Copyright 2009, 2010, 2013 André Berg
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/andreberg/Meslo-Font
+
+Meslo LG is based on Apple's Menlo, which itself derives from the Bitstream
+Vera and DejaVu fonts:
+  Copyright (c) 2009 Apple Inc.       Menlo  ("Menlo" is a trademark of Apple Inc.)
+  Copyright (c) 2003 Bitstream, Inc.  Bitstream Vera
+  Copyright (c) 2006 Tavmjong Bah     DejaVu
+
+MesloLGS NF
+  A Nerd Font-patched build of Meslo LG, prepared for Powerlevel10k by
+  Roman Perepelitsa (romkatv).
+  https://github.com/romkatv/powerlevel10k-media
