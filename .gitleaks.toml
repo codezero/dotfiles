@@ -1,0 +1,13 @@
+# gitleaks config — extends the built-in ruleset, then allowlists public,
+# non-secret identifiers that live in this repo so they don't block commits.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public (non-secret) identifiers committed on purpose"
+regexes = [
+  # Docker's official GPG key fingerprint (pinned in step 20 / docs) — public.
+  '''9DC858229FC7DD38854AE2D88D81803C0EBFCD88''',
+  # Bruno's public GPG key id (keyserver lookup in step 20).
+  '''0x9FA6017ECABE0266''',
+]

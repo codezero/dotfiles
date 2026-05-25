@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# gitleaks pre-commit hook — blocks a commit if a secret is detected in the
+# STAGED changes. This is a backstop for the .gitignore (which is filename-based;
+# this scans content). Enable once per clone:
+#     git config core.hooksPath .githooks
+# gitleaks comes from the Brewfile (brew install gitleaks).
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[pre-commit] gitleaks not installed — skipping secret scan (brew install gitleaks)" >&2
+  exit 0
+fi
+
+# Prefer the modern `git --staged` (gitleaks 8.18+); fall back to the older
+# `protect --staged` on legacy versions. Detected via --help.
+if gitleaks git --help >/dev/null 2>&1; then
+  exec gitleaks git --staged --redact --no-banner
+elif gitleaks protect --help >/dev/null 2>&1; then
+  exec gitleaks protect --staged --redact --no-banner
+else
+  echo "[pre-commit] gitleaks: no known staged-scan subcommand; skipping" >&2
+  exit 0
+fi

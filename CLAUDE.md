@@ -51,6 +51,7 @@ Both `install.sh` and step 60 install a shared set into `$HOME` — the file set
 - `.deb` downloads (Cursor/Bruno) use `mktemp` (0600), not predictable `/tmp` paths, to avoid a TOCTOU swap of the file apt installs as root.
 - Homebrew is hardcoded at `/home/linuxbrew/.linuxbrew`. The omz `jj`/`bun` plugins only add completions; a missing tool just warns.
 - **Never committed** (see `.gitignore`): SSH/GPG keys, `~/.claude/`, cloud creds, shell history. `.gitconfig` ships a placeholder identity — set the real one.
+- **Secret scanning** (defense-in-depth beyond the filename-based `.gitignore`): `gitleaks` (in the Brewfile) scans content. A versioned pre-commit hook lives in `.githooks/` — enable per clone with `git config core.hooksPath .githooks`. CI runs `.github/workflows/gitleaks.yml` on push/PR. `.gitleaks.toml` allowlists public identifiers (Docker fingerprint, Bruno key id). The hook prefers `gitleaks git --staged`; CI scans full history.
 
 ## Open TODOs
 - [ ] **Live smoke-test on a real arm64 box** — none of the mutating paths have been run live (only dry-run + `shellcheck`): `cargo install alacritty`, the Claude native installer, `rustup`, `dconf load` + the finalize step, the Cursor/Bruno `.deb` fetches, rootless Docker (`DOCKER_ROOTLESS=1` — needs unprivileged userns; the headless setuptool + linger path is the least-exercised), and a full `sudo GOLDEN_IMAGE=1 bash provision.sh`.

@@ -18,6 +18,11 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 > **Never committed:** SSH/GPG keys, `~/.claude/`, cloud creds, shell history
 > (see `.gitignore`). `.bashrc` is the stock Ubuntu default, so it's omitted.
 
+> **Secret scanning:** `gitleaks` backs up the `.gitignore` with content-based
+> detection. Enable the local pre-commit hook once per clone:
+> `git config core.hooksPath .githooks` (needs `gitleaks` — it's in the Brewfile).
+> CI also scans every push via `.github/workflows/gitleaks.yml`.
+
 ## Two ways to use it
 
 - **Just my shell on an existing box** → `install.sh` (below).
