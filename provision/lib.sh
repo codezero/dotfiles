@@ -90,13 +90,20 @@ if [ "$(id -u "$TARGET_USER" 2>/dev/null || true)" = "0" ]; then
   fi
 fi
 
-# Run a command as the target (non-root) user via a login shell.
+# Run a command as the target (non-root) user.
+# Deliberately a NON-login shell (`bash -c`, not `-lc`): a non-interactive LOGIN
+# bash runs ~/.bash_logout on exit, and Ubuntu's default runs `clear_console`,
+# which FAILS without a controlling tty (we have none under sudo). On an explicit
+# `exit N` that failure overwrites the status — so an idempotent skip (`exit 0`)
+# was wrongly reported as a step failure. We don't need login PATH: brew is
+# eval'd by absolute path, rustup installs --no-modify-path, and blocks that need
+# cargo source ~/.cargo/env themselves — so the profile never provided anything.
 as_user() {
   if dry; then would "(as $TARGET_USER) $*"; return 0; fi
   if [ "$(id -un)" = "$TARGET_USER" ]; then
-    bash -lc "$*"
+    bash -c "$*"
   else
-    sudo -u "$TARGET_USER" -H bash -lc "$*"
+    sudo -u "$TARGET_USER" -H bash -c "$*"
   fi
 }
 

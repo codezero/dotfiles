@@ -122,6 +122,9 @@ else
   fi
 fi
 
+# Real runs only — a dry-run changed nothing, so post-install follow-ups would
+# be misleading (and look like it actually ran). Golden already exited above.
+if ! dry; then
 cat <<EOF
 
 Manual follow-ups (need an interactive login session):
@@ -140,6 +143,7 @@ Manual follow-ups (need an interactive login session):
       – rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
           sudo usermod -aG docker $TARGET_USER
 EOF
+fi
 
 # Every step ran regardless of failures; this only sets the exit code so that
 # image-build automation can detect a partial/failed provision.
