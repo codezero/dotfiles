@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 20 — third-party repos & apps: Docker, VSCodium, Bruno, Cursor.
+# Step 20 — third-party repos & apps: Docker, VSCodium, Cursor.
 # All official sources, verified 2026-05-24. Each block is failure-tolerant.
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
@@ -12,14 +12,10 @@ apt_install ca-certificates curl gnupg wget
 
 # Expected repo signing-key fingerprints — the repo add is gated on a match.
 # Docker, Cursor, and VSCodium are PINNED (each verified against its live key).
-# Bruno stays UNPINNED by default: its key rotates/expires and the keyserver
-# returns multiple keys (usebruno#3569), so a hardcoded pin would break installs.
-# A mismatch soft_fails + skips that vendor (never bricks); all are env-overridable
-# (e.g. set BRUNO_KEY_FP to pin Bruno yourself, or clear VSCODIUM_KEY_FP).
+# A mismatch soft_fails + skips that vendor (never bricks); all are env-overridable.
 DOCKER_FP="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 CURSOR_FP="380FF4BCDC34A4BD92A3565342A1772E62E492D6"
 VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-1302DE60231889FE1EBACADC54678CF75A278D9C}"
-BRUNO_KEY_FP="${BRUNO_KEY_FP:-}"
 
 # ── Docker (official) ───────────────────────────────────────────────────────
 log "Docker: repo + Engine"
@@ -94,45 +90,6 @@ fi
 if [ "$vscodium_ok" = 1 ]; then
   apt_get update || true
   apt_install codium
-fi
-
-# ── Bruno (official) — apt repo is amd64-only; arm64 uses GitHub .deb ─────────
-log "Bruno: API client"
-if [ "$ARCH" = "amd64" ]; then
-  bruno_ok=1
-  if dry; then
-    would "add + verify Bruno key (pin: ${BRUNO_KEY_FP:-none}) + amd64 repo, then install bruno"
-  else
-    if curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9FA6017ECABE0266" \
-         | gpg --dearmor 2>/dev/null | $SUDO tee /etc/apt/keyrings/bruno.gpg >/dev/null \
-       && verify_keyring /etc/apt/keyrings/bruno.gpg "$BRUNO_KEY_FP"; then
-      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/bruno.gpg] http://debian.usebruno.com/ bruno stable" \
-        | $SUDO tee /etc/apt/sources.list.d/bruno.list >/dev/null
-      apt_get update || true
-    else
-      bruno_ok=0
-      $SUDO rm -f /etc/apt/keyrings/bruno.gpg /etc/apt/sources.list.d/bruno.list
-      soft_fail "Bruno key download/verify failed — skipping Bruno"
-    fi
-  fi
-  if [ "$bruno_ok" = 1 ]; then apt_install bruno; fi
-else
-  if dry; then
-    would "fetch latest Bruno arm64 .deb from GitHub releases and install"
-  else
-    warn "Bruno apt repo is amd64-only; fetching latest arm64 .deb from GitHub releases"
-    url="$(curl -fsSL https://api.github.com/repos/usebruno/bruno/releases/latest \
-          | grep -oE 'https://[^"]+[Aa]rm64[^"]*\.deb' | head -n1)"
-    if [ -n "${url:-}" ]; then
-      # mktemp (unpredictable, 0600) avoids a /tmp symlink/TOCTOU swap of the
-      # .deb that apt then installs as root.
-      deb="$(mktemp /tmp/bruno.XXXXXX.deb)"
-      curl -fsSL "$url" -o "$deb" && apt_install "$deb" || soft_fail "Bruno arm64 .deb download failed"
-      rm -f "$deb"
-    else
-      soft_fail "Could not resolve a Bruno arm64 .deb — skipping."
-    fi
-  fi
 fi
 
 # ── Cursor (official SIGNED apt repo) ────────────────────────────────────────

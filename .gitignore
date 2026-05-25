@@ -35,7 +35,6 @@ id_*
 **/auth.json
 **/.credentials.json
 .codex/
-.config/bruno/cookies.json
 .config/remmina/
 .config/goa-1.0/
 .config/go/telemetry/

@@ -16,7 +16,8 @@ is_denied() {
     efibootmgr|grub-*|shim-signed) return 0 ;;
     linux-generic*|linux-image-*|linux-headers-*|linux-modules-*|linux-*-hwe-*|linux-hwe-*) return 0 ;;
     docker-ce|docker-ce-cli|docker-ce-rootless-extras|docker-buildx-plugin|docker-compose-plugin|containerd.io|uidmap) return 0 ;;
-    codium|cursor|bruno) return 0 ;;
+    codium|cursor) return 0 ;;
+    bruno) return 0 ;;   # removed from the project; still skip if a re-export re-adds it
     flatpak|gnome-software-plugin-flatpak) return 0 ;;   # owned by step 50 (CLI flatpak)
   esac
   return 1

@@ -20,7 +20,7 @@ provision/
 │   └── dconf-settings.ini # curated GNOME settings (loaded by step 55, desktop-only)
 └── steps/
     ├── 10-apt.sh             # base apt packages
-    ├── 20-apt-third-party.sh # Docker · VSCodium · Bruno · Cursor (official repos)
+    ├── 20-apt-third-party.sh # Docker · VSCodium · Cursor (official repos)
     ├── 25-docker-rootless.sh # rootless Docker via setuptool (only DOCKER_ROOTLESS=1)
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
@@ -113,7 +113,7 @@ cloud-init on first boot.
   `apt-mark showmanual` set, so the script always skips **boot/firmware** (`grub*`,
   `shim-signed`, `efibootmgr`) and **kernel** metapackages (they'd reconfigure the
   bootloader / rebuild initramfs), and the **third-party** packages that step 20
-  owns (`docker-*`, `containerd.io`, `codium`, `cursor`, `bruno`, `uidmap`) — those
+  owns (`docker-*`, `containerd.io`, `codium`, `cursor`, `uidmap`) — those
   have no repo yet at step 10, and a single unlocatable package would otherwise
   abort the entire `apt-get install` batch. The **desktop/locale/IME** set is
   skipped unless `INSTALL_DESKTOP=1`. The batch also falls back to per-package
@@ -127,19 +127,16 @@ cloud-init on first boot.
   any macOS-only cask simply fails-soft. `corepack` is a manual follow-up.
 - **Tolerant.** Each step and each apt batch is wrapped so failures warn and
   continue; `provision.sh` prints a summary of any steps that had issues.
-- **Official sources, verified 2026-05-24.** Docker, VSCodium, Bruno, and Cursor
-  all use their official **signed apt repos** (Cursor moved off the old
-  download-URL API to `downloads.cursor.com/aptrepo`).
+- **Official sources, verified 2026-05-24.** Docker, VSCodium, and Cursor all
+  use their official **signed apt repos** (Cursor moved off the old download-URL
+  API to `downloads.cursor.com/aptrepo`).
 - **Signing keys are verified + gated.** Each repo add + install only proceeds
   after `verify_keyring` confirms a valid, non-empty GPG key landed (no
   half-configured repo behind a failed/tampered key). Docker, Cursor, and
-  VSCodium fingerprints are **pinned** (each verified against the live key);
-  only Bruno is verified-but-unpinned — its key rotates and the keyserver returns
-  several keys (`usebruno#3569`), so a pin would break; set `BRUNO_KEY_FP` to pin
-  it yourself. A failed/mismatched key skips just that vendor (never bricks).
+  VSCodium fingerprints are all **pinned** (each verified against the live key).
+  A failed/mismatched key skips just that vendor (never bricks).
 - **Arch-aware.** Docker codename auto-falls back to `noble` if the repo lacks
-  your release; Bruno falls back to a GitHub `arm64` .deb (its apt repo is
-  amd64-only). Cursor's signed apt repo serves both arches (`stable` suite).
+  your release. Cursor's signed apt repo serves both arches (`stable` suite).
 
 ## Refreshing the lists (do this on the source machine)
 

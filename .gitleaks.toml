@@ -6,8 +6,8 @@ useDefault = true
 [allowlist]
 description = "Public (non-secret) identifiers committed on purpose"
 regexes = [
-  # Docker's official GPG key fingerprint (pinned in step 20 / docs) — public.
-  '''9DC858229FC7DD38854AE2D88D81803C0EBFCD88''',
-  # Bruno's public GPG key id (keyserver lookup in step 20).
-  '''0x9FA6017ECABE0266''',
+  # Public GPG key fingerprints pinned in step 20 (not secrets).
+  '''9DC858229FC7DD38854AE2D88D81803C0EBFCD88''',   # Docker
+  '''380FF4BCDC34A4BD92A3565342A1772E62E492D6''',   # Cursor (Anysphere)
+  '''1302DE60231889FE1EBACADC54678CF75A278D9C''',   # VSCodium
 ]

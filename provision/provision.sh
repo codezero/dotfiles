@@ -10,7 +10,7 @@
 #   sudo GOLDEN_IMAGE=1 bash provision.sh     # strict build + finalize, ready to snapshot
 #   sudo DOCKER_ROOTLESS=1 bash provision.sh  # also set up rootless Docker for the user
 #
-# It installs:  apt base pkgs · Docker/VSCodium/Bruno/Cursor · Homebrew formulae
+# It installs:  apt base pkgs · Docker/VSCodium/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
 #               · GNOME dconf settings (desktop only)
 #               · zsh/oh-my-zsh/p10k + dotfiles symlinks

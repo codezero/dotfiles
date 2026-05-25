@@ -1,12 +1,11 @@
 # Manually-installed apt packages (apt-mark showmanual, minus the base image).
 # NOT all installed by default — step 10 filters this list:
 #   • boot/firmware + kernel        -> always skipped
-#   • third-party (Docker/VSCodium/Bruno/Cursor/flatpak) -> owned by steps 20/50
+#   • third-party (Docker/VSCodium/Cursor/flatpak) -> owned by steps 20/50
 #   • desktop/locale/IME            -> only with INSTALL_DESKTOP=1
 # Essential/base packages (dash, grep, coreutils, …) are intentionally NOT listed
 # here — they're always present, so reinstalling them is pure noise.
 binfmt-support
-bruno
 build-essential
 ca-certificates
 codium
