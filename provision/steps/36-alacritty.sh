@@ -13,9 +13,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 log "Alacritty: build deps + cargo install (as '$TARGET_USER')"
 
-# Build deps per Alacritty's INSTALL.md (Ubuntu). build-essential is from step 10.
-apt_install cmake pkg-config libfreetype6-dev libfontconfig1-dev \
-            libxcb-xfixes0-dev libxkbcommon-dev python3
+# Build deps per Alacritty's INSTALL.md (Ubuntu). Ensure build-essential (cc +
+# linker), curl, and git HERE rather than assuming an earlier step provided them
+# — otherwise a missing compiler surfaces as a cryptic cargo/link error, and the
+# step can't run standalone.
+apt_install build-essential curl git cmake pkg-config libfreetype6-dev \
+            libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev python3
 
 # cargo comes from step 35. Source ~/.cargo/env because rustup --no-modify-path
 # means cargo isn't on PATH in a fresh non-login shell yet.

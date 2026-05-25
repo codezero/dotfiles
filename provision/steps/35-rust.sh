@@ -6,6 +6,7 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 log "Rust (rustup) for '$TARGET_USER'"
+apt_install curl   # the rustup installer fetches over curl — ensure it, don't assume
 
 # Install rustup + the stable toolchain if cargo isn't already present.
 # --no-modify-path: .zshrc owns PATH (it sources ~/.cargo/env), so don't let
