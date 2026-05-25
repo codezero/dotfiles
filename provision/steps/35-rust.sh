@@ -19,3 +19,7 @@ as_user 'test -x "$HOME/.cargo/bin/cargo" || command -v cargo >/dev/null 2>&1 ||
 # Keep stable current on re-runs (no-op when already up to date).
 as_user 'test -x "$HOME/.cargo/bin/rustup" && "$HOME/.cargo/bin/rustup" update stable >/dev/null 2>&1' \
   || true
+
+# Validate the toolchain actually landed (curl|sh can exit 0 on a masked fetch failure).
+as_user 'test -x "$HOME/.cargo/bin/cargo" && test -x "$HOME/.cargo/bin/rustc"' \
+  || soft_fail "rust toolchain missing after rustup (fetch/install may have failed)"

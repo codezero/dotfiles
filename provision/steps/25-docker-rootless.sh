@@ -14,10 +14,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 [ "${DOCKER_ROOTLESS:-0}" = "1" ] || { log "rootless Docker: skipped (DOCKER_ROOTLESS != 1)"; exit 0; }
 command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1 \
-  || { warn "dockerd-rootless-setuptool.sh missing (docker-ce-rootless-extras not installed) — skipping"; exit 0; }
+  || { soft_fail "rootless requested but dockerd-rootless-setuptool.sh missing (docker-ce-rootless-extras not installed)"; exit 0; }
 
 uid="$(id -u "$TARGET_USER" 2>/dev/null || true)"
-[ -n "$uid" ] || { warn "can't resolve uid for '$TARGET_USER' — skipping rootless Docker"; exit 0; }
+[ -n "$uid" ] || { soft_fail "rootless requested but can't resolve uid for '$TARGET_USER'"; exit 0; }
 
 log "Rootless Docker for '$TARGET_USER' (uid $uid)"
 
@@ -31,7 +31,7 @@ fi
 
 # Linger so the user's systemd instance (hence rootless dockerd) runs with no
 # active login — essential headless.
-$SUDO loginctl enable-linger "$TARGET_USER" || warn "enable-linger failed"
+$SUDO loginctl enable-linger "$TARGET_USER" || soft_fail "enable-linger failed (rootless daemon won't survive logout)"
 
 # Wait for the lingering user manager's session bus to appear.
 RB="/run/user/$uid/bus"
@@ -47,6 +47,11 @@ as_user "export XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:pat
 as_user "export XDG_RUNTIME_DIR=/run/user/$uid; \
   docker context create rootless --docker host=unix:///run/user/$uid/docker.sock >/dev/null 2>&1 || true; \
   docker context use rootless >/dev/null 2>&1 || true"
+
+# Validate the requested rootless daemon actually came up — don't silently
+# underdeliver (under GOLDEN_IMAGE/STRICT this soft_fail aborts the build).
+as_user "export XDG_RUNTIME_DIR=/run/user/$uid; systemctl --user is-active --quiet docker" \
+  || soft_fail "rootless Docker service not active after setup (unprivileged userns restricted?)"
 
 log "Rootless Docker configured (socket unix:///run/user/$uid/docker.sock)."
 log "System (rootful) Docker is left installed but unused; to remove it:"

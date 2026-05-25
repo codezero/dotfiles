@@ -27,6 +27,15 @@ for a in "$@"; do
   esac
 done
 export DRY_RUN
+
+# Flags are UPPERCASE env vars; warn on the common lowercase typo before defaulting.
+for _lc in install_desktop golden_image docker_rootless; do
+  _uc="${_lc^^}"
+  [ -n "${!_lc:-}" ] && [ -z "${!_uc:-}" ] && \
+    echo "[warn] env '$_lc' is set but IGNORED — flags are UPPERCASE; did you mean '$_uc'?" >&2
+done
+unset _lc _uc
+
 export INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"   # 1 = also install the desktop/locale/IME set
 export GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"         # 1 = strict build + finalize + self-contained dotfile copies
 export DOCKER_ROOTLESS="${DOCKER_ROOTLESS:-0}"   # 1 = set up rootless Docker for the target user (step 25)

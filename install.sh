@@ -70,6 +70,7 @@ mkdir -p "$HOME/.nvm"   # required by brew's nvm
 echo "==> [6/7] Install dotfiles (+ Alacritty theme) into \$HOME ($([ "$DOTFILES_COPY" = 1 ] && echo copy || echo symlink) mode)"
 link() {
   local name="$1"
+  case "$name" in ""|/*|*..*) echo "    skip (unsafe dotfiles.list entry): $name"; return ;; esac
   local src="$DOTFILES_DIR/$name"
   local dest="$HOME/$name"
   [ -e "$src" ] || { echo "    skip (missing in repo): $name"; return; }

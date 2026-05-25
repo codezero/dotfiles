@@ -26,6 +26,8 @@ copy_mode=0
 mapfile -t dotfiles < <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_ROOT/dotfiles.list")
 
 for f in "${dotfiles[@]}"; do
+  # Reject unsafe manifest entries before any root-backed mkdir/cp/chown/symlink.
+  case "$f" in ""|/*|*..*) warn "skip unsafe dotfiles.list entry: '$f'"; continue ;; esac
   src="$DOTFILES_ROOT/$f"
   dst="$TARGET_HOME/$f"
   [ -e "$src" ] || { warn "missing $src — skipping"; continue; }
@@ -66,5 +68,5 @@ ZSH_BIN="$(command -v zsh || echo /usr/bin/zsh)"
 if [ "$(getent passwd "$TARGET_USER" | cut -d: -f7)" = "$ZSH_BIN" ]; then
   log "default shell already $ZSH_BIN"
 else
-  run $SUDO chsh -s "$ZSH_BIN" "$TARGET_USER" || warn "chsh failed for $TARGET_USER"
+  run $SUDO chsh -s "$ZSH_BIN" "$TARGET_USER" || soft_fail "chsh failed for $TARGET_USER (login shell not set to zsh)"
 fi

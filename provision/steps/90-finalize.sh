@@ -1,64 +1,67 @@
 #!/usr/bin/env bash
 # Step 90 — golden-image finalize (ONLY with GOLDEN_IMAGE=1). Strips
-# machine-specific identity + build cruft so the captured image boots as many
-# UNIQUE clones. DESTRUCTIVE by design; gated hard on the flag and runs last
-# (in GOLDEN_IMAGE/strict mode an earlier failure aborts before we get here, so
-# we never finalize a broken image).
+# machine-specific identity, credentials, caches, logs, and history so the
+# captured image boots as many UNIQUE, credential-free clones. DESTRUCTIVE by
+# design; gated hard on the flag; runs last (strict mode aborts earlier on any
+# failure, so we never finalize a broken image).
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 [ "${GOLDEN_IMAGE:-0}" = "1" ] || { log "finalize: skipped (GOLDEN_IMAGE != 1)"; exit 0; }
 
-log "GOLDEN IMAGE finalize — stripping identity, caches, logs, history"
+log "GOLDEN IMAGE finalize — stripping identity, credentials, caches, logs, history"
+
+# Credential/token stores scrubbed from BOTH the target user and root — never
+# needed in a shared image (reconfigure per-clone; cloud-init re-injects SSH).
+# NOTE: .docker/config.json is intentionally kept (rootless context; auths are
+# empty on a pristine build box — don't `docker login` on the builder).
+CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .codex \
+  .claude/.credentials.json .claude/projects .claude/sessions \
+  .claude/history.jsonl .claude/shell-snapshots)
 
 if dry; then
   would "apt-get autoremove + clean; rm -rf /var/lib/apt/lists/*"
-  would "scrub $TARGET_USER creds: .gnupg/.aws/.config/{gh,gcloud}/.codex/.claude creds+history, .ssh private keys"
-  would "truncate /etc/machine-id to empty (regenerated per clone); rm /var/lib/dbus/machine-id"
-  would "rm /etc/ssh/ssh_host_* (unique host keys regenerated on first boot)"
-  would "cloud-init clean --logs --seed; rm -rf /var/lib/cloud/* (re-runs on clone)"
-  would "truncate /var/log/* ; clear systemd journal"
-  would "rm root + $TARGET_USER bash/zsh history; clear /tmp and /var/tmp"
-else
-  $SUDO apt-get autoremove -y >/dev/null 2>&1 || true   # before log-clear, so finalize stays last
-  $SUDO apt-get clean 2>/dev/null || true
-  $SUDO rm -rf /var/lib/apt/lists/* 2>/dev/null || true
-
-  # Scrub the build user's credential/token stores so they aren't baked into the
-  # image (defense-in-depth — the build box should already be pristine). Keeps
-  # ~/.ssh/authorized_keys (login) and .docker/config.json (rootless context).
-  for p in .gnupg .aws .config/gh .config/gcloud .codex \
-           .claude/.credentials.json .claude/projects .claude/sessions \
-           .claude/history.jsonl .claude/shell-snapshots; do
-    $SUDO rm -rf "$TARGET_HOME/$p" 2>/dev/null || true
-  done
-  $SUDO rm -f "$TARGET_HOME"/.ssh/id_* "$TARGET_HOME"/.ssh/known_hosts 2>/dev/null || true
-
-  # machine-id MUST stay an EMPTY file so systemd regenerates a unique id per
-  # clone on first boot (deleting the file can break boot). dbus id is removed.
-  $SUDO truncate -s 0 /etc/machine-id 2>/dev/null || true
-  $SUDO rm -f /var/lib/dbus/machine-id 2>/dev/null || true
-
-  # SSH host keys — unique per clone, regenerated on first boot.
-  $SUDO rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
-
-  # cloud-init re-runs on the clone with fresh instance metadata.
-  command -v cloud-init >/dev/null 2>&1 && { $SUDO cloud-init clean --logs --seed >/dev/null 2>&1 || true; }
-  $SUDO rm -rf /var/lib/cloud/* 2>/dev/null || true
-
-  # Logs + systemd journal.
-  $SUDO find /var/log -type f -exec truncate -s 0 {} + 2>/dev/null || true
-  $SUDO rm -rf /var/log/journal/* 2>/dev/null || true
-
-  # Shell history (root + target user).
-  for h in /root/.bash_history /root/.zsh_history \
-           "$TARGET_HOME/.bash_history" "$TARGET_HOME/.zsh_history"; do
-    $SUDO rm -f "$h" 2>/dev/null || true
-  done
-
-  # Temp dirs.
-  $SUDO rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
+  would "scrub creds from $TARGET_USER + root: ${CRED_PATHS[*]}"
+  would "rm SSH private keys + known_hosts (+ authorized_keys if cloud-init re-injects)"
+  would "truncate /etc/machine-id; rm /var/lib/dbus/machine-id; rm /etc/ssh/ssh_host_*"
+  would "cloud-init clean --logs --seed; rm -rf /var/lib/cloud/*"
+  would "LAST: truncate /var/log/* + journal, rm shell history, clear /tmp & /var/tmp (incl. hidden)"
+  exit 0
 fi
 
-log "Finalize complete — power off and capture/snapshot the image."
-log "Clones regenerate machine-id, SSH host keys, and cloud-init state on first boot."
+$SUDO apt-get autoremove -y >/dev/null 2>&1 || true
+$SUDO apt-get clean 2>/dev/null || true
+$SUDO rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+
+# Scrub credential stores from the target user AND root.
+for home in "$TARGET_HOME" /root; do
+  [ -n "$home" ] || continue
+  for p in "${CRED_PATHS[@]}"; do $SUDO rm -rf "$home/$p" 2>/dev/null || true; done
+  # SSH: always drop private keys + known_hosts. Drop authorized_keys too only if
+  # cloud-init is present (it re-injects from instance metadata on first boot);
+  # otherwise keep it so a non-cloud image isn't locked out.
+  $SUDO rm -f "$home"/.ssh/id_* "$home"/.ssh/known_hosts 2>/dev/null || true
+  command -v cloud-init >/dev/null 2>&1 && $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
+done
+
+# machine-id stays an EMPTY file (systemd regenerates a unique id per clone;
+# deleting it can break boot). dbus id removed. SSH host keys regenerated on boot.
+$SUDO truncate -s 0 /etc/machine-id 2>/dev/null || true
+$SUDO rm -f /var/lib/dbus/machine-id 2>/dev/null || true
+$SUDO rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
+
+# cloud-init re-runs on the clone with fresh instance metadata.
+command -v cloud-init >/dev/null 2>&1 && { $SUDO cloud-init clean --logs --seed >/dev/null 2>&1 || true; }
+$SUDO rm -rf /var/lib/cloud/* 2>/dev/null || true
+
+log "Finalize done — wiping logs/history/tmp last, then power off and capture the image."
+
+# LAST disk actions: logs, journal, shell history, temp (incl. hidden files).
+# Nothing logs after this. (See the runbook: don't tee a golden build to
+# /var/log — provision.sh's own end-of-run summary would re-create a log there.)
+$SUDO find /var/log -type f -exec truncate -s 0 {} + 2>/dev/null || true
+$SUDO rm -rf /var/log/journal/* 2>/dev/null || true
+for home in /root "$TARGET_HOME"; do
+  [ -n "$home" ] && $SUDO rm -f "$home/.bash_history" "$home/.zsh_history" 2>/dev/null || true
+done
+$SUDO find /tmp /var/tmp -mindepth 1 -delete 2>/dev/null || true

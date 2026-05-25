@@ -90,7 +90,11 @@ Each booted clone regenerates a unique machine-id + SSH host keys and re-runs
 cloud-init on first boot.
 
 > **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
-> and history — only run it on a throwaway build box, never your daily machine.
+> shell history, and credential stores (`.aws`/`.gnupg`/`.config/{gh,gcloud}`/
+> `.kube`/`.npmrc`/SSH keys/…) from the target user **and** root — only run it on
+> a throwaway build box, never your daily machine. Don't tee a golden build to
+> `/var/log` (finalize wipes it last, and the end-of-run summary would leave a
+> stray log there); tee to `~/golden.log` and `rm` it before capture.
 > For a *full* image use `provision.sh`; `install.sh` only sets up shell +
 > dotfiles and is for an existing box you don't want to fully provision.
 

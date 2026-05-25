@@ -51,4 +51,4 @@ as_user 'set -e; d="$HOME/.config/alacritty/themes"; \
   || soft_fail "alacritty theme clone failed"
 # Confirm the theme that alacritty.toml imports actually resolved.
 as_user 'test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"' \
-  || warn "alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"
+  || soft_fail "alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"
