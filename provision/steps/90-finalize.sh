@@ -39,6 +39,7 @@ if dry; then
   would "rm ALL private keys in ~/.ssh (id_* + any file containing 'PRIVATE KEY') + known_hosts (+ authorized_keys if cloud-init re-injects)"
   would "truncate /etc/machine-id; rm /var/lib/dbus/machine-id; rm /etc/ssh/ssh_host_*"
   would "cloud-init clean --logs --seed; rm -rf /var/lib/cloud/*"
+  would "scan $TARGET_HOME + /root for a leftover repo clone / *.log and WARN (never delete)"
   would "LAST: truncate /var/log/* + journal, rm shell history, clear /tmp & /var/tmp (incl. hidden)"
   would "verify (STRICT): machine-id empty, no host keys, no cred dirs / private keys remain — else die"
   exit 0
@@ -98,6 +99,24 @@ $SUDO rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
 # cloud-init re-runs on the clone with fresh instance metadata.
 command -v cloud-init >/dev/null 2>&1 && { $SUDO cloud-init clean --logs --seed >/dev/null 2>&1 || true; }
 $SUDO rm -rf /var/lib/cloud/* 2>/dev/null || true
+
+# Heads-up (operator-facing, NON-destructive): finalize does NOT touch $HOME, so a
+# repo clone or run-log left there bakes into the image. We never delete user files
+# blindly — just flag them so you can rm before capture. (Cloning + logging under
+# /tmp avoids this entirely: the tmp-wipe below removes those for free.) Hidden
+# repos are skipped — ~/.oh-my-zsh etc. are intentional git checkouts, not cruft.
+for home in "$TARGET_HOME" /root; do
+  [ -n "$home" ] && [ -d "$home" ] || continue
+  leftovers=()
+  while IFS= read -r g; do
+    repo="${g%/.git}"; case "${repo##*/}" in .*) continue ;; esac
+    leftovers+=("$repo")
+  done < <($SUDO find "$home" -mindepth 2 -maxdepth 2 -name .git -type d 2>/dev/null)
+  while IFS= read -r f; do leftovers+=("$f"); done \
+    < <($SUDO find "$home" -mindepth 1 -maxdepth 1 -type f -name '*.log' 2>/dev/null)
+  [ "${#leftovers[@]}" -gt 0 ] \
+    && warn "leftover under $home will bake into the image — rm before capture: ${leftovers[*]}"
+done
 
 log "Finalize done — wiping logs/history/tmp last, then power off and capture the image."
 

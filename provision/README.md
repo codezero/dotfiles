@@ -71,16 +71,20 @@ builder. It changes three things versus a normal run:
 ### Take-path: fresh Ubuntu 26.04 → image
 
 ```bash
-# 1. On a throwaway build box, get the repo somewhere temporary (it is NOT
-#    needed at runtime once the dotfiles are copied in).
+# 1. On a throwaway build box, get the repo under /tmp — it is NOT needed at
+#    runtime once the dotfiles are copied in, and finalize wipes /tmp LAST, so a
+#    /tmp clone (and any /tmp logs) are swept from the image automatically.
 git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles/provision
 
-# 2. Preview, then build strictly. PROVISION_USER targets the image's login
-#    user; add INSTALL_DESKTOP=1 for a desktop image.
+# 2. Preview, then build strictly. PROVISION_USER targets the image's login user;
+#    add INSTALL_DESKTOP=1 for a desktop image. Log under /tmp so the same finalize
+#    tmp-wipe removes the log too (never tee a golden build to /var/log or $HOME).
 sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh --dry-run
-sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh
+sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/golden.log
 
-# 3. (optional) rm -rf /tmp/dotfiles so the repo isn't baked into the image.
+# 3. Repo + log were under /tmp → finalize already removed them; nothing to clean.
+#    (If you cloned into $HOME or logged there instead, finalize does NOT touch
+#    $HOME — it WARNS about a leftover repo/*.log, but you must rm them yourself.)
 # 4. Power off and capture:
 #      cloud (AWS/GCP/Azure) : create an image/AMI from the stopped instance
 #      Packer                : run provision.sh as the provisioner
@@ -93,9 +97,12 @@ cloud-init on first boot.
 > **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
 > shell history, and credential stores (`.aws`/`.gnupg`/`.config/{gh,gcloud}`/
 > `.kube`/`.npmrc`/SSH keys/…) from the target user **and** root — only run it on
-> a throwaway build box, never your daily machine. Don't tee a golden build to
-> `/var/log` (finalize wipes it last, and the end-of-run summary would leave a
-> stray log there); tee to `~/golden.log` and `rm` it before capture.
+> a throwaway build box, never your daily machine. Keep the repo clone **and** any
+> run logs under `/tmp` — finalize wipes `/tmp` last, so they're removed from the
+> image automatically. Don't tee a golden build to `/var/log` (finalize truncates
+> it last) and don't leave the clone/logs in `$HOME` (finalize does NOT touch
+> `$HOME`, so they'd bake in — it warns about a leftover repo/`*.log`, but you must
+> `rm` them yourself before capture).
 > For a *full* image use `provision.sh`; `install.sh` only sets up shell +
 > dotfiles and is for an existing box you don't want to fully provision.
 
