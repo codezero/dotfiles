@@ -140,6 +140,11 @@ Manual follow-ups (need an interactive login session):
           dockerd-rootless-setuptool.sh install && systemctl --user enable --now docker
           sudo loginctl enable-linger $TARGET_USER   # survive logout (headless)
           docker context use rootless
+        If 'docker' then fails with a user-namespace/clone error, Ubuntu 24.04+
+        blocks unprivileged userns via AppArmor by default. Allow it persistently
+        (host-wide security trade-off), then re-run the rootless setup:
+          echo kernel.apparmor_restrict_unprivileged_userns=0 | sudo tee /etc/sysctl.d/99-rootless-userns.conf
+          sudo sysctl --system
       – rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
           sudo usermod -aG docker $TARGET_USER
 EOF

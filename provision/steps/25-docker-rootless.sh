@@ -41,7 +41,7 @@ for _ in {1..10}; do [ -S "$RB" ] && break; sleep 1; done
 # Install + enable the rootless daemon as the user, against that session bus.
 as_user "export XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=$RB PATH=/usr/bin:\$PATH; \
   dockerd-rootless-setuptool.sh install --force && systemctl --user enable --now docker" \
-  || soft_fail "rootless Docker setup failed (unprivileged user namespaces restricted on this host?)"
+  || soft_fail "rootless Docker setup failed — unprivileged userns likely AppArmor-restricted (Ubuntu 24.04+ default); see the post-run Docker note to allow it persistently"
 
 # Point the user's docker CLI at the rootless socket by default.
 as_user "export XDG_RUNTIME_DIR=/run/user/$uid; \

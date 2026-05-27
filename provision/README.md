@@ -190,5 +190,9 @@ in `/var/log/provision.log`.
 > the official setuptool + `loginctl enable-linger` so it survives logout + the
 > `rootless` context). It — and anything needing unprivileged user namespaces —
 > won't work on hosts that restrict nested userns (the same limitation seen on
-> the source VM); there it soft-fails and rootful Docker still works. For
-> rootless you do **not** `usermod -aG docker` (that group is root-equivalent).
+> the source VM); there it soft-fails and rootful Docker still works. On Ubuntu
+> 24.04+/26.04 the block is AppArmor's `kernel.apparmor_restrict_unprivileged_userns=1`
+> (default — even when the `kernel.unprivileged_userns_clone` sysctl is `1`); to
+> allow rootless persistently, drop a `sysctl.d` file setting it to `0` and run
+> `sudo sysctl --system` (a host-wide security trade-off). For rootless you do
+> **not** `usermod -aG docker` (that group is root-equivalent).
