@@ -38,6 +38,18 @@ log "apt update"
 # under STRICT/golden this aborts; a normal run records it and continues.
 apt_get update || soft_fail "apt-get update failed"
 
+# Optional whole-system package refresh (APT_UPGRADE=1, OFF by default). A blanket
+# upgrade also bumps the installed kernel/grub/shim point-releases this step
+# otherwise avoids touching (initramfs rebuild + a reboot-required flag that
+# provision.sh never acts on), so it is opt-in. `upgrade` (never `full-upgrade`)
+# so NO brand-new kernel packages are pulled; the noninteractive/needrestart
+# wrapper keeps it prompt-free. Convergent → idempotent (a no-op once current).
+# A reboot may be wanted afterward on a live box; a golden clone reboots anyway.
+if [ "${APT_UPGRADE:-0}" = "1" ]; then
+  log "apt upgrade (APT_UPGRADE=1)"
+  apt_get upgrade -y || soft_fail "apt-get upgrade failed"
+fi
+
 # Pre-accept the msttcorefonts EULA (harmless if the package isn't pulled in).
 if ! dry; then
   echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \

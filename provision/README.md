@@ -47,6 +47,7 @@ sudo bash provision.sh
 # target a specific user:        sudo PROVISION_USER=alice bash provision.sh
 # also install the desktop set:  sudo INSTALL_DESKTOP=1 bash provision.sh
 # build a reusable golden image: sudo GOLDEN_IMAGE=1 bash provision.sh
+# upgrade installed pkgs first:  sudo APT_UPGRADE=1 bash provision.sh
 ```
 
 Everything is idempotent — safe to re-run.
@@ -122,6 +123,13 @@ cloud-init on first boot.
   abort the entire `apt-get install` batch. The **desktop/locale/IME** set is
   skipped unless `INSTALL_DESKTOP=1`. The batch also falls back to per-package
   installs if it fails.
+- **`APT_UPGRADE=1` (opt-in, off by default)** runs `apt-get upgrade` right after
+  the step-10 index refresh, bringing already-installed packages up to date before
+  the toolchain installs. It uses `upgrade` (not `full-upgrade`) so no brand-new
+  kernel packages are pulled, runs prompt-free via the noninteractive wrapper, and is
+  convergent (idempotent). It *will* bump installed kernel/grub point-releases
+  (reboot-required), which is why it's opt-in; cloud-init users can use
+  `package_upgrade: true` instead.
 - **Brewfile is filtered at install time** (step 30) to Homebrew-native lines
   (`tap`/`brew`/`cask`). `brew bundle dump` also records `flatpak`, `npm`, `mas`,
   and `vscode` entries; feeding those to `brew bundle` here would install flatpaks
