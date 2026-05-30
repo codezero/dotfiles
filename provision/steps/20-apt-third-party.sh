@@ -80,7 +80,7 @@ else
        | gpg --dearmor 2>/dev/null | $SUDO dd of="$VSCODIUM_KR" status=none 2>/dev/null \
      && $SUDO chmod a+r "$VSCODIUM_KR" \
      && verify_keyring "$VSCODIUM_KR" "$VSCODIUM_KEY_FP"; then
-    echo "deb [arch=amd64,arm64 signed-by=$VSCODIUM_KR] https://download.vscodium.com/debs vscodium main" \
+    echo "deb [arch=${ARCH} signed-by=$VSCODIUM_KR] https://download.vscodium.com/debs vscodium main" \
       | $SUDO tee /etc/apt/sources.list.d/vscodium.list >/dev/null
   else
     vscodium_ok=0
@@ -98,6 +98,10 @@ fi
 # its own .deb does (key at /usr/share/keyrings/anysphere.gpg + deb822 source) so
 # 'cursor' installs + self-updates via apt with NO download-URL scraping. The
 # suite is 'stable' (not Ubuntu-codename-specific), so this is version-agnostic.
+# Architectures pinned to the LOCAL arch (same model as Docker above): the InRelease
+# pins the hash of every per-arch Packages.gz it lists, so an upstream CDN-sync
+# drift on the other arch's index (we hit one 2026-05-29) would otherwise fail
+# `apt update` on this box too — and STRICT-abort a golden build.
 log "Cursor: AI editor (signed apt repo)"
 cursor_ok=1
 CURSOR_KR=/usr/share/keyrings/anysphere.gpg
@@ -113,8 +117,8 @@ elif [ "$cursor_ok" = 1 ]; then
        | gpg --dearmor 2>/dev/null | $SUDO tee "$CURSOR_KR" >/dev/null \
      && $SUDO chmod a+r "$CURSOR_KR" \
      && verify_keyring "$CURSOR_KR" "$CURSOR_FP"; then
-    printf 'Types: deb\nURIs: https://downloads.cursor.com/aptrepo\nSuites: stable\nComponents: main\nArchitectures: amd64,arm64\nSigned-By: %s\n' \
-      "$CURSOR_KR" | $SUDO tee /etc/apt/sources.list.d/cursor.sources >/dev/null
+    printf 'Types: deb\nURIs: https://downloads.cursor.com/aptrepo\nSuites: stable\nComponents: main\nArchitectures: %s\nSigned-By: %s\n' \
+      "$ARCH" "$CURSOR_KR" | $SUDO tee /etc/apt/sources.list.d/cursor.sources >/dev/null
   else
     cursor_ok=0
     $SUDO rm -f "$CURSOR_KR" /etc/apt/sources.list.d/cursor.sources
