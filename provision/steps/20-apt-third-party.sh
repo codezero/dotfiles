@@ -94,14 +94,19 @@ if [ "$vscodium_ok" = 1 ]; then
 fi
 
 # ── Cursor (official SIGNED apt repo) ────────────────────────────────────────
-# Cursor publishes a proper signed apt repo (amd64,arm64). Add it the same way
-# its own .deb does (key at /usr/share/keyrings/anysphere.gpg + deb822 source) so
-# 'cursor' installs + self-updates via apt with NO download-URL scraping. The
-# suite is 'stable' (not Ubuntu-codename-specific), so this is version-agnostic.
-# Architectures pinned to the LOCAL arch (same model as Docker above): the InRelease
-# pins the hash of every per-arch Packages.gz it lists, so an upstream CDN-sync
-# drift on the other arch's index (we hit one 2026-05-29) would otherwise fail
-# `apt update` on this box too — and STRICT-abort a golden build.
+# Cursor publishes a proper signed apt repo (amd64,arm64). We write the key +
+# deb822 source OURSELVES, pinned to the LOCAL arch: InRelease pins the hash of
+# every per-arch Packages.gz it lists, so an upstream CDN-sync drift on the OTHER
+# arch's index (we hit one 2026-05-29: amd64 Packages.gz republished 7.5h after
+# InRelease was signed) would otherwise fail `apt update` on this box too — and
+# STRICT-abort a golden build.
+#   NB: the `cursor` .deb postinst REWRITES cursor.sources back to `amd64,arm64`
+#   on every install/upgrade — defeating the arch pin — UNLESS we opt out of its
+#   repo management via debconf (cursor/add-cursor-repo=false, preseeded below).
+#   With that set, postinst leaves our narrowed file alone. (This does NOT make
+#   us immune to a SAME-arch InRelease/Packages drift during a future Cursor
+#   release — only retry/tolerance would — but it removes the cross-arch failure
+#   mode, which is the common one.)
 log "Cursor: AI editor (signed apt repo)"
 cursor_ok=1
 CURSOR_KR=/usr/share/keyrings/anysphere.gpg
@@ -126,6 +131,14 @@ elif [ "$cursor_ok" = 1 ]; then
   fi
 fi
 if [ "$cursor_ok" = 1 ]; then
+  # Opt out of the package's self-managed repo (see NB above) BEFORE install, so
+  # its postinst keeps its hands off our arch-pinned cursor.sources. Harmless if
+  # the debconf template is absent on a future Cursor build.
+  if dry; then
+    would "debconf preseed cursor/add-cursor-repo=false (keep our arch-pinned cursor.sources from the postinst rewrite)"
+  else
+    echo "cursor cursor/add-cursor-repo boolean false" | $SUDO debconf-set-selections 2>/dev/null || true
+  fi
   apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
   apt_install cursor
 fi
