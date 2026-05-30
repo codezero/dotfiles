@@ -10,7 +10,8 @@ Everything here is Bash + config files — there is no build system, test suite,
 - `bash provision/provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
 - `sudo bash provision/provision.sh` — full machine replication. `sudo PROVISION_USER=alice bash …` targets a user; `sudo INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set.
 - `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,flatpak.list,Brewfile}` from live state.
-- Scripts are **not** executable — always invoke with `bash <script>`. Lint with `bash -n <script>` / `shellcheck` if available.
+- Scripts are **not** executable — always invoke with `bash <script>`.
+- **Lint every script you touch with `shellcheck` — not just `bash -n`** (which only catches parse errors; shellcheck catches the bugs that actually bite: unquoted expansions, `$SUDO` redirect gotchas, etc.). shellcheck ships via the Brewfile. Run it from the steps dir so the sourced `lib.sh` resolves: `cd provision/steps && shellcheck -x <script>`. The tree is clean at the warning level; the only remaining notes are **intentional** info-level ones (SC2016 on the `as_user '…$HOME…'` deferred-expansion pattern, SC2024 on root-side `dconf load < "$FRAG"` redirects) — don't "fix" those.
 
 ## Layout
 - `.zshrc`, `.p10k.zsh`, `.gitconfig` — the dotfiles (symlinked into `$HOME`).
