@@ -27,7 +27,8 @@ cloud_init_reinjects() {
 # NOTE: .docker/config.json is KEPT but credential-SCRUBBED below — its
 # currentContext pointer is useful (rootless), but any auths/credHelpers a stray
 # `docker login` wrote are stripped so they can't bake into a shared image.
-CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .codex \
+CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .netrc \
+  .git-credentials .codex \
   .claude/.credentials.json .claude/projects .claude/sessions \
   .claude/history.jsonl .claude/shell-snapshots)
 
@@ -70,8 +71,13 @@ for home in "$TARGET_HOME" /root; do
     -exec grep -qI 'PRIVATE KEY' {} \; -delete 2>/dev/null || true
   # authorized_keys: drop ONLY when cloud-init will actually re-inject keys on the
   # clone (see cloud_init_reinjects) — not merely when it's installed — so a local
-  # / disabled-cloud-init image isn't locked out.
-  cloud_init_reinjects && $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
+  # / disabled-cloud-init image isn't locked out. When kept, SAY SO loudly: it is
+  # a deliberate lockout-safety trade-off against a fully key-free image.
+  if cloud_init_reinjects; then
+    $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
+  elif $SUDO test -f "$home/.ssh/authorized_keys" 2>/dev/null; then
+    warn "KEEPING $home/.ssh/authorized_keys (cloud-init won't re-inject keys — removing it would lock the image out); rm it manually if this image must be key-free"
+  fi
 done
 
 # Docker: strip registry creds a stray `docker login` may have written, but KEEP
@@ -84,7 +90,7 @@ for home in "$TARGET_HOME" /root; do
   if command -v jq >/dev/null 2>&1 \
      && $SUDO sh -c 'jq "del(.auths,.credsStore,.credHelpers,.HttpHeaders)" "$1" >"$1.tmp"' _ "$dc" 2>/dev/null; then
     $SUDO mv "$dc.tmp" "$dc"
-    [ "$home" = "$TARGET_HOME" ] && $SUDO chown "$TARGET_USER":"$TARGET_USER" "$dc" 2>/dev/null || true
+    [ "$home" = "$TARGET_HOME" ] && $SUDO chown "$TARGET_USER":"$TARGET_GROUP" "$dc" 2>/dev/null || true
   else
     $SUDO rm -f "$dc" "$dc.tmp" 2>/dev/null || true
   fi
@@ -139,7 +145,9 @@ if strict; then
   ls /etc/ssh/ssh_host_* >/dev/null 2>&1 && probs+=("/etc/ssh host keys present")
   for home in "$TARGET_HOME" /root; do
     [ -n "$home" ] || continue
-    for p in .aws .gnupg .kube .config/gh .config/gcloud .npmrc; do
+    # Verify EVERY path the scrub above claims to remove — same array, so the
+    # scrub list and the verifier can't drift apart.
+    for p in "${CRED_PATHS[@]}"; do
       [ -e "$home/$p" ] && probs+=("$home/$p remains")
     done
     if [ -d "$home/.ssh" ] && { ls "$home"/.ssh/id_* >/dev/null 2>&1 \

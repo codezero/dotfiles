@@ -10,6 +10,9 @@ apt_install build-essential procps curl file git
 # PROFILE=minimal swaps in the lean Brewfile (core CLI toolchain only).
 BREWFILE="$PKG_DIR/Brewfile"
 minimal && { BREWFILE="$PKG_DIR/Brewfile.minimal"; log "PROFILE=minimal — using $(basename "$BREWFILE")"; }
+# Fail CLOSED on a missing/empty manifest (see step 10) — an empty bundle
+# would silently "succeed" while installing nothing.
+[ -s "$BREWFILE" ] || soft_fail "brew manifest missing/empty: $BREWFILE — no formulae will be installed"
 
 if dry; then
   n="$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$BREWFILE" 2>/dev/null || true)"

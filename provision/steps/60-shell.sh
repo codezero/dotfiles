@@ -7,15 +7,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 log "Shell setup for '$TARGET_USER'"
 
 # oh-my-zsh (unattended; don't let it run zsh or overwrite our .zshrc).
-as_user 'test -d "$HOME/.oh-my-zsh" || \
+# Gate on the SENTINEL FILE, not the directory: an interrupted install leaves a
+# partial ~/.oh-my-zsh that a dir-only check would skip forever. (The installer
+# refuses to run over an existing dir, so a partial install surfaces as a loud
+# failure here instead of a silently broken shell — remove the dir and re-run.)
+as_user 'test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" || \
   RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended' \
   || soft_fail "oh-my-zsh install failed"
+as_user 'test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"' \
+  || soft_fail "oh-my-zsh incomplete: ~/.oh-my-zsh/oh-my-zsh.sh missing after install"
 
-# Powerlevel10k theme.
+# Powerlevel10k theme (same sentinel-file pattern).
 as_user 'ZC="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"; \
-  test -d "$ZC/themes/powerlevel10k" || \
+  test -f "$ZC/themes/powerlevel10k/powerlevel10k.zsh-theme" || \
   git clone --depth=1 https://github.com/romkatv/powerlevel10k "$ZC/themes/powerlevel10k"' \
   || soft_fail "powerlevel10k clone failed"
+as_user 'test -f "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k/powerlevel10k.zsh-theme"' \
+  || soft_fail "powerlevel10k incomplete: powerlevel10k.zsh-theme missing after install"
 
 # Install dotfiles from the repo into the target user's home (nested paths too).
 # File set = the shared manifest at the repo root (also read by install.sh, so
@@ -53,7 +61,7 @@ for f in "${dotfiles[@]}"; do
     $SUDO mkdir -p "$TARGET_HOME/$rel"
     d="$rel"
     while [ "$d" != "." ] && [ "$d" != "/" ]; do
-      $SUDO chown "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/$d" 2>/dev/null || true
+      $SUDO chown "$TARGET_USER":"$TARGET_GROUP" "$TARGET_HOME/$d" 2>/dev/null || true
       d="$(dirname "$d")"
     done
   fi
@@ -70,10 +78,10 @@ for f in "${dotfiles[@]}"; do
     # than capturing an image with a dotfile silently missing.
     $SUDO cp -a "$src" "$dst" || { soft_fail "dotfile copy failed: $f"; continue; }
     # cp -a preserves the repo's ownership, so re-own the WHOLE tree, not just top.
-    $SUDO chown -R "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
+    $SUDO chown -R "$TARGET_USER":"$TARGET_GROUP" "$dst" 2>/dev/null || true
   else
     $SUDO ln -sfn "$src" "$dst" || { soft_fail "dotfile symlink failed: $f"; continue; }
-    $SUDO chown -h "$TARGET_USER":"$TARGET_USER" "$dst" 2>/dev/null || true
+    $SUDO chown -h "$TARGET_USER":"$TARGET_GROUP" "$dst" 2>/dev/null || true
   fi
 done
 

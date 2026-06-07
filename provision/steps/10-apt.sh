@@ -60,7 +60,10 @@ fi
 # lean list (the deny/desktop filters below still apply, harmlessly).
 APT_LIST="$PKG_DIR/apt.list"
 minimal && { APT_LIST="$PKG_DIR/apt.minimal.list"; log "PROFILE=minimal — using $(basename "$APT_LIST")"; }
-mapfile -t raw < <(grep -vE '^[[:space:]]*(#|$)' "$APT_LIST")
+# Fail CLOSED on a missing/empty manifest: silently installing nothing would
+# look like success (and bake an empty golden). soft_fail => STRICT aborts.
+[ -s "$APT_LIST" ] || soft_fail "apt manifest missing/empty: $APT_LIST — no base packages will be installed"
+mapfile -t raw < <(grep -vE '^[[:space:]]*(#|$)' "$APT_LIST" 2>/dev/null)
 pkgs=(); skipped=()
 for p in "${raw[@]}"; do
   p="${p//[[:space:]]/}"            # package names carry no spaces; drop stray whitespace

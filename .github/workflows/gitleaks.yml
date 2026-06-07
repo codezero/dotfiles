@@ -11,10 +11,12 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to commit SHAs (not mutable tags) — supply-chain hardening; the
+      # trailing comment records the human-readable version. Update by re-pinning.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
         with:
           fetch-depth: 0   # full history so gitleaks scans every commit
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7   # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Free for personal/individual and public repos. ORGANIZATION repos

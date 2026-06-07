@@ -87,6 +87,9 @@ else
   [ -n "${TARGET_USER:-}" ] || TARGET_USER="ubuntu"
 fi
 TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
+# Primary GROUP of the target user — do NOT assume it equals the username
+# (true for stock Ubuntu users, not for custom/cloud-directory accounts).
+TARGET_GROUP="$(id -gn "$TARGET_USER" 2>/dev/null || echo "$TARGET_USER")"
 
 # Per-user installs (Homebrew/oh-my-zsh/rustup) must NOT run as root and
 # shouldn't land in /root. Refuse a root/uid-0 target (covers SUDO_USER=root,

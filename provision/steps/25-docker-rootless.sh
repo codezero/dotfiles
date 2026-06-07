@@ -13,8 +13,13 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 [ "${DOCKER_ROOTLESS:-0}" = "1" ] || { log "rootless Docker: skipped (DOCKER_ROOTLESS != 1)"; exit 0; }
-command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1 \
-  || { soft_fail "rootless requested but dockerd-rootless-setuptool.sh missing (docker-ce-rootless-extras not installed)"; exit 0; }
+# Skip this host-state check under --dry-run: on a fresh preview box the
+# setuptool isn't installed YET (step 20 would install it in the real run), and
+# failing here would under-report the planned rootless actions.
+if ! dry && ! command -v dockerd-rootless-setuptool.sh >/dev/null 2>&1; then
+  soft_fail "rootless requested but dockerd-rootless-setuptool.sh missing (docker-ce-rootless-extras not installed)"
+  exit 0
+fi
 
 uid="$(id -u "$TARGET_USER" 2>/dev/null || true)"
 [ -n "$uid" ] || { soft_fail "rootless requested but can't resolve uid for '$TARGET_USER'"; exit 0; }

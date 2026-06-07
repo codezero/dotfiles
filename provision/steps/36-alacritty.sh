@@ -38,8 +38,10 @@ as_user 'set -e; . "$HOME/.cargo/env"; \
   icondir="$HOME/.local/share/icons/hicolor/scalable/apps"; \
   mkdir -p "$appdir" "$icondir"; \
   infocmp alacritty >/dev/null 2>&1 || { \
-    t="$(mktemp)"; curl -fsSL "$base/alacritty.info" -o "$t" \
-      && tic -xe alacritty,alacritty-direct -o "$HOME/.terminfo" "$t"; rm -f "$t"; }; \
+    t="$(mktemp)"; ok=0; \
+    curl -fsSL "$base/alacritty.info" -o "$t" \
+      && tic -xe alacritty,alacritty-direct -o "$HOME/.terminfo" "$t" && ok=1; \
+    rm -f "$t"; [ "$ok" = 1 ]; }; \
   curl -fsSL "$base/logo/alacritty-term.svg" -o "$icondir/Alacritty.svg"; \
   curl -fsSL "$base/linux/Alacritty.desktop" -o "$appdir/Alacritty.desktop"; \
   sed -i "s|^Exec=alacritty|Exec=$HOME/.cargo/bin/alacritty|; s|^TryExec=alacritty|TryExec=$HOME/.cargo/bin/alacritty|" "$appdir/Alacritty.desktop"' \

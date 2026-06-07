@@ -9,7 +9,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 [ "${INSTALL_DESKTOP:-0}" = "1" ] || { log "GNOME dconf: skipped (INSTALL_DESKTOP != 1)"; exit 0; }
 
 FRAG="$PROVISION_DIR/gnome/dconf-settings.ini"
-[ -f "$FRAG" ] || { warn "missing $FRAG — skipping"; exit 0; }
+# soft_fail, not warn: the desktop set was EXPLICITLY requested, so a missing
+# fragment is underdelivery (and must abort a GOLDEN desktop image build).
+[ -f "$FRAG" ] || { soft_fail "missing $FRAG — GNOME settings NOT applied"; exit 0; }
 
 log "GNOME dconf settings for '$TARGET_USER'"
 command -v dconf >/dev/null 2>&1 || apt_install dconf-cli
