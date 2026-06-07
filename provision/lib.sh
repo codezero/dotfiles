@@ -168,3 +168,34 @@ load_brew() {
   [ -x /home/linuxbrew/.linuxbrew/bin/brew ] && \
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 }
+
+# The manual post-provision follow-ups. ONE source of truth: provision.sh prints
+# this at the end of a normal run, and step 80 writes it to
+# ~/PROVISION-NEXT-STEPS.md (+ an MOTD pointer) — a GOLDEN build exits + wipes
+# before the end-of-run summary, so without the file a clone / cloud-init user
+# would have no on-box record of these. Plain text that also reads as Markdown.
+next_steps_text() {
+  cat <<EOF
+Manual follow-ups (need an interactive login session):
+
+  - Open a new terminal so zsh + Powerlevel10k load.
+  - Node:  nvm install --lts
+  - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
+        corepack enable
+  - MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
+    OTHER terminal, select "MesloLGS NF" in its font settings.
+  - Set your real git identity in ~/.gitconfig.
+  - Docker access for $TARGET_USER — choose ONE:
+      - rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:
+            dockerd-rootless-setuptool.sh install && systemctl --user enable --now docker
+            sudo loginctl enable-linger $TARGET_USER   # survive logout (headless)
+            docker context use rootless
+        If 'docker' then fails with a user-namespace/clone error, Ubuntu 24.04+
+        blocks unprivileged userns via AppArmor by default. Allow it persistently
+        (host-wide security trade-off), then re-run the rootless setup:
+            echo kernel.apparmor_restrict_unprivileged_userns=0 | sudo tee /etc/sysctl.d/99-rootless-userns.conf
+            sudo sysctl --system
+      - rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
+            sudo usermod -aG docker $TARGET_USER
+EOF
+}

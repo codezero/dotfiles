@@ -64,6 +64,7 @@ STEPS=(
   50-flatpak.sh
   55-gnome-dconf.sh
   60-shell.sh
+  80-next-steps.sh
   90-finalize.sh
 )
 
@@ -99,9 +100,11 @@ if [ "${GOLDEN_IMAGE:-0}" != "1" ]; then
 fi
 
 # GOLDEN: finalize (step 90) is the LAST guest-side action — it wiped logs,
-# history, and tmp. Print/write NOTHING after it (the summary + per-clone manual
-# follow-ups below could otherwise be captured into the image). A golden run is
-# STRICT, so any failure already aborted; reaching here means success.
+# history, and tmp. Print/write NOTHING after it (the summary below could
+# otherwise be captured into the image). The per-clone manual follow-ups are
+# already on-box: step 80 wrote ~/PROVISION-NEXT-STEPS.md + an MOTD pointer,
+# both of which survive finalize. A golden run is STRICT, so any failure
+# already aborted; reaching here means success.
 if [ "${GOLDEN_IMAGE:-0}" = "1" ] && ! dry; then
   exit 0
 fi
@@ -126,30 +129,13 @@ fi
 
 # Real runs only — a dry-run changed nothing, so post-install follow-ups would
 # be misleading (and look like it actually ran). Golden already exited above.
+# Text lives in lib.sh (next_steps_text) — step 80 wrote the same content to
+# ~/PROVISION-NEXT-STEPS.md so it persists beyond this one-time print.
 if ! dry; then
-cat <<EOF
-
-Manual follow-ups (need an interactive login session):
-  • Open a new terminal so zsh + Powerlevel10k load.
-  • Node:  nvm install --lts
-  • corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
-        corepack enable
-  • MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
-    OTHER terminal, select "MesloLGS NF" in its font settings.
-  • Set your real git identity in ~/.gitconfig.
-  • Docker access for $TARGET_USER — choose ONE:
-      – rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:
-          dockerd-rootless-setuptool.sh install && systemctl --user enable --now docker
-          sudo loginctl enable-linger $TARGET_USER   # survive logout (headless)
-          docker context use rootless
-        If 'docker' then fails with a user-namespace/clone error, Ubuntu 24.04+
-        blocks unprivileged userns via AppArmor by default. Allow it persistently
-        (host-wide security trade-off), then re-run the rootless setup:
-          echo kernel.apparmor_restrict_unprivileged_userns=0 | sudo tee /etc/sysctl.d/99-rootless-userns.conf
-          sudo sysctl --system
-      – rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
-          sudo usermod -aG docker $TARGET_USER
-EOF
+  echo
+  next_steps_text
+  echo
+  log "Also saved on-box: $TARGET_HOME/PROVISION-NEXT-STEPS.md (MOTD reminds at login; delete the file when done)"
 fi
 
 # Every step ran regardless of failures; this only sets the exit code so that

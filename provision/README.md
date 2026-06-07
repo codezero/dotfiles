@@ -29,6 +29,7 @@ provision/
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     ├── 55-gnome-dconf.sh     # GNOME dconf settings (only with INSTALL_DESKTOP=1)
     ├── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks/copies (as user)
+    ├── 80-next-steps.sh      # ~/PROVISION-NEXT-STEPS.md + MOTD pointer (persistent manual follow-ups)
     └── 90-finalize.sh        # image cleanup: machine-id/ssh-key/log/cargo-cache reset (only GOLDEN_IMAGE=1)
 ```
 
@@ -93,6 +94,12 @@ sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/gold
 
 Each booted clone regenerates a unique machine-id + SSH host keys and re-runs
 cloud-init on first boot.
+
+The manual follow-ups (git identity, `nvm install --lts`, Docker mode choice)
+survive into every clone: step 80 writes them to `~/PROVISION-NEXT-STEPS.md`
+and adds an MOTD pointer (`/etc/update-motd.d/99-provision-next-steps`), both
+of which finalize leaves alone. The MOTD notice is self-silencing — delete the
+`.md` once done and it stops printing.
 
 > **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
 > shell history, and credential stores (`.aws`/`.gnupg`/`.config/{gh,gcloud}`/
