@@ -39,26 +39,34 @@ for _ in {1..10}; do [ -S "$RB" ] && break; sleep 1; done
 [ -S "$RB" ] || warn "user session bus $RB not up yet — systemctl --user may fail"
 
 # Install + enable the rootless daemon as the user, against that session bus.
+setup_ok=1
 as_user "export XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=$RB PATH=/usr/bin:\$PATH; \
   dockerd-rootless-setuptool.sh install --force && systemctl --user enable --now docker" \
-  || soft_fail "rootless Docker setup failed — unprivileged userns likely AppArmor-restricted (Ubuntu 24.04+ default); see the post-run Docker note to allow it persistently"
+  || { setup_ok=0; soft_fail "rootless Docker setup failed — unprivileged userns likely AppArmor-restricted (Ubuntu 24.04+ default); see ~/PROVISION-NEXT-STEPS.md to allow it persistently, then re-run with DOCKER_ROOTLESS=1"; }
 
-# Point the user's docker CLI at the rootless socket by default.
-as_user "export XDG_RUNTIME_DIR=/run/user/$uid; \
-  docker context create rootless --docker host=unix:///run/user/$uid/docker.sock >/dev/null 2>&1 || true; \
-  docker context use rootless >/dev/null 2>&1 || true"
+# Only repoint the CLI + validate when the setup actually succeeded. On failure
+# we must NOT `docker context use rootless` — that would aim the user's CLI at a
+# socket that doesn't exist, breaking even rootful use ("soft-fails and the
+# rootful daemon still works" is the contract). Tolerant runs reach this point
+# after the soft_fail above; STRICT/golden already died there.
+if [ "$setup_ok" = 1 ]; then
+  # Point the user's docker CLI at the rootless socket by default.
+  as_user "export XDG_RUNTIME_DIR=/run/user/$uid; \
+    docker context create rootless --docker host=unix:///run/user/$uid/docker.sock >/dev/null 2>&1 || true; \
+    docker context use rootless >/dev/null 2>&1 || true"
 
-# Validate the requested rootless daemon actually came up — don't silently
-# underdeliver (under GOLDEN_IMAGE/STRICT this soft_fail aborts the build).
-as_user "export XDG_RUNTIME_DIR=/run/user/$uid; systemctl --user is-active --quiet docker" \
-  || soft_fail "rootless Docker service not active after setup (unprivileged userns restricted?)"
+  # Validate the requested rootless daemon actually came up — don't silently
+  # underdeliver (under GOLDEN_IMAGE/STRICT this soft_fail aborts the build).
+  as_user "export XDG_RUNTIME_DIR=/run/user/$uid; systemctl --user is-active --quiet docker" \
+    || soft_fail "rootless Docker service not active after setup (unprivileged userns restricted?)"
 
-# Validate the CLI default context is actually 'rootless' (the `context use`
-# above is best-effort) — otherwise `docker` would silently talk to the rootful
-# daemon and the rootless setup would be a no-op from the user's POV.
-as_user "export XDG_RUNTIME_DIR=/run/user/$uid; [ \"\$(docker context show 2>/dev/null)\" = rootless ]" \
-  || soft_fail "docker context is not 'rootless' after setup (CLI would default to the rootful daemon)"
+  # Validate the CLI default context is actually 'rootless' (the `context use`
+  # above is best-effort) — otherwise `docker` would silently talk to the rootful
+  # daemon and the rootless setup would be a no-op from the user's POV.
+  as_user "export XDG_RUNTIME_DIR=/run/user/$uid; [ \"\$(docker context show 2>/dev/null)\" = rootless ]" \
+    || soft_fail "docker context is not 'rootless' after setup (CLI would default to the rootful daemon)"
 
-log "Rootless Docker configured (socket unix:///run/user/$uid/docker.sock)."
-log "System (rootful) Docker is left installed but unused; to remove it:"
-log "  sudo systemctl disable --now docker.service docker.socket"
+  log "Rootless Docker configured (socket unix:///run/user/$uid/docker.sock)."
+  log "System (rootful) Docker is left installed but unused; to remove it:"
+  log "  sudo systemctl disable --now docker.service docker.socket"
+fi
