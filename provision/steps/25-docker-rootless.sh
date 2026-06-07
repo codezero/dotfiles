@@ -22,10 +22,32 @@ uid="$(id -u "$TARGET_USER" 2>/dev/null || true)"
 log "Rootless Docker for '$TARGET_USER' (uid $uid)"
 
 if dry; then
+  would "preflight: require kernel.apparmor_restrict_unprivileged_userns != 1 (rootlesskit needs caps inside the userns)"
   would "loginctl enable-linger $TARGET_USER"
   would "(as $TARGET_USER) dockerd-rootless-setuptool.sh install --force"
   would "(as $TARGET_USER) systemctl --user enable --now docker"
   would "(as $TARGET_USER) docker context use rootless (unix:///run/user/$uid/docker.sock)"
+  exit 0
+fi
+
+# Pre-flight: fail fast (and precisely) when AppArmor restricts unprivileged
+# user namespaces — otherwise the same failure surfaces minutes later inside the
+# setuptool with a vaguer message (and under STRICT/golden, that's where the
+# build would abort). We read the sysctl DIRECTLY rather than probing with
+# `unshare --user --map-root-user true`: that probe false-OKs on 24.04+ —
+# Ubuntu grants the `unshare` binary its own userns-allowing AppArmor profile,
+# and the restriction doesn't deny userns *creation* anyway (it transitions the
+# process to an `unprivileged_userns` profile that strips capabilities INSIDE
+# the ns, which is what kills rootlesskit's mounts). The sysctl is the exact
+# knob the documented remedy flips. Relaxing it is a deliberate host-wide
+# trade-off left to the user (see ~/PROVISION-NEXT-STEPS.md) — and on a GOLDEN
+# build box the sysctl.d drop-in would bake into the image (every clone
+# inherits it), so a golden stays rootless-free by default and clones opt in.
+# Missing file (non-Ubuntu kernel / pre-23.10) => no restriction => proceed;
+# a rare hand-crafted rootlesskit profile would false-block here — acceptable,
+# the message says how to proceed.
+if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
+  soft_fail "rootless preflight: kernel.apparmor_restrict_unprivileged_userns=1 (Ubuntu 24.04+ default) — rootlesskit would get a capability-stripped userns; skipping rootless setup. See ~/PROVISION-NEXT-STEPS.md, then re-run with DOCKER_ROOTLESS=1"
   exit 0
 fi
 
