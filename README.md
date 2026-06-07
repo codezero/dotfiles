@@ -28,6 +28,13 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 - **Just my shell on an existing box** → `install.sh` (below).
 - **Replicate the whole machine / cloud-init** → [`provision/`](provision/README.md).
 
+## Smoke tests
+
+`bash smoke-test.sh lint` + `bash smoke-test.sh dry` run anywhere (no sudo, no
+changes): shellcheck the tree + assert the `--dry-run` behavior of every
+provisioning flag. `bash smoke-test.sh verify` audits a provisioned box's end
+state read-only; `bash smoke-test.sh scenarios` prints the live-test runbook.
+
 ## Quick start (install.sh)
 
 ```bash
