@@ -1,0 +1,12 @@
+# Minimal agent profile (PROFILE=minimal): core CLI toolchain only.
+# Kept: gh/jq/ripgrep/gitleaks (+ shellcheck — this repo mandates it for its
+# own scripts). rust comes from step 35 (rustup), node from nvm post-provision,
+# claude from step 37. Dropped vs the full Brewfile: bat/eza/zoxide/fzf/btop
+# and friends (.zshrc guards those aliases with `command -v`), nvim, go, and
+# the k8s/docker TUIs.
+brew "gh"
+brew "gitleaks"
+brew "jq"
+brew "nvm"
+brew "ripgrep"
+brew "shellcheck"

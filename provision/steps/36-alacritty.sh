@@ -11,6 +11,10 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
+# Headless agent boxes need no GUI terminal (and no Nerd Font — that's only for
+# glyph rendering in a terminal emulator; the p10k prompt itself degrades fine).
+minimal && { log "alacritty: skipped (PROFILE=minimal)"; exit 0; }
+
 log "Alacritty: build deps + cargo install (as '$TARGET_USER')"
 
 # Build deps per Alacritty's INSTALL.md (Ubuntu). Ensure build-essential (cc +

@@ -10,6 +10,7 @@
 #   sudo GOLDEN_IMAGE=1 bash provision.sh     # strict build + finalize, ready to snapshot
 #   sudo DOCKER_ROOTLESS=1 bash provision.sh  # also set up rootless Docker for the user
 #   sudo APT_UPGRADE=1 bash provision.sh       # also `apt upgrade` already-installed pkgs first
+#   sudo PROFILE=minimal bash provision.sh     # lean headless agent box (no GUI steps/editors)
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
@@ -23,14 +24,14 @@ DRY_RUN=0
 for a in "$@"; do
   case "$a" in
     --dry-run|-n) DRY_RUN=1 ;;
-    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] [DOCKER_ROOTLESS=1] [APT_UPGRADE=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
+    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [PROFILE=full|minimal] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] [DOCKER_ROOTLESS=1] [APT_UPGRADE=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
     *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
   esac
 done
 export DRY_RUN
 
 # Flags are UPPERCASE env vars; warn on the common lowercase typo before defaulting.
-for _lc in install_desktop golden_image docker_rootless apt_upgrade; do
+for _lc in install_desktop golden_image docker_rootless apt_upgrade profile; do
   _uc="${_lc^^}"
   [ -n "${!_lc:-}" ] && [ -z "${!_uc:-}" ] && \
     echo "[warn] env '$_lc' is set but IGNORED — flags are UPPERCASE; did you mean '$_uc'?" >&2
@@ -41,8 +42,20 @@ export INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"   # 1 = also install the desktop/
 export GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"         # 1 = strict build + finalize + self-contained dotfile copies
 export DOCKER_ROOTLESS="${DOCKER_ROOTLESS:-0}"   # 1 = set up rootless Docker for the target user (step 25)
 export APT_UPGRADE="${APT_UPGRADE:-0}"           # 1 = apt-get upgrade already-installed pkgs first (step 10)
+export PROFILE="${PROFILE:-full}"                # minimal = lean headless agent box (no GUI steps/editors)
 
 source "$HERE/lib.sh"
+
+# Validate PROFILE early — a typo'd value would silently provision the FULL set.
+case "$PROFILE" in
+  full|minimal) : ;;
+  *) die "PROFILE must be 'full' or 'minimal' (got '$PROFILE')" ;;
+esac
+# minimal + desktop contradict: step 10 would install the desktop apt set while
+# the GUI steps (36/50/55) skip — a half-state. Refuse the combination outright.
+if minimal && [ "$INSTALL_DESKTOP" = "1" ]; then
+  die "PROFILE=minimal and INSTALL_DESKTOP=1 conflict — a minimal agent box has no GUI; drop one of the flags"
+fi
 
 if dry; then
   log "DRY RUN — no changes will be made; printing planned actions."

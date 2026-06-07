@@ -7,12 +7,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 log "Homebrew + formulae as user '$TARGET_USER'"
 apt_install build-essential procps curl file git
 
+# PROFILE=minimal swaps in the lean Brewfile (core CLI toolchain only).
+BREWFILE="$PKG_DIR/Brewfile"
+minimal && { BREWFILE="$PKG_DIR/Brewfile.minimal"; log "PROFILE=minimal — using $(basename "$BREWFILE")"; }
+
 if dry; then
-  n="$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$PKG_DIR/Brewfile" 2>/dev/null || true)"
+  n="$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$BREWFILE" 2>/dev/null || true)"
   n="${n:-0}"
   would "pre-create /home/linuxbrew owned by $TARGET_USER (so the non-root brew installer needs no sudo)"
   would "install Homebrew (if missing) as $TARGET_USER"
-  would "brew bundle: $n formulae/casks from Brewfile (flatpak/npm/mas/vscode lines ignored)"
+  would "brew bundle: $n formulae/casks from $(basename "$BREWFILE") (flatpak/npm/mas/vscode lines ignored)"
   as_user 'mkdir -p "$HOME/.nvm"'
 else
   # Homebrew won't run as root, but its FIRST install needs root to create
@@ -39,7 +43,7 @@ else
   # Casks ARE kept: Linux-capable casks (e.g. `codex`) install fine on linuxbrew;
   # any macOS-only cask just fails-soft. Flatpaks are handled by flatpak.list.
   FILTERED="$(mktemp /tmp/Brewfile.filtered.XXXXXX)"
-  grep -E '^[[:space:]]*(tap|brew|cask)[[:space:]]' "$PKG_DIR/Brewfile" > "$FILTERED" 2>/dev/null || true
+  grep -E '^[[:space:]]*(tap|brew|cask)[[:space:]]' "$BREWFILE" > "$FILTERED" 2>/dev/null || true
   chmod 0644 "$FILTERED" 2>/dev/null || true   # so the target user can read it
 
   as_user "eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"; \

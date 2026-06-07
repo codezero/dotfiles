@@ -27,6 +27,15 @@ would() { printf '   \033[2m[would]\033[0m %s\n' "$*"; }
 # Execute a plain command (no pipes/redirects), or just print it in dry-run.
 run()   { if dry; then would "$*"; else "$@"; fi; }
 
+# --- profile -----------------------------------------------------------------
+# PROFILE=minimal = lean headless box for AI agents: GUI steps (36-alacritty,
+# 50-flatpak) and GUI editors (VSCodium/Cursor in step 20) are skipped, and the
+# lean package lists (apt.minimal.list / Brewfile.minimal) are used. zsh + p10k
+# + dotfiles + Docker + rust + Claude Code are kept. provision.sh validates the
+# value and rejects PROFILE=minimal + INSTALL_DESKTOP=1.
+PROFILE="${PROFILE:-full}"
+minimal() { [ "$PROFILE" = "minimal" ]; }
+
 # --- strict / golden-image mode ---------------------------------------------
 # GOLDEN_IMAGE=1 builds a reusable image: it implies STRICT (fail hard on the
 # first real failure instead of warn-and-continue) and turns on the finalize
@@ -182,8 +191,14 @@ Manual follow-ups (need an interactive login session):
   - Node:  nvm install --lts
   - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
+EOF
+  # Font bullet only when the font was actually installed (step 36 is skipped
+  # under PROFILE=minimal — headless, no GUI terminal).
+  minimal || cat <<EOF
   - MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
     OTHER terminal, select "MesloLGS NF" in its font settings.
+EOF
+  cat <<EOF
   - Set your real git identity in ~/.gitconfig.
   - Docker access for $TARGET_USER — choose ONE:
       - rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:

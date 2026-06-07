@@ -56,8 +56,11 @@ if ! dry; then
     | $SUDO debconf-set-selections 2>/dev/null || true
 fi
 
-# Build the filtered install list.
-mapfile -t raw < <(grep -vE '^[[:space:]]*(#|$)' "$PKG_DIR/apt.list")
+# Build the filtered install list. PROFILE=minimal swaps in the hand-curated
+# lean list (the deny/desktop filters below still apply, harmlessly).
+APT_LIST="$PKG_DIR/apt.list"
+minimal && { APT_LIST="$PKG_DIR/apt.minimal.list"; log "PROFILE=minimal — using $(basename "$APT_LIST")"; }
+mapfile -t raw < <(grep -vE '^[[:space:]]*(#|$)' "$APT_LIST")
 pkgs=(); skipped=()
 for p in "${raw[@]}"; do
   p="${p//[[:space:]]/}"            # package names carry no spaces; drop stray whitespace

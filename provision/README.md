@@ -15,7 +15,9 @@ provision/
 ├── packages/
 │   ├── apt.list          # apt packages (base/desktop/boot excluded)
 │   ├── flatpak.list      # Flathub app IDs
-│   └── Brewfile          # Homebrew formulae (the CLI toolchain)
+│   ├── Brewfile          # Homebrew formulae (the CLI toolchain)
+│   ├── apt.minimal.list  # lean apt set for PROFILE=minimal (headless agent box)
+│   └── Brewfile.minimal  # lean brew set for PROFILE=minimal
 ├── gnome/
 │   └── dconf-settings.ini # curated GNOME settings (loaded by step 55, desktop-only)
 └── steps/
@@ -53,6 +55,9 @@ sudo bash provision.sh
 # also install the desktop set:  sudo INSTALL_DESKTOP=1 bash provision.sh
 # build a reusable golden image: sudo GOLDEN_IMAGE=1 bash provision.sh
 # upgrade installed pkgs first:  sudo APT_UPGRADE=1 bash provision.sh
+# lean headless agent box:       sudo PROFILE=minimal bash provision.sh
+#   (skips Alacritty/flatpak + the GUI editors; lean apt/brew lists; keeps
+#    zsh+p10k, Docker, rust, Claude Code. Conflicts with INSTALL_DESKTOP=1.)
 ```
 
 Everything is idempotent — safe to re-run.

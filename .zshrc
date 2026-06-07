@@ -116,18 +116,21 @@ export CLAUDE_CODE_NO_FLICKER=1
 export NVM_DIR="$HOME/.nvm"
   [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"  # This loads nvm
   [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # Rust toolchain (rustup) — installed per-user under ~/.cargo (provision step 35).
 [ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-alias ls="eza --icons=always"
-eval "$(zoxide init zsh)"
-alias cat="bat"
+# Niceties — each guarded so a lean box (provision PROFILE=minimal installs
+# no bat/eza/zoxide) gets a clean shell instead of "command not found" noise.
+command -v eza    >/dev/null && alias ls="eza --icons=always"
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+command -v bat    >/dev/null && alias cat="bat"
 
-
-source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
+  source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
+  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 zstyle ':omz:plugins:alias-finder' autoload yes
 zstyle ':omz:plugins:alias-finder' longer yes

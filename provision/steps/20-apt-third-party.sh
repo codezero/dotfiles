@@ -103,8 +103,12 @@ fi
 # ── VSCodium (official) ──────────────────────────────────────────────────────
 log "VSCodium: repo + codium"
 vscodium_ok=1
+# GUI editor — skipped on a headless agent box (Docker above is kept).
+minimal && { vscodium_ok=0; log "VSCodium: skipped (PROFILE=minimal)"; }
 VSCODIUM_KR=/usr/share/keyrings/vscodium-archive-keyring.gpg
-if dry; then
+if [ "$vscodium_ok" = 0 ]; then
+  :
+elif dry; then
   would "download + verify VSCodium key -> $VSCODIUM_KR (pin: ${VSCODIUM_KEY_FP:-none})"
   would "add repo: deb [...] https://download.vscodium.com/debs vscodium main"
 else
@@ -141,11 +145,15 @@ fi
 #   mode, which is the common one.)
 log "Cursor: AI editor (signed apt repo)"
 cursor_ok=1
+# GUI editor — skipped on a headless agent box.
+minimal && { cursor_ok=0; log "Cursor: skipped (PROFILE=minimal)"; }
 CURSOR_KR=/usr/share/keyrings/anysphere.gpg
-case "$ARCH" in
-  amd64|arm64) : ;;
-  *) cursor_ok=0; warn "Cursor: unsupported arch '$ARCH' — skipping" ;;
-esac
+if [ "$cursor_ok" = 1 ]; then
+  case "$ARCH" in
+    amd64|arm64) : ;;
+    *) cursor_ok=0; warn "Cursor: unsupported arch '$ARCH' — skipping" ;;
+  esac
+fi
 if [ "$cursor_ok" = 1 ] && dry; then
   would "download + fingerprint-verify ($CURSOR_FP) Cursor key -> $CURSOR_KR"
   would "add repo: deb822 https://downloads.cursor.com/aptrepo stable main"

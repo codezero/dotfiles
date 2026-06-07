@@ -3,6 +3,9 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
+# Flatpaks here are GUI apps — nothing for a headless agent box.
+minimal && { log "flatpak: skipped (PROFILE=minimal)"; exit 0; }
+
 log "Ensuring Flatpak + Flathub remote"
 apt_install flatpak
 # gnome-software-plugin-flatpak is GUI-only (shows flatpaks in the Software app)
