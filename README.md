@@ -31,6 +31,7 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 ## Quick start (install.sh)
 
 ```bash
+sudo apt update && sudo apt install -y git   # fresh/default Ubuntu ships no git
 git clone <your-repo-url> ~/dotfiles
 cd ~/dotfiles
 bash install.sh        # not chmod +x in the repo, so invoke with bash

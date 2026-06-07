@@ -36,7 +36,11 @@ provision/
 ## Usage
 
 ```bash
-# 1. Get the repo onto the clean machine (see cloud-init note about private repos)
+# 1. Get the repo onto the clean machine (see cloud-init note about private repos).
+#    git is the ONLY bootstrap dependency — a fresh/default Ubuntu ships without
+#    it (cloud-init users: the user-data below installs it via `packages: [git]`).
+#    Everything else the scripts need is installed by the provisioner itself.
+sudo apt update && sudo apt install -y git
 git clone <repo-url> ~/dotfiles
 cd ~/dotfiles/provision
 
@@ -75,6 +79,7 @@ builder. It changes three things versus a normal run:
 # 1. On a throwaway build box, get the repo under /tmp — it is NOT needed at
 #    runtime once the dotfiles are copied in, and finalize wipes /tmp LAST, so a
 #    /tmp clone (and any /tmp logs) are swept from the image automatically.
+#    (Fresh box: install git first — see Usage above.)
 git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles/provision
 
 # 2. Preview, then build strictly. PROVISION_USER targets the image's login user;
