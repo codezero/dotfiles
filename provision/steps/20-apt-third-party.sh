@@ -17,6 +17,38 @@ DOCKER_FP="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 CURSOR_FP="380FF4BCDC34A4BD92A3565342A1772E62E492D6"
 VSCODIUM_KEY_FP="${VSCODIUM_KEY_FP:-1302DE60231889FE1EBACADC54678CF75A278D9C}"
 
+# Third-party index refresh, resilient by design. Refreshes ONLY the given
+# vendor's source file (Dir::Etc::sourcelist + List-Cleanup=0), so base/security
+# repos are untouched here BY CONSTRUCTION — their freshness and STRICT
+# semantics stay step 10's, and we stop re-fetching the whole Ubuntu index once
+# per vendor. Retries cover transient CDN flakiness; a PERSISTENT failure (e.g.
+# Cursor's recurring InRelease/Packages publish race, hit 2026-05-29) is a WARN,
+# not a soft_fail — even under STRICT/golden: apt keeps any previously-fetched
+# index ("old ones used instead"), so on a re-run / iterate-on-golden the
+# install still works from the old index. On a FIRST run there is no old index,
+# so the apt_install right after fails → soft_fail → STRICT still aborts — i.e.
+# a golden aborts on actual underdelivery (package missing), no longer on a
+# mere index hiccup.
+vendor_apt_update() {
+  local src="$1" name="$2" try
+  if dry; then
+    would "apt-get update (ONLY $src; 3 tries w/ backoff; persistent failure warns, never aborts)"
+    return 0
+  fi
+  for try in 1 2 3; do
+    apt_get update \
+      -o Dir::Etc::sourcelist="$src" \
+      -o Dir::Etc::sourceparts=/dev/null \
+      -o APT::Get::List-Cleanup=0 && return 0
+    if [ "$try" -lt 3 ]; then
+      warn "$name index refresh failed (try $try/3) — retrying in $((try * 10))s"
+      sleep $((try * 10))
+    fi
+  done
+  warn "$name index refresh still failing after 3 tries — continuing with any previously-fetched index ('old ones used instead'); the install below is the real gate"
+  return 0
+}
+
 # ── Docker (official) ───────────────────────────────────────────────────────
 log "Docker: repo + Engine"
 # Remove distro/old Docker packages first — docker.io, the docker snap's deps,
@@ -60,7 +92,7 @@ else
   fi
 fi
 if [ "$docker_ok" = 1 ]; then
-  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
+  vendor_apt_update /etc/apt/sources.list.d/docker.list "Docker"
   # uidmap + docker-ce-rootless-extras + dbus-user-session are the rootless
   # prerequisites (dbus-user-session is required for `systemctl --user`; step 25
   # wires it up when DOCKER_ROOTLESS=1).
@@ -89,7 +121,7 @@ else
   fi
 fi
 if [ "$vscodium_ok" = 1 ]; then
-  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
+  vendor_apt_update /etc/apt/sources.list.d/vscodium.list "VSCodium"
   apt_install codium
 fi
 
@@ -139,6 +171,6 @@ if [ "$cursor_ok" = 1 ]; then
   else
     echo "cursor cursor/add-cursor-repo boolean false" | $SUDO debconf-set-selections 2>/dev/null || true
   fi
-  apt_get update || soft_fail "apt-get update failed after adding a third-party repo"
+  vendor_apt_update /etc/apt/sources.list.d/cursor.sources "Cursor"
   apt_install cursor
 fi
