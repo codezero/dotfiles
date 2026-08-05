@@ -9,7 +9,7 @@
 #                                  read-only end-state audit ON a provisioned
 #                                  box/clone. Scenarios: auto (default) | plain
 #                                  | copy | minimal | desktop | rootless |
-#                                  golden-clone. Add-ons compose:
+#                                  golden-clone | installsh. Add-ons compose:
 #                                  `verify plain desktop rootless` runs all 3.
 #   bash smoke-test.sh scenarios   print the live test runbook (S1–S11)
 #
@@ -161,6 +161,34 @@ v_minimal() {
     bash -c '! grep -q MesloLGS "$HOME/PROVISION-NEXT-STEPS.md"'
 }
 
+v_installsh() {
+  # install.sh's OWN contract — deliberately NOT v_core. install.sh is the
+  # lightweight "shell + dotfiles" entry point: no tmux, no rustup/claude/docker,
+  # no step-80 files, and only its own 5-package brew subset. Auditing it with
+  # v_core would red-flag ~9 things it never claims to install.
+  hdr "verify: install.sh bootstrap (shell + dotfiles only)"
+  check "zsh installed"          command -v zsh
+  check "oh-my-zsh present"      test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"
+  check "p10k theme present"     test -f "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme"
+  check "zsh starts clean"       zsh -ic true
+  check "default shell = zsh"    bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
+  # Dotfile set from the shared manifest — same source of truth install.sh reads,
+  # so the audit can't drift from what was deployed.
+  local f
+  while IFS= read -r f; do
+    check "dotfile $f installed" test -e "$HOME/$f"
+  done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
+  check "brew"                   test -x /home/linuxbrew/.linuxbrew/bin/brew
+  local b
+  for b in nvm eza bat zoxide jq; do
+    check "$b (brew subset)"     bash -c "test -e /home/linuxbrew/.linuxbrew/bin/$b || /home/linuxbrew/.linuxbrew/bin/brew list --formula $b"
+  done
+  check "\$HOME/.nvm dir (brew nvm needs it)" test -d "$HOME/.nvm"
+  check "alacritty themes clone" test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"
+  check "MesloLGS NF (user font dir)" \
+    bash -c 'ls "$HOME"/.local/share/fonts/MesloLGS*.ttf'
+}
+
 v_mode() {  # $1 = symlink|copy
   hdr "verify: dotfile mode = $1"
   if [ "$1" = copy ]; then
@@ -200,13 +228,18 @@ cmd_verify() {
   local args=("$@")
   if [ "${#args[@]}" -eq 0 ] || [ "${args[0]}" = auto ]; then
     args=()
-    # auto-detect: profile by what's installed, mode by .zshrc type
-    if dpkg-query -W codium >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/alacritty" ]; then
+    # auto-detect: install.sh box first — provision.sh ALWAYS writes the step-80
+    # notes file (and it survives the golden wipe), so its absence means this box
+    # was never provisioned, only bootstrapped.
+    if [ ! -f "$HOME/PROVISION-NEXT-STEPS.md" ]; then
+      args+=(installsh)
+    elif dpkg-query -W codium >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/alacritty" ]; then
       args+=(full); else args+=(minimal); fi
     if [ -L "$HOME/.zshrc" ]; then args+=(plain); else args+=(copy); fi
     echo "auto-detected: ${args[*]}"
   fi
-  v_core
+  # installsh replaces the core audit rather than adding to it (different contract).
+  case " ${args[*]} " in *" installsh "*) ;; *) v_core ;; esac
   local a
   for a in "${args[@]}"; do
     case "$a" in
@@ -214,6 +247,7 @@ cmd_verify() {
       plain)        v_mode symlink ;;
       copy)         v_mode copy ;;
       minimal)      v_minimal ;;
+      installsh)    v_installsh ;;
       desktop)      v_desktop ;;
       rootless)     v_rootless ;;
       golden-clone) v_mode copy; v_golden_clone ;;
@@ -246,7 +280,8 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     or DOTFILES_COPY=1 — plain re-run would symlink over the copies)
                     [+ APT_UPGRADE=1 for a true bring-to-latest]
  S10 install.sh     bash install.sh && exec zsh; re-run for idempotency; --copy variant
-                    -> verify plain   (core checks; brew subset differs by design)
+                    -> verify installsh   (its OWN contract — NOT verify plain:
+                    no tmux/rustup/claude/docker/step-80, 5-formula brew subset)
  S11 minimal        sudo env PROFILE=minimal PROVISION_USER=$USER bash provision/provision.sh
                     -> verify minimal plain
 
