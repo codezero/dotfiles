@@ -157,8 +157,14 @@ v_minimal() {
   checkno "eza ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/eza
   checkno "zoxide ABSENT"          test -e /home/linuxbrew/.linuxbrew/bin/zoxide
   check  "shellcheck (brew, kept)" test -x /home/linuxbrew/.linuxbrew/bin/shellcheck
-  check  "font bullet absent from notes" \
-    bash -c '! grep -q MesloLGS "$HOME/PROVISION-NEXT-STEPS.md"'
+  # The notes must not CLAIM the font is installed (step 36 was skipped), but
+  # must explain the tofu you'd see in a terminal opened ON this box.
+  check   "notes carry the no-Nerd-Font note" \
+    bash -c 'grep -q "No Nerd Font on this profile" "$HOME/PROVISION-NEXT-STEPS.md"'
+  checkno "notes do NOT claim the font is installed" \
+    bash -c 'grep -q "installed system-wide" "$HOME/PROVISION-NEXT-STEPS.md"'
+  checkno "MesloLGS ABSENT system-wide" \
+    bash -c 'ls /usr/local/share/fonts/MesloLGS-NF/*.ttf'
 }
 
 v_installsh() {

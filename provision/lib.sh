@@ -195,12 +195,26 @@ Manual follow-ups (need an interactive login session):
   - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
 EOF
-  # Font bullet only when the font was actually installed (step 36 is skipped
-  # under PROFILE=minimal — headless, no GUI terminal).
-  minimal || cat <<EOF
+  # Step 36 (which installs the vendored Nerd Font) is skipped under
+  # PROFILE=minimal, so the two profiles need opposite advice. Fonts render
+  # CLIENT-side: over SSH the glyphs come from the font on the machine you're
+  # sitting at, so a headless box genuinely doesn't need one. But if you open a
+  # terminal ON a minimal box that happens to have a desktop, p10k's glyphs are
+  # tofu — say so rather than staying silent (observed live, S11).
+  if minimal; then
+    cat <<EOF
+  - No Nerd Font on this profile (PROFILE=minimal skips it). Over SSH that's
+    fine — glyphs render with YOUR local terminal's font. Only if you open a
+    terminal ON this box will p10k show boxes/tofu; then either install the
+    font here (repo: fonts/MesloLGS-NF -> ~/.local/share/fonts && fc-cache -f)
+    or re-provision without PROFILE=minimal.
+EOF
+  else
+    cat <<EOF
   - MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
     OTHER terminal, select "MesloLGS NF" in its font settings.
 EOF
+  fi
   cat <<EOF
   - Set your real git identity in ~/.gitconfig.
   - Docker access for $TARGET_USER — choose ONE:
