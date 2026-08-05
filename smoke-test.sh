@@ -289,7 +289,7 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     -> verify minimal plain
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
-S8 (C Run 1), S9 (Phase D), S11 (2026-08-05). Pending live: S4, S6, S10.
+S8 (C Run 1), S9 (Phase D), S11 + S10 (2026-08-05). Pending live: S4, S6.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
