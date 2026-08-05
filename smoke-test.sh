@@ -283,16 +283,37 @@ cmd_verify() {
   local args=("$@")
   if [ "${#args[@]}" -eq 0 ] || [ "${args[0]}" = auto ]; then
     args=()
-    # auto-detect: install.sh box first — provision.sh ALWAYS writes the step-80
-    # notes file (and it survives the golden wipe), so its absence means this box
-    # was never provisioned, only bootstrapped.
-    if [ ! -f "$HOME/PROVISION-NEXT-STEPS.md" ]; then
+    # auto-detect: install.sh box first — provision.sh ALWAYS writes step 80's
+    # notes file AND its MOTD drop-in (both survive the golden wipe), so with
+    # neither present this box was never provisioned, only bootstrapped. Check
+    # both for the same reason as the guard below: deleting the notes file is the
+    # documented cleanup, so it alone would misread a tidied box as install.sh.
+    if [ ! -f "$HOME/PROVISION-NEXT-STEPS.md" ] && \
+       [ ! -e /etc/update-motd.d/99-provision-next-steps ]; then
       args+=(installsh)
     elif dpkg-query -W codium >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/alacritty" ]; then
       args+=(full); else args+=(minimal); fi
     if [ -L "$HOME/.zshrc" ]; then args+=(plain); else args+=(copy); fi
     echo "auto-detected: ${args[*]}"
   fi
+  # Guard: verify audits a PROVISIONED box or clone. Without this, auditing a box
+  # that was never provisioned turns every provision-only assertion red for that
+  # one reason — which reads like a regression instead of a category error.
+  #
+  # Marker = step 80's artifacts, either one. The notes file alone is not enough:
+  # deleting it IS the documented "follow-ups done" cleanup, so a tidied box
+  # would trip this falsely. The MOTD drop-in is root-owned, not part of that
+  # cleanup, and only provision.sh ever writes it — so it survives as evidence.
+  # Both survive the golden wipe by construction. installsh is exempt:
+  # install.sh writes neither.
+  case " ${args[*]} " in
+    *" installsh "*) ;;
+    *) if [ ! -f "$HOME/PROVISION-NEXT-STEPS.md" ] && \
+          [ ! -e /etc/update-motd.d/99-provision-next-steps ]; then
+         printf '\033[1;33m⚠ no sign of provision.sh on this box (neither %s nor the step-80 MOTD drop-in) — never provisioned, so the results below are NOT meaningful. Audit a provisioned box/clone, or use: verify installsh\033[0m\n\n' \
+           "$HOME/PROVISION-NEXT-STEPS.md"
+       fi ;;
+  esac
   # installsh replaces the core audit rather than adding to it (different contract).
   case " ${args[*]} " in *" installsh "*) ;; *) v_core ;; esac
   local a
