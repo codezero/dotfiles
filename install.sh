@@ -4,7 +4,10 @@
 # Installs every prerequisite the .zshrc expects, then symlinks the dotfiles
 # from this repo into $HOME.
 #
-# Run from inside the cloned repo:   ./install.sh
+# Run from inside the cloned repo:   bash install.sh
+# Run it as YOURSELF, not under sudo — it sudo's only where it needs to (apt,
+# Homebrew). If you tee/redirect the output, note step [0/7]: sudo prompts on
+# the tty but prints to stderr, so an un-primed run can look like a silent hang.
 # Safe to re-run (idempotent). Existing real files are backed up, not deleted.
 #
 # SCOPE: this is the lightweight "shell + dotfiles" bootstrap (zsh, oh-my-zsh,
@@ -28,6 +31,19 @@ for a in "$@"; do
     *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
   esac
 done
+
+# Prime the sudo timestamp in the FOREGROUND before anything else. Two reasons:
+#  1. The password prompt then appears here, not minutes later inside apt or the
+#     Homebrew installer. That matters because sudo writes its prompt to stderr
+#     but reads the password from /dev/tty — so a run whose output is redirected
+#     to a log file (`bash install.sh > log 2>&1`) looks like a SILENT HANG: the
+#     prompt is sitting in the log while sudo waits on the terminal.
+#  2. Fail fast with a clear message if this user can't sudo at all, instead of
+#     a confusing apt error.
+# NB: step [7/7]'s `chsh` prompts for YOUR OWN password via PAM regardless — that
+# one is unrelated to sudo and cannot be primed away.
+echo "==> [0/7] sudo access (needed for apt + Homebrew)"
+sudo -v || { echo "    this script needs sudo (apt + Homebrew) — aborting" >&2; exit 1; }
 
 echo "==> [1/7] Base apt packages"
 sudo apt update
@@ -130,6 +146,8 @@ else
 fi
 
 echo "==> [7/7] Make zsh the default shell"
+# chsh authenticates YOU via PAM — it prompts for your own password (bare
+# "Password:", not "[sudo] password for …"). Expected, and not primeable.
 if [ "${SHELL:-}" != "$(command -v zsh)" ]; then
   chsh -s "$(command -v zsh)" || \
     echo "    chsh failed — run manually: chsh -s $(command -v zsh)"

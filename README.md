@@ -41,9 +41,16 @@ state read-only; `bash smoke-test.sh scenarios` prints the live-test runbook.
 sudo apt update && sudo apt install -y git   # fresh/default Ubuntu ships no git
 git clone <your-repo-url> ~/dotfiles
 cd ~/dotfiles
-bash install.sh        # not chmod +x in the repo, so invoke with bash
+bash install.sh        # not chmod +x in the repo, so invoke with bash — as
+                       # YOURSELF, not under sudo (it sudo's only where needed)
 exec zsh
 ```
+
+Two password prompts are expected: sudo (apt + Homebrew — step `[0/7]` primes it
+up front) and `chsh` at step `[7/7]`, which asks for **your own** password via
+PAM to change your login shell. If you redirect the output to a log
+(`bash install.sh > log 2>&1`), run `sudo -v` first — otherwise sudo's prompt
+goes to the log while it waits on the terminal, and the run looks like a hang.
 
 Installs zsh + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
 the dotfiles listed in `dotfiles.list` into `$HOME` — `.zshrc`, `.p10k.zsh`,
