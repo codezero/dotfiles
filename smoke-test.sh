@@ -11,7 +11,7 @@
 #                                  | copy | minimal | desktop | rootless |
 #                                  golden-clone | installsh. Add-ons compose:
 #                                  `verify plain desktop rootless` runs all 3.
-#   bash smoke-test.sh scenarios   print the live test runbook (S1–S11)
+#   bash smoke-test.sh scenarios   print the live test runbook (S1–S14)
 #
 # lint+dry are the pre-commit/dev-box tier; verify codifies the hand audits
 # from phases A–D. NEVER calls Electron `--version` (hangs headless) — package
@@ -305,9 +305,29 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     no tmux/rustup/claude/docker/step-80, 5-formula brew subset)
  S11 minimal        sudo env PROFILE=minimal PROVISION_USER=$USER bash provision/provision.sh
                     -> verify minimal plain
+ S12 bring-to-latest  sudo env APT_UPGRADE=1 PROVISION_USER=$USER bash provision/provision.sh
+                    on a box already provisioned (S2/S3). Gates are PROSE, not a
+                    verify token (upstream publishes updates constantly, so any
+                    "0 upgradable" assertion would flap): exit 0; `apt list
+                    --upgradable` much shorter than before; note whether
+                    /var/run/reboot-required appeared — provision.sh never acts
+                    on it, and that is exactly what a user needs told.
+ S13 cloud-init     REAL cloud-init user-data on a fresh box (not a manual sudo
+                    run): root, no SUDO_USER, no tty, PROVISION_USER=<name>
+                    genuinely load-bearing. -> verify plain full
+                    Also covers PROVISION_USER != the invoking user, which every
+                    other scenario dodges by passing $USER.
+ S14 minimal+rootless  relax userns, then
+                    sudo env PROFILE=minimal DOCKER_ROOTLESS=1 PROVISION_USER=$USER \
+                      bash provision/provision.sh   -> verify minimal plain rootless
+                    (minimal KEEPS Docker on purpose — a headless agent box
+                    running containers is a plausible daily configuration.)
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
-S8 (C Run 1), S9 (Phase D), S11 + S10 (2026-08-05). Pending live: S4, S6.
+S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 (2026-08-05).
+Pending live: S6, and the coverage gaps S12 (APT_UPGRADE — never run), S13
+(cloud-init end-to-end + PROVISION_USER != invoker — the resolution logic in
+lib.sh exists for a case no test has ever hit), S14 (minimal+rootless).
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
