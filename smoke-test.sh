@@ -219,6 +219,10 @@ v_desktop() {
     bash -c 'dconf read /org/gnome/desktop/interface/color-scheme 2>/dev/null | grep -q prefer-dark'
   check "dconf applied: accent-color=orange" \
     bash -c 'dconf read /org/gnome/desktop/interface/accent-color 2>/dev/null | grep -q orange'
+  # Without this the stock terminal renders p10k glyphs as tofu even though the
+  # font is installed system-wide (found live, S4).
+  check "dconf applied: monospace font = MesloLGS NF" \
+    bash -c 'dconf read /org/gnome/desktop/interface/monospace-font-name 2>/dev/null | grep -q "MesloLGS NF"'
 }
 
 v_rootless() {

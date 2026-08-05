@@ -162,18 +162,39 @@ verify_keyring() {
 # DPkg::Lock::Timeout=600 is the final backstop. Verified current for 26.04/APT 3.x.
 apt_preflight() {
   if dry; then
-    would "pause apt-daily/unattended-upgrades/packagekit units, then wait for any in-flight run"
+    would "pause apt-daily/unattended-upgrades/packagekit units (30s cap each), then wait up to ${APT_PREFLIGHT_TIMEOUT:-300}s for any in-flight run"
     return 0
   fi
+  # Everything here is BEST-EFFORT and time-bounded. apt's own
+  # DPkg::Lock::Timeout=600 (see apt_get) is the real backstop, so this may
+  # always give up and continue — it exists to avoid a lock wait, not to
+  # guarantee one never happens.
+  local wait_max="${APT_PREFLIGHT_TIMEOUT:-300}"
   log "apt preflight: pausing background updaters for this run (they resume on next boot)"
   for u in unattended-upgrades.service apt-daily.service apt-daily-upgrade.service \
            apt-daily.timer apt-daily-upgrade.timer packagekit.service; do
-    $SUDO systemctl stop "$u" 2>/dev/null || true
+    # `systemctl stop` BLOCKS until the unit stops, and a stop queued behind a
+    # still-running start job waits for that job to finish first — unbounded on
+    # a fresh boot. Cap it; a unit we couldn't stop is not fatal.
+    timeout 30 $SUDO systemctl stop "$u" 2>/dev/null \
+      || warn "apt preflight: could not stop $u within 30s — continuing"
   done
-  command -v systemd-run >/dev/null 2>&1 && \
-    $SUDO systemd-run --quiet --collect --wait \
-      --property="After=apt-daily.service apt-daily-upgrade.service unattended-upgrades.service" \
-      /bin/true 2>/dev/null || true
+  if command -v systemd-run >/dev/null 2>&1; then
+    # Transient unit ordered After= the updaters: it runs once they're done, so
+    # waiting on it waits for any in-flight run. MUST be bounded — on a freshly
+    # booted desktop image unattended-upgrade can churn for many minutes, and an
+    # unbounded silent wait here is indistinguishable from a hang (observed live,
+    # S4: the run sat on this for minutes with no output). Announce the bound
+    # BEFORE waiting so it never reads as frozen.
+    log "apt preflight: waiting up to ${wait_max}s for any in-flight apt-daily / unattended-upgrade run (set APT_PREFLIGHT_TIMEOUT to change)"
+    if timeout "$wait_max" $SUDO systemd-run --quiet --collect --wait \
+         --property="After=apt-daily.service apt-daily-upgrade.service unattended-upgrades.service" \
+         /bin/true 2>/dev/null; then
+      log "apt preflight: no in-flight run (or it finished)"
+    else
+      warn "apt preflight: a background updater is STILL running after ${wait_max}s — continuing anyway; apt will wait for the dpkg lock (DPkg::Lock::Timeout=600)"
+    fi
+  fi
 }
 
 load_brew() {
