@@ -73,8 +73,12 @@ must exist before it's sourced**:
 ⚠️ **`bat`:** install via **brew** (binary `bat`) — apt's package is `batcat`, which
 breaks `.zshrc`'s `alias cat="bat"`.
 
-ℹ️ **Plugins** `jj`/`bun` only add completions; a missing tool just prints a harmless
-warning (`brew install jj bun` if you use them).
+ℹ️ **Plugins** `.zshrc` loads oh-my-zsh plugins for tools this bootstrap doesn't
+install (`golang`, `httpie`, `kubectl`, `rust`, `docker`, `docker-compose`, `jj`,
+`bun`). They only add completions/aliases and stay quiet when the binary is
+missing — verified on a fresh box. Install what you use (`brew install jj bun`)
+or trim the `plugins=()` line. `tmux` is the exception: its plugin nags on every
+shell start, so `install.sh` installs tmux (it also ships `.tmux.conf`).
 
 ## Back up / restore
 
@@ -86,3 +90,22 @@ gh repo create dotfiles --private --source=. --push    # or: git remote add orig
 
 `install.sh` symlinks the files, so editing `~/.zshrc` edits the repo copy — commit
 and push to save. `p10k configure` writes back through the symlink too.
+
+### Symlink vs. copy mode — copies are sticky
+
+`--copy` / `DOTFILES_COPY=1` installs real files instead of symlinks (self-contained;
+the repo can then be deleted, but edits no longer flow back). Note the asymmetry:
+
+- **symlink → copy** is a plain `bash install.sh --copy`. No backups are made — the
+  old dest is a symlink, which holds no content of its own.
+- **copy → symlink does NOT happen on a re-run.** A plain `bash install.sh` leaves
+  identical copies alone, on purpose: that same guard is what stops a fresh
+  `.backup.<timestamp>` being minted on every re-run. To go back, remove the files
+  first (e.g. `rm ~/.zshrc` — or delete each entry in `dotfiles.list`), then re-run.
+
+Provision has the mirror-image trap: a re-run **on** a golden image must keep
+`GOLDEN_IMAGE=1` or `DOTFILES_COPY=1`, or it will symlink over the copies.
+
+A `~/.zshrc.backup.<timestamp>` on a fresh box is expected once: oh-my-zsh's
+installer writes a template `.zshrc` before ours is installed, and that template
+gets backed up rather than deleted.
