@@ -211,6 +211,14 @@ v_desktop() {
   hdr "verify: desktop"
   check "ubuntu-desktop installed (dpkg)" dpkg-query -W ubuntu-desktop
   check "dconf settings shipped"          test -f "$HERE/provision/gnome/dconf-settings.ini"
+  # Read the settings BACK off the box — "the fragment exists in the repo" says
+  # nothing about whether step 55's `dconf load` actually landed. Two distinctive
+  # keys whose distro defaults differ from ours ('default' / no accent).
+  # Reads hit the user's dconf db directly, so no session bus is needed.
+  check "dconf applied: color-scheme=prefer-dark" \
+    bash -c 'dconf read /org/gnome/desktop/interface/color-scheme 2>/dev/null | grep -q prefer-dark'
+  check "dconf applied: accent-color=orange" \
+    bash -c 'dconf read /org/gnome/desktop/interface/accent-color 2>/dev/null | grep -q orange'
 }
 
 v_rootless() {
