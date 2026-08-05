@@ -6,7 +6,7 @@ Personal dotfiles backup + full-machine provisioning for **Ubuntu 26.04 ("resolu
 Everything here is Bash + config files — there is no build system, test suite, or linter.
 
 ## Commands
-- `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, oh-my-zsh, p10k, core brew CLI, symlinks).
+- `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, tmux, oh-my-zsh, p10k, core brew CLI, symlinks). Run as yourself, not under sudo.
 - `bash provision/provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
 - `sudo bash provision/provision.sh` — full machine replication. `sudo PROVISION_USER=alice bash …` targets a user; `sudo INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set.
 - `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,flatpak.list,Brewfile}` from live state.

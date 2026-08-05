@@ -48,8 +48,12 @@ sudo -v || { echo "    this script needs sudo (apt + Homebrew) — aborting" >&2
 echo "==> [1/7] Base apt packages"
 sudo apt update
 sudo apt install -y \
-  zsh git curl wget build-essential \
+  zsh git curl wget build-essential tmux \
   zsh-autosuggestions zsh-syntax-highlighting
+# ^ tmux: we install .tmux.conf from dotfiles.list AND .zshrc loads omz's `tmux`
+#   plugin, which prints "tmux not found. Please install tmux before using this
+#   plugin." on every shell start when it's missing. Shipping the config without
+#   the binary was incoherent (found live, S10).
 # ^ zsh-autosuggestions & zsh-syntax-highlighting land in /usr/share/...,
 #   which is exactly where .zshrc sources them from.
 
@@ -167,7 +171,10 @@ cat <<'EOF'
   3. Open a new terminal, or run:  exec zsh
 
 Notes:
-  - The omz plugins `jj` and `bun` only add completions/aliases. If you don't
-    have jujutsu (jj) or bun installed, zsh may print a harmless warning.
-    Install them if you use them:  brew install jj  /  brew install bun
+  - .zshrc loads oh-my-zsh plugins for tools this lightweight bootstrap does
+    NOT install (golang, httpie, kubectl, rust, docker, docker-compose, jj,
+    bun). Those plugins only add completions/aliases and stay quiet when the
+    binary is absent — verified on a fresh box. Install what you actually use
+    (`brew install jj`), or trim the plugins=() line in .zshrc.
+    For the full set, use provision/provision.sh instead.
 EOF

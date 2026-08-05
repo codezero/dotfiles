@@ -168,6 +168,9 @@ v_installsh() {
   # v_core would red-flag ~9 things it never claims to install.
   hdr "verify: install.sh bootstrap (shell + dotfiles only)"
   check "zsh installed"          command -v zsh
+  # tmux: install.sh ships .tmux.conf and .zshrc loads omz's tmux plugin, which
+  # nags on every shell start when the binary is missing (found live, S10).
+  check "tmux installed"         command -v tmux
   check "oh-my-zsh present"      test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"
   check "p10k theme present"     test -f "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme"
   check "zsh starts clean"       zsh -ic true

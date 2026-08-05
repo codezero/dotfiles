@@ -52,7 +52,7 @@ PAM to change your login shell. If you redirect the output to a log
 (`bash install.sh > log 2>&1`), run `sudo -v` first — otherwise sudo's prompt
 goes to the log while it waits on the terminal, and the run looks like a hang.
 
-Installs zsh + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
+Installs zsh + tmux + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
 the dotfiles listed in `dotfiles.list` into `$HOME` — `.zshrc`, `.p10k.zsh`,
 `.gitconfig`, `.tmux.conf`, `.config/alacritty/alacritty.toml` (+ theme clone),
 `.config/nvim/` (LazyVim) and the tracked `.claude/` configs — symlinked by
