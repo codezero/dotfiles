@@ -33,6 +33,10 @@ checkno() { local d="$1"; shift; if "$@" >/dev/null 2>&1; then bad "$d"; else ok
 
 summary() {
   printf '\n\033[1m%d passed, %d failed, %d skipped\033[0m\n' "$PASS" "$FAIL" "$SKIP"
+  # A skipped check is NOT a passing one — it means the property was never
+  # verified. Without this line "36 passed, 1 skipped" reads as green, which is
+  # how an unverified assertion quietly becomes a believed one.
+  [ "$SKIP" -gt 0 ] && printf '\033[1;33m⚠ %d check(s) SKIPPED — those properties are NOT verified\033[0m\n' "$SKIP"
   [ "$FAIL" -eq 0 ]
 }
 
@@ -106,6 +110,10 @@ cmd_dry() {
 v_core() {
   hdr "verify: core (every provisioned box)"
   check "zsh installed"            command -v zsh
+  # Step 60 runs chsh; nothing audited whether it took. v_installsh checked this
+  # from the start — v_core didn't, which was simply an asymmetry.
+  check "default shell = zsh (chsh took)" \
+    bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
   check "oh-my-zsh present"        test -d "$HOME/.oh-my-zsh"
   check "p10k theme present"       test -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
   check "zsh starts clean"         zsh -ic true
@@ -138,6 +146,11 @@ v_full_extras() {  # full-profile installs (skipped for minimal)
       bash -c 'sudo -n debconf-show cursor 2>/dev/null | grep -q "add-cursor-repo: false"'
   else skip "cursor debconf preseed (needs sudo)"; fi
   check "alacritty built"          test -x "$HOME/.cargo/bin/alacritty"
+  # Design invariant (CLAUDE.md): Alacritty was the only user snap, and it is
+  # built via cargo so the machine needs no snapd. NB this asserts WE installed
+  # no snap — not that snapd is absent, which would be wrong on a stock Ubuntu
+  # desktop image where snapd ships by default.
+  checkno "alacritty NOT from snap (cargo build is the design)" snap list alacritty
   check "alacritty themes clone"   test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"
   check "MesloLGS NF system-wide"  bash -c 'ls /usr/local/share/fonts/MesloLGS-NF/*.ttf'
   check "_alacritty completion world-readable" \
@@ -205,6 +218,27 @@ v_mode() {  # $1 = symlink|copy
   else
     check ".zshrc is a symlink (repo is source of truth)" test -L "$HOME/.zshrc"
   fi
+  # Presence is not correctness: `test -e` passes for ANY file, so a stale copy
+  # from an older commit — exactly what copy mode invites, since edits stop
+  # flowing back — would sail through every other check. Compare CONTENT.
+  # Files only: directory entries (.config/nvim) legitimately drift once used,
+  # because lazy-lock.json is deliberately untracked, so a tree diff would
+  # false-positive. In symlink mode cmp follows the link and is trivially true —
+  # that is fine, the assertion that matters there is the -L check above.
+  #
+  # SCOPE: this is meaningful on a FRESHLY PROVISIONED box, which is what verify
+  # is for. On a box that has been used for a while, some of these files are
+  # app-managed and drift by design — Claude Code rewrites .claude/settings.json,
+  # `p10k configure` rewrites .p10k.zsh. In symlink mode those writes land in the
+  # repo (no drift); in COPY mode they diverge legitimately. Read a red here as
+  # "home and repo differ", then judge the direction — it is not automatically
+  # a provisioning failure.
+  local f bad_n=0
+  while IFS= read -r f; do
+    [ -f "$HERE/$f" ] || continue          # skip dirs + entries missing from the repo
+    cmp -s "$HERE/$f" "$HOME/$f" || { bad "content differs from repo: $f"; bad_n=$((bad_n+1)); }
+  done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
+  [ "$bad_n" -eq 0 ] && ok "file dotfiles match the repo byte-for-byte"
 }
 
 v_desktop() {
