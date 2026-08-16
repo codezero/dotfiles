@@ -376,9 +376,27 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade
  S13 cloud-init     REAL cloud-init user-data on a fresh box (not a manual sudo
                     run): root, no SUDO_USER, no tty, PROVISION_USER=<name>
-                    genuinely load-bearing. -> verify plain full
+                    genuinely load-bearing. -> verify plain full   (run it as
+                    the target user: sudo -iu <name> bash …/smoke-test.sh)
                     Also covers PROVISION_USER != the invoking user, which every
                     other scenario dodges by passing $USER.
+                    user-data creates a SECOND user beside the image default:
+                      users: [ default, {name: agent, uid: 1100,
+                               primary_group: staff, groups: [sudo], …} ]
+                    PIN uid EXPLICITLY. Listing `- default` first does NOT win
+                    uid 1000 (live 2026-08-16: agent got 1000, ubuntu 1001) —
+                    and if the target IS the uid-1000 user the whole point is
+                    lost, because the explicit branch and the uid-1000 fallback
+                    then pick the same account. primary_group != username is
+                    deliberate: it is the only thing that exercises TARGET_GROUP.
+                    Resolution is 3 rungs (lib.sh); prove them SEPARATELY with
+                    --dry-run, which needs no root and changes nothing:
+                      PROVISION_USER=probe …provision.sh --dry-run   -> probe
+                      (interactive, no override)                    -> $USER
+                      sudo systemd-run --pipe --quiet …--dry-run     -> uid-1000
+                    NB `setsid` does NOT simulate cloud-init: logname resolves
+                    from the audit loginuid, which survives it. Only a systemd
+                    unit (or real cloud-init) has no loginuid.
  S14 minimal+rootless  relax userns, then
                     sudo env PROFILE=minimal DOCKER_ROOTLESS=1 PROVISION_USER=$USER \
                       bash provision/provision.sh   -> verify minimal plain rootless
@@ -386,10 +404,9 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     running containers is a plausible daily configuration.)
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
-S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05).
-Pending live: S13 (cloud-init end-to-end + PROVISION_USER != invoker — the
-resolution logic in lib.sh exists for a case no test has ever hit), S14
-(minimal+rootless).
+S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05),
+S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource).
+Pending live: S14 (minimal+rootless).
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
