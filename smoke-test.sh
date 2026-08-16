@@ -367,6 +367,13 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     --upgradable` much shorter than before; note whether
                     /var/run/reboot-required appeared — provision.sh never acts
                     on it, and that is exactly what a user needs told.
+                    EXPECT A NON-ZERO REMAINDER — it is not a failure. Step 10
+                    runs `apt-get upgrade`, which (a) never installs a new or
+                    removes an existing package, so kernel ABI bumps and library
+                    transitions stay "kept back" BY DESIGN, and (b) does not
+                    override Ubuntu's per-machine phased updates. Split the two
+                    with:  apt-get -s upgrade   vs
+                    apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade
  S13 cloud-init     REAL cloud-init user-data on a fresh box (not a manual sudo
                     run): root, no SUDO_USER, no tty, PROVISION_USER=<name>
                     genuinely load-bearing. -> verify plain full
@@ -379,10 +386,10 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     running containers is a plausible daily configuration.)
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
-S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 (2026-08-05).
-Pending live: S6, and the coverage gaps S12 (APT_UPGRADE — never run), S13
-(cloud-init end-to-end + PROVISION_USER != invoker — the resolution logic in
-lib.sh exists for a case no test has ever hit), S14 (minimal+rootless).
+S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05).
+Pending live: S13 (cloud-init end-to-end + PROVISION_USER != invoker — the
+resolution logic in lib.sh exists for a case no test has ever hit), S14
+(minimal+rootless).
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
