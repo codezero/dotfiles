@@ -100,6 +100,14 @@ cmd_dry() {
     "using apt.minimal.list" "using Brewfile.minimal" \
     "VSCodium: skipped (PROFILE=minimal)" "Cursor: skipped (PROFILE=minimal)" \
     "alacritty: skipped (PROFILE=minimal)" "flatpak: skipped (PROFILE=minimal)"
+  # S14's combination. The load-bearing claim is that PROFILE=minimal drops the
+  # GUI set while KEEPING Docker *and* its rootless prerequisites — a future
+  # `minimal &&` gate on the Docker block would silently break rootless on the
+  # very profile (headless agent box) most likely to want it.
+  dry_case "minimal+rootless" 0 PROFILE=minimal DOCKER_ROOTLESS=1 -- \
+    "docker-ce-rootless-extras uidmap dbus-user-session" \
+    "preflight: require kernel.apparmor_restrict_unprivileged_userns" \
+    "Cursor: skipped (PROFILE=minimal)" "!Docker: skipped"
   dry_case "bogus profile dies" 1 PROFILE=bogus --
   dry_case "minimal+desktop dies" 1 PROFILE=minimal INSTALL_DESKTOP=1 --
   dry_case "lowercase flag typo warns" 0 golden_image=1 -- \
