@@ -413,8 +413,9 @@ After each live run:  bash smoke-test.sh verify <scenario...>
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
 S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05),
-S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource).
-Pending live: S14 (minimal+rootless).
+S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource),
+S14 (2026-08-21, minimal+rootless).
+Pending live: none — every sunny-day scenario above has now run on real hardware.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
