@@ -5,13 +5,17 @@
 #   bash smoke-test.sh lint        shellcheck every script (anywhere; no sudo)
 #   bash smoke-test.sh dry        provision.sh --dry-run matrix + assertions
 #                                  (anywhere; no sudo, no changes, no network)
-#   bash smoke-test.sh verify [scenario]
+#   bash smoke-test.sh verify [S<n> | token...]
 #                                  read-only end-state audit ON a provisioned
-#                                  box/clone. Scenarios: auto (default) | plain
-#                                  | copy | minimal | desktop | rootless |
-#                                  golden-clone | installsh. Add-ons compose:
-#                                  `verify plain desktop rootless` runs all 3.
-#   bash smoke-test.sh scenarios   print the live test runbook (S1–S14)
+#                                  box/clone. Takes a runbook id (`verify S4`)
+#                                  and expands it, or raw tokens, or nothing at
+#                                  all (auto-detects mode+profile from the box).
+#                                  The tokens are not peers — one MODE, one
+#                                  PROFILE, any number of ADD-ONs, and
+#                                  `installsh` stands alone because it REPLACES
+#                                  the core audit. `scenarios` prints the map.
+#   bash smoke-test.sh scenarios   the live runbook (S1–S14) + the verify
+#                                  vocabulary and how the tokens compose
 #
 # lint+dry are the pre-commit/dev-box tier; verify codifies the hand audits
 # from phases A–D. NEVER calls Electron `--version` (hangs headless) — package
@@ -123,6 +127,87 @@ cmd_dry() {
             "--dry-run" "provision/README.md#flags"; do
     if grep -qF -e "$hp" <<<"$h"; then ok "--help — saw: $hp"; else bad "--help — MISSING: $hp"; fi
   done
+
+  # F item 4: the runbook and the audit vocabulary used to be two hand-translated
+  # languages. Now `verify S4` is the only thing to type — so the map has to stay
+  # complete. Every S-id the runbook prints must resolve (S1 is the lint+dry tier
+  # and deliberately resolves to "nothing to audit"); add a scenario, forget the
+  # map, and this goes red instead of failing months later on a live box.
+  local sid smap
+  smap="$(cmd_scenarios 2>/dev/null | grep -oE '^ S[0-9]+' | tr -d ' ' | sort -u)"
+  for sid in $smap; do
+    if [ "$sid" = S1 ]; then
+      if scenario_tokens S1 >/dev/null 2>&1; then bad "scenario map — S1 should have no tokens"
+      else ok "scenario map — S1 correctly has no audit"; fi
+    elif scenario_tokens "$sid" >/dev/null 2>&1; then ok "scenario map — $sid"
+    else bad "scenario map — $sid is in the runbook with no verify tokens"; fi
+  done
+  if [ "$(scenario_tokens s4)" = "plain full desktop" ]; then ok "scenario map — s4 lowercase"
+  else bad "scenario map — s4 lowercase did not expand"; fi
+  if scenario_tokens S99 >/dev/null 2>&1; then bad "scenario map — S99 should be unknown"
+  else ok "scenario map — unknown id rejected"; fi
+  # The composition rules (F item 5) live in `scenarios` output; assert the
+  # section is actually there, since it is the only place they are written down.
+  if cmd_scenarios | grep -q "MODE (exactly one"; then ok "scenarios — composition rules present"
+  else bad "scenarios — composition rules MISSING"; fi
+  # ...and that they are ENFORCED, not merely printed. These exit before any
+  # audit runs, so they are safe in the no-changes tier.
+  local combo crc
+  for combo in "plain copy" "full minimal" "plain golden-clone" "installsh full"; do
+    # shellcheck disable=SC2086
+    bash "$HERE/smoke-test.sh" verify $combo >/dev/null 2>&1; crc=$?
+    # Exit 2 is "rejected before auditing". Merely asserting non-zero would ALSO
+    # pass if the guard broke and a real audit ran and failed — a false green of
+    # exactly the kind this suite exists to catch.
+    if [ "$crc" = 2 ]; then ok "combo guard — '$combo' rejected (exit 2)"
+    else bad "combo guard — '$combo' gave exit $crc (want 2 = rejected unaudited)"; fi
+  done
+}
+
+# ── scenario id -> verify tokens ────────────────────────────────────────────
+# THE single owner of this mapping. The runbook prints "-> verify S4" and this
+# turns it into tokens, so the two vocabularies that used to be translated by
+# hand (F item 4) can no longer drift: there is one thing to type, and the
+# expansion is echoed at run time so it is never a black box.
+# Exit 1 = a known id with nothing to audit; exit 2 = not an id at all.
+scenario_tokens() {
+  case "${1,,}" in
+    s2|s3|s12|s13) echo "plain full" ;;
+    s4)            echo "plain full desktop" ;;
+    s5)            echo "plain full rootless" ;;
+    s6)            echo "copy full" ;;
+    s7|s9)         echo "golden-clone full" ;;
+    s8)            echo "golden-clone full desktop" ;;
+    s10)           echo "installsh" ;;
+    s11)           echo "minimal plain" ;;
+    s14)           echo "minimal plain rootless" ;;
+    s1)            return 1 ;;   # lint+dry tier — there is no box end-state to audit
+    *)             return 2 ;;
+  esac
+}
+
+# Enforce the composition rules `scenarios` documents (F item 5). A rule that is
+# only written down is a rule that silently does not hold — and the failure mode
+# here is nasty: `verify full minimal` would print a wall of red for the wrong
+# reason (each token correctly asserting the negation of the other) and read as a
+# regression rather than as operator error.
+_tok_has() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }
+
+verify_validate() {
+  local list="$*" conflict=""
+  _tok_has plain "$list"     && _tok_has copy "$list" \
+    && conflict="plain + copy — a box's dotfiles are symlinks or real files, not both"
+  _tok_has plain "$list"     && _tok_has golden-clone "$list" \
+    && conflict="plain + golden-clone — golden-clone implies copy mode"
+  _tok_has full "$list"      && _tok_has minimal "$list" \
+    && conflict="full + minimal — one asserts the GUI toolchain is present, the other that it is absent"
+  _tok_has installsh "$list" && { _tok_has full "$list" || _tok_has minimal "$list" \
+                                  || _tok_has golden-clone "$list"; } \
+    && conflict="installsh + a provision profile — installsh REPLACES the core audit because install.sh has a different contract"
+  [ -z "$conflict" ] && return 0
+  echo "contradictory verify tokens: $conflict" >&2
+  echo "see the vocabulary at the end of: bash smoke-test.sh scenarios" >&2
+  exit 2
 }
 
 # ── verify (on-box end-state audit) ─────────────────────────────────────────
@@ -315,6 +400,36 @@ cmd_verify() {
     if [ -L "$HOME/.zshrc" ]; then args+=(plain); else args+=(copy); fi
     echo "auto-detected: ${args[*]}"
   fi
+  # Accept scenario ids (verify S4) as well as tokens (verify plain full desktop).
+  if [ "${#args[@]}" -gt 0 ]; then
+    local expanded=() x toks trc tk
+    for x in "${args[@]}"; do
+      case "$x" in
+        [Ss][0-9]|[Ss][0-9][0-9])
+          toks="$(scenario_tokens "$x")"; trc=$?
+          if [ "$trc" = 1 ]; then
+            echo "${x^^} is the lint+dry tier — run: bash smoke-test.sh lint && bash smoke-test.sh dry" >&2
+            exit 2
+          elif [ "$trc" != 0 ]; then
+            echo "unknown scenario id: $x (see: bash smoke-test.sh scenarios)" >&2
+            exit 2
+          fi
+          echo "${x^^} = verify $toks"
+          read -ra tk <<<"$toks"; expanded+=("${tk[@]}") ;;
+        *) expanded+=("$x") ;;
+      esac
+    done
+    args=("${expanded[@]}")
+    verify_validate "${args[@]}"
+    # golden-clone already runs the copy-mode audit; passing both would run the
+    # same assertions twice and inflate the count.
+    if _tok_has golden-clone "${args[*]}" && _tok_has copy "${args[*]}"; then
+      echo "note: dropping redundant 'copy' — golden-clone already includes it"
+      local kept=(); for x in "${args[@]}"; do [ "$x" = copy ] || kept+=("$x"); done
+      args=("${kept[@]}")
+    fi
+  fi
+
   # Guard: verify audits a PROVISIONED box or clone. Without this, auditing a box
   # that was never provisioned turns every provision-only assertion red for that
   # one reason — which reads like a regression instead of a category error.
@@ -355,34 +470,37 @@ cmd_verify() {
 cmd_scenarios() {
   cat <<'EOF'
 Live smoke scenarios (sunny-day set — fresh box unless noted).
-After each live run:  bash smoke-test.sh verify <scenario...>
+After each live run:  bash smoke-test.sh verify S<n>   (e.g. `verify S4` —
+the tokens it expands to, and how they compose, are listed at the bottom.)
 
  S1  dry            bash smoke-test.sh lint && bash smoke-test.sh dry     (any box)
  S2  plain          sudo env PROVISION_USER=$USER bash provision/provision.sh
-                    -> verify plain full
- S3  re-run         repeat S2; expect exit 0, idempotent     -> verify plain full
+                    -> verify S2
+ S3  re-run         repeat S2; expect exit 0, idempotent     -> verify S3
  S4  desktop        sudo env INSTALL_DESKTOP=1 PROVISION_USER=$USER bash provision/provision.sh
-                    -> verify plain full desktop
+                    -> verify S4
  S5  rootless       relax userns per ~/PROVISION-NEXT-STEPS.md, then
                     sudo env DOCKER_ROOTLESS=1 PROVISION_USER=$USER bash provision/provision.sh
-                    -> verify plain full rootless
+                    -> verify S5
  S6  copy           sudo env DOTFILES_COPY=1 PROVISION_USER=$USER bash provision/provision.sh
-                    -> verify copy full
+                    -> verify S6
  S7  golden         sudo env GOLDEN_IMAGE=1 PROVISION_USER=$USER bash provision/provision.sh
-                    (clone+log under /tmp!)  -> on a BOOTED CLONE: verify golden-clone full
- S8  golden-desktop S7 + INSTALL_DESKTOP=1   -> clone: verify golden-clone full desktop
+                    (clone+log under /tmp!)  -> on a BOOTED CLONE: verify S7
+ S8  golden-desktop S7 + INSTALL_DESKTOP=1   -> on a booted clone: verify S8
  S9  iterate-golden re-run S7/S8 ON a booted golden clone (MUST keep GOLDEN_IMAGE=1
                     or DOTFILES_COPY=1 — plain re-run would symlink over the copies)
-                    [+ APT_UPGRADE=1 for a true bring-to-latest]
+                    [+ APT_UPGRADE=1 for a true bring-to-latest]   -> verify S9
  S10 install.sh     bash install.sh && exec zsh; re-run for idempotency; --copy variant
-                    -> verify installsh   (its OWN contract — NOT verify plain:
-                    no tmux/rustup/claude/docker/step-80, 5-formula brew subset)
+                    -> verify S10   (installsh is its OWN contract and REPLACES
+                    the core audit — not verify S2: install.sh ships no
+                    tmux/rustup/claude/docker/step-80, and a 5-formula brew subset)
  S11 minimal        sudo env PROFILE=minimal PROVISION_USER=$USER bash provision/provision.sh
-                    -> verify minimal plain
+                    -> verify S11
  S12 bring-to-latest  sudo env APT_UPGRADE=1 PROVISION_USER=$USER bash provision/provision.sh
                     on a box already provisioned (S2/S3). Gates are PROSE, not a
                     verify token (upstream publishes updates constantly, so any
-                    "0 upgradable" assertion would flap): exit 0; `apt list
+                    "0 upgradable" assertion would flap; `verify S12` audits the
+                    box, not the upgrade): exit 0; `apt list
                     --upgradable` much shorter than before; note whether
                     /var/run/reboot-required appeared — provision.sh never acts
                     on it, and that is exactly what a user needs told.
@@ -395,8 +513,8 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade
  S13 cloud-init     REAL cloud-init user-data on a fresh box (not a manual sudo
                     run): root, no SUDO_USER, no tty, PROVISION_USER=<name>
-                    genuinely load-bearing. -> verify plain full   (run it as
-                    the target user: sudo -iu <name> bash …/smoke-test.sh)
+                    genuinely load-bearing. -> verify S13   (run it as the
+                    target user: sudo -iu <name> bash …/smoke-test.sh)
                     Also covers PROVISION_USER != the invoking user, which every
                     other scenario dodges by passing $USER.
                     user-data creates a SECOND user beside the image default:
@@ -418,7 +536,7 @@ After each live run:  bash smoke-test.sh verify <scenario...>
                     unit (or real cloud-init) has no loginuid.
  S14 minimal+rootless  relax userns, then
                     sudo env PROFILE=minimal DOCKER_ROOTLESS=1 PROVISION_USER=$USER \
-                      bash provision/provision.sh   -> verify minimal plain rootless
+                      bash provision/provision.sh   -> verify S14
                     (minimal KEEPS Docker on purpose — a headless agent box
                     running containers is a plausible daily configuration.)
 
@@ -430,6 +548,39 @@ Pending live: none — every sunny-day scenario above has now run on real hardwa
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
+
+  # Generated from scenario_tokens() — never hand-written, so the runbook above
+  # and the audit vocabulary cannot drift apart (they did for 14 scenarios).
+  echo
+  echo "Verify vocabulary. \`verify S<n>\` expands to these tokens (echoed at run time);"
+  echo "you can still pass tokens directly, and mix them: \`verify S11 rootless\`."
+  echo
+  local id toks
+  for id in S2 S3 S4 S5 S6 S7 S8 S9 S10 S11 S12 S13 S14; do
+    toks="$(scenario_tokens "$id")" && printf '  %-4s = verify %s\n' "$id" "$toks"
+  done
+  cat <<'EOF'
+
+The tokens are NOT peers — this is the part that was only ever in code comments:
+  MODE (exactly one, and every scenario has one)
+    plain          dotfiles are symlinks into the repo
+    copy           dotfiles are real files (DOTFILES_COPY / GOLDEN_IMAGE)
+    golden-clone   a booted clone: implies `copy`, adds the identity/credential
+                   sweep. Don't pass `copy` as well — it's already in there.
+  PROFILE (exactly one)
+    full           asserts the GUI toolchain is PRESENT (codium/cursor/alacritty…)
+    minimal        asserts those same things are ABSENT — the lean box's whole
+                   claim is what it did NOT install
+  ADD-ON (any number, order-free — they only add assertions)
+    desktop        GNOME dconf settings, read back off the box
+    rootless       docker context + user service + linger
+  STANDALONE (never combine)
+    installsh      install.sh's own contract, and it REPLACES the core audit
+                   rather than adding to it: no tmux/rustup/claude/docker/step-80
+
+Everything except `installsh` runs the core audit first. With no arguments,
+`verify` auto-detects mode+profile from the box and says what it picked.
+EOF
 }
 
 # ── main ────────────────────────────────────────────────────────────────────
@@ -439,5 +590,9 @@ case "${1:-}" in
   verify)    shift; cmd_verify "$@"; summary ;;
   scenarios) cmd_scenarios ;;
   all)       cmd_lint; cmd_dry; summary ;;
-  *) echo "usage: bash smoke-test.sh {lint|dry|all|verify [auto|plain|copy|full|minimal|desktop|rootless|golden-clone ...]|scenarios}"; exit 2 ;;
+  *) echo "usage: bash smoke-test.sh {lint|dry|all|scenarios|verify [S<n> | token...]}"
+     echo "       verify takes a runbook id (verify S4), raw tokens"
+     echo "       (auto|plain|copy|full|minimal|desktop|rootless|golden-clone|installsh),"
+     echo "       or nothing (auto-detect). Map + composition rules: smoke-test.sh scenarios"
+     exit 2 ;;
 esac

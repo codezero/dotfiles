@@ -66,8 +66,10 @@ prints the recipes above at the point of use.
 
 `bash smoke-test.sh lint` + `bash smoke-test.sh dry` run anywhere (no sudo, no
 changes): shellcheck the tree + assert the `--dry-run` behavior of every
-provisioning flag. `bash smoke-test.sh verify` audits a provisioned box's end
-state read-only; `bash smoke-test.sh scenarios` prints the live-test runbook.
+provisioning flag. `bash smoke-test.sh verify S4` audits a provisioned box's end
+state read-only — it takes the runbook's scenario id and expands it to the right
+assertions. `bash smoke-test.sh scenarios` prints the runbook, the id → token
+map, and how the tokens compose.
 
 ## `install.sh` in detail
 
