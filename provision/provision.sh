@@ -4,13 +4,11 @@
 # Designed to be safe for cloud-init: runs as root, non-interactive, idempotent,
 # and tolerant (one failing step never aborts the rest).
 #
-#   sudo bash provision.sh                    # auto-detect the target user
-#   sudo PROVISION_USER=alice bash provision.sh
-#   bash provision.sh --dry-run               # preview only; no changes, no sudo needed
-#   sudo GOLDEN_IMAGE=1 bash provision.sh     # strict build + finalize, ready to snapshot
-#   sudo DOCKER_ROOTLESS=1 bash provision.sh  # also set up rootless Docker for the user
-#   sudo APT_UPGRADE=1 bash provision.sh       # also `apt upgrade` already-installed pkgs first
-#   sudo PROFILE=minimal bash provision.sh     # lean headless agent box (no GUI steps/editors)
+#   sudo bash provision.sh         # full set, per-user steps drop to the invoking user
+#   bash provision.sh --dry-run    # preview only; no changes, no sudo, no network
+#
+# The recipes and the full flag list live in `--help` and provision/README.md#flags
+# (one owner per fact — don't restate them here).
 #
 # It installs:  apt base pkgs · Docker/VSCodium/Cursor · Homebrew formulae
 #               · Rust (rustup) + Alacritty · Claude Code · Flatpak+Flathub
@@ -24,14 +22,39 @@ DRY_RUN=0
 for a in "$@"; do
   case "$a" in
     --dry-run|-n) DRY_RUN=1 ;;
-    -h|--help) echo "usage: [sudo] [PROVISION_USER=u] [PROFILE=full|minimal] [INSTALL_DESKTOP=1] [GOLDEN_IMAGE=1] [DOCKER_ROOTLESS=1] [APT_UPGRADE=1] bash provision.sh [--dry-run|-n]"; exit 0 ;;
+    -h|--help) cat <<'EOF'
+provision.sh — replicate a full machine on a clean Ubuntu 26.04.
+
+usage: [sudo] [env VAR=val ...] bash provision.sh [--dry-run|-n]
+
+Pick a recipe (run from the repo; `git` is the only bootstrap dependency):
+
+  full machine, this user     sudo bash provision.sh
+  lean headless agent box     sudo env PROFILE=minimal bash provision.sh
+  daily desktop               sudo env INSTALL_DESKTOP=1 bash provision.sh
+  golden image (strict)       sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh
+  bring a box up to date      sudo env APT_UPGRADE=1 bash provision.sh
+  shell + dotfiles only       bash install.sh   (repo root; no root, other script)
+
+Preview ANY of them by adding --dry-run: prints every planned action, makes no
+changes, and needs neither sudo nor network.
+
+Add-ons, combinable with any recipe above:
+  PROVISION_USER=alice   target another account (it must already exist)
+  DOCKER_ROOTLESS=1      rootless Docker for that user (step 25)
+  DOTFILES_COPY=1        copy dotfiles into $HOME instead of symlinking
+  STRICT=1               abort on the first failure instead of continuing
+
+Every flag, its default, and how they combine: provision/README.md#flags
+EOF
+      exit 0 ;;
     *) echo "unknown argument: $a (try --help)" >&2; exit 2 ;;
   esac
 done
 export DRY_RUN
 
 # Flags are UPPERCASE env vars; warn on the common lowercase typo before defaulting.
-for _lc in install_desktop golden_image docker_rootless apt_upgrade profile; do
+for _lc in install_desktop golden_image docker_rootless apt_upgrade profile strict dotfiles_copy; do
   _uc="${_lc^^}"
   [ -n "${!_lc:-}" ] && [ -z "${!_uc:-}" ] && \
     echo "[warn] env '$_lc' is set but IGNORED — flags are UPPERCASE; did you mean '$_uc'?" >&2

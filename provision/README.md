@@ -51,16 +51,50 @@ bash provision.sh --dry-run
 
 # 3. Provision (root for system pkgs; per-user steps auto-drop to your account)
 sudo bash provision.sh
-# target a specific user:        sudo PROVISION_USER=alice bash provision.sh
-# also install the desktop set:  sudo INSTALL_DESKTOP=1 bash provision.sh
-# build a reusable golden image: sudo GOLDEN_IMAGE=1 bash provision.sh
-# upgrade installed pkgs first:  sudo APT_UPGRADE=1 bash provision.sh
-# lean headless agent box:       sudo PROFILE=minimal bash provision.sh
-#   (skips Alacritty/flatpak + the GUI editors; lean apt/brew lists; keeps
-#    zsh+p10k, Docker, rust, Claude Code. Conflicts with INSTALL_DESKTOP=1.)
 ```
 
-Everything is idempotent — safe to re-run.
+Everything is idempotent — safe to re-run. `bash provision.sh --help` prints the
+recipes; the table below is the full flag reference.
+
+## Flags
+
+Every knob is an environment variable except `--dry-run`. **This table is the
+canonical reference** — the [recipes in the root README](../README.md#pick-your-box)
+and in `--help` are just common combinations of it.
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--dry-run` / `-n` | off | Print every planned action and change nothing. Needs neither root nor network — run it after any edit to a step script. |
+| `PROVISION_USER` | invoking user → uid 1000 → `ubuntu` | The account that gets the per-user steps (Homebrew, rustup, Claude Code, dotfiles, login shell). **Must already exist** — a typo aborts the run instead of provisioning the wrong account, and provisioning never creates users (cloud-init owns that). `--dry-run` only warns. |
+| `PROFILE` | `full` | `minimal` = lean headless agent box: skips Alacritty (36) and Flatpak (50), skips VSCodium + Cursor in step 20, and swaps in `apt.minimal.list` + `Brewfile.minimal`. **Keeps Docker**, Rust, Claude Code, zsh + p10k. Any other value aborts. |
+| `INSTALL_DESKTOP` | `0` | Also install the desktop/locale/IME apt set and apply the GNOME dconf settings (step 55). |
+| `GOLDEN_IMAGE` | `0` | Build a reusable image: implies `STRICT` **and** `DOTFILES_COPY`, and runs finalize (step 90). Destructive — throwaway build box only. |
+| `DOTFILES_COPY` | `0` | Copy the dotfiles into `$HOME` instead of symlinking them to the repo: self-contained, so the repo can be deleted afterwards, but edits no longer flow back. |
+| `DOCKER_ROOTLESS` | `0` | Set up rootless Docker for the target user (step 25): the official setuptool, linger, the `--user` service, and the `rootless` context. Needs unprivileged user namespaces — see the note at the end of this file. |
+| `APT_UPGRADE` | `0` | `apt-get upgrade` the already-installed packages before installing anything (step 10). Off by default because it bumps installed kernel/grub point-releases. |
+| `STRICT` | `0` | Abort on the first real failure instead of completing every step and exiting non-zero. Implied by `GOLDEN_IMAGE`. |
+
+### How they combine
+
+- **`GOLDEN_IMAGE=1` implies `STRICT=1` and `DOTFILES_COPY=1`.** An explicit
+  `STRICT=0` cannot weaken it: a partially built image must never be captured.
+- **`PROFILE=minimal` + `INSTALL_DESKTOP=1` is refused** — the run dies rather
+  than half-installing. A minimal box has no GUI, so the combination would pull in
+  the desktop apt set while the GUI steps (36/50/55) skip.
+- **`GOLDEN_IMAGE=1` + `DOCKER_ROOTLESS=1` is deliberately unsupported.** Rootless
+  needs a host-wide AppArmor relaxation (below), which would bake into the image
+  and be inherited by every clone. Build the image without it; each clone opts in.
+- **Copy mode is sticky.** A re-run *on* a golden image must carry `GOLDEN_IMAGE=1`
+  or `DOTFILES_COPY=1`, or step 60 replaces the copies with symlinks into a repo
+  path the image may not keep.
+- **Flags are UPPERCASE.** A lowercase `golden_image=1` is not the same variable,
+  so the run warns about the likely typo rather than silently doing a default run.
+- **The examples use `sudo env VAR=… bash provision.sh`, not `sudo VAR=…`.** Both
+  work under the stock Ubuntu sudoers rule, but per sudo(8) a command-line
+  assignment is subject to the security policy — under a restricted rule that lists
+  specific commands without the `SETENV` tag, sudo refuses it. Passing the
+  assignment to `env` instead keeps it out of sudo's policy entirely, and it is the
+  form every live test scenario exercised.
 
 ## Building a golden image
 
@@ -90,8 +124,8 @@ git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles/provision
 # 2. Preview, then build strictly. PROVISION_USER targets the image's login user;
 #    add INSTALL_DESKTOP=1 for a desktop image. Log under /tmp so the same finalize
 #    tmp-wipe removes the log too (never tee a golden build to /var/log or $HOME).
-sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh --dry-run
-sudo GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/golden.log
+sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh --dry-run
+sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/golden.log
 
 # 3. Repo + log were under /tmp → finalize already removed them; nothing to clean.
 #    (If you cloned into $HOME or logged there instead, finalize does NOT touch

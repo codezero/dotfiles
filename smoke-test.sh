@@ -75,9 +75,9 @@ dry_case() {
   if [ "$rc" = "$want" ]; then ok "$desc — exit $rc"; else bad "$desc — exit $rc (want $want)"; fi
   for p in "${pats[@]}"; do
     case "$p" in
-      '!'*) if grep -qF "${p#!}" <<<"$out"; then bad "$desc — unexpectedly saw: ${p#!}"
+      '!'*) if grep -qF -e "${p#!}" <<<"$out"; then bad "$desc — unexpectedly saw: ${p#!}"
             else ok "$desc — absent: ${p#!}"; fi ;;
-      *)    if grep -qF "$p" <<<"$out"; then ok "$desc — saw: $p"
+      *)    if grep -qF -e "$p" <<<"$out"; then ok "$desc — saw: $p"
             else bad "$desc — MISSING: $p"; fi ;;
     esac
   done
@@ -112,6 +112,17 @@ cmd_dry() {
   dry_case "minimal+desktop dies" 1 PROFILE=minimal INSTALL_DESKTOP=1 --
   dry_case "lowercase flag typo warns" 0 golden_image=1 -- \
     "did you mean 'GOLDEN_IMAGE'" "finalize: skipped"
+
+  # --help is a user-facing surface, not just syntax: it answers "which one do I
+  # want" with the recipes and points at the canonical flag table. Asserted here
+  # so a later rewrite can't quietly drop either. Must work without root.
+  local h hrc hp
+  h="$(bash "$HERE/provision/provision.sh" --help 2>&1)"; hrc=$?
+  if [ "$hrc" = 0 ]; then ok "--help — exit 0"; else bad "--help — exit $hrc (want 0)"; fi
+  for hp in "PROFILE=minimal" "INSTALL_DESKTOP=1" "GOLDEN_IMAGE=1" "APT_UPGRADE=1" \
+            "--dry-run" "provision/README.md#flags"; do
+    if grep -qF -e "$hp" <<<"$h"; then ok "--help — saw: $hp"; else bad "--help — MISSING: $hp"; fi
+  done
 }
 
 # ── verify (on-box end-state audit) ─────────────────────────────────────────

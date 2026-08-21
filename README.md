@@ -2,6 +2,45 @@
 
 Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolchain.
 
+## Pick your box
+
+Two entry points, both first-class: **`install.sh`** sets up shell + dotfiles on a
+box you already have; **`provision/provision.sh`** builds a whole machine and is
+what cloud-init runs. Five recipes cover nearly every use — each is one line, run
+from the repo root.
+
+| I want… | Run this |
+|---------|----------|
+| **Just my shell** on an existing box — zsh, p10k, dotfiles, core CLI tools. No Docker, no editors. | `bash install.sh` |
+| **A headless agent box** — lean apt/brew set, Docker, Rust, Claude Code, zsh + p10k. Skips every GUI package. | `sudo env PROFILE=minimal bash provision/provision.sh` |
+| **My daily desktop** — the full set, plus the desktop/locale/IME packages and GNOME settings. | `sudo env INSTALL_DESKTOP=1 bash provision/provision.sh` |
+| **A golden image** to clone from — strict, self-contained, machine identity wiped. [Throwaway build box only](provision/README.md#building-a-golden-image). | `sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision/provision.sh` |
+| **To bring a box up to date** — re-run whichever recipe built it, plus an `apt upgrade` of what's installed. | `sudo env APT_UPGRADE=1 bash provision/provision.sh` |
+
+On a fresh Ubuntu, first: `sudo apt update && sudo apt install -y git`, then clone
+the repo — **git is the only bootstrap dependency**; the scripts install the rest.
+
+**Preview before you commit to anything.** Adding `--dry-run` to any provision
+line prints every planned action and changes nothing — no sudo, no network:
+
+```bash
+bash provision/provision.sh --dry-run
+```
+
+Three things are deliberately *not* recipes, because they combine with any of them:
+
+- **Rootless Docker** — add `DOCKER_ROOTLESS=1`. On Ubuntu 24.04+ this needs one
+  host-wide AppArmor change first; the run says exactly what, and
+  `~/PROVISION-NEXT-STEPS.md` keeps the instructions on the box afterwards.
+- **Another account** — add `PROVISION_USER=alice`. It must already exist:
+  provisioning never creates users (on a cloud box, cloud-init owns that).
+- **cloud-init** — the same script is the payload, run as root from `runcmd`. See
+  [cloud-init wiring](provision/README.md#cloud-init-wiring).
+
+Every flag, its default, and how they interact:
+[**provision/README — Flags**](provision/README.md#flags). `provision.sh --help`
+prints the recipes above at the point of use.
+
 ## What's in here
 
 | Path | Purpose |
@@ -23,11 +62,6 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 > `git config core.hooksPath .githooks` (needs `gitleaks` — it's in the Brewfile).
 > CI also scans every push via `.github/workflows/gitleaks.yml`.
 
-## Two ways to use it
-
-- **Just my shell on an existing box** → `install.sh` (below).
-- **Replicate the whole machine / cloud-init** → [`provision/`](provision/README.md).
-
 ## Smoke tests
 
 `bash smoke-test.sh lint` + `bash smoke-test.sh dry` run anywhere (no sudo, no
@@ -35,7 +69,7 @@ changes): shellcheck the tree + assert the `--dry-run` behavior of every
 provisioning flag. `bash smoke-test.sh verify` audits a provisioned box's end
 state read-only; `bash smoke-test.sh scenarios` prints the live-test runbook.
 
-## Quick start (install.sh)
+## `install.sh` in detail
 
 ```bash
 sudo apt update && sudo apt install -y git   # fresh/default Ubuntu ships no git
