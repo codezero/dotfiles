@@ -213,6 +213,11 @@ cmd_dry() {
   nst_case "follow-ups: rootless actually up" "$nst_home" DOCKER_ROOTLESS=1 -- \
     "rootless is ALREADY set up" "docker info --format" \
     "!choose ONE" "!usermod -aG docker"
+  nst_case "follow-ups: apt not upgraded (default)" "$nst_home" -- \
+    "re-run with APT_UPGRADE=1" "!will not reach zero"
+  nst_case "follow-ups: apt upgraded" "$nst_home" APT_UPGRADE=1 -- \
+    "the count will not reach zero" "Always-Include-Phased-Updates" \
+    "!re-run with APT_UPGRADE=1"
   rm -rf "$nst_home"
 }
 

@@ -174,6 +174,24 @@ if ! dry; then
   log "Also saved on-box: $TARGET_HOME/PROVISION-NEXT-STEPS.md (MOTD reminds at login; delete the file when done)"
 fi
 
+# Dynamic MACHINE state, so it cannot live in next_steps_text: that text is
+# static and shared byte-for-byte with the on-box notes file, which outlives
+# this run — a "reboot pending" line baked into a .md would still be there a
+# week after the reboot. The run has this state and used to simply discard it
+# (seen live in S12: APT_UPGRADE=1 set the flag and nothing said so).
+#
+# A golden build exits above and never reaches here. That is correct, not an
+# omission: /var/run is a symlink into the /run tmpfs, so the flag cannot
+# survive into the captured image, and a clone cold-boots the newest installed
+# kernel anyway — there is nothing for a clone to reboot FOR.
+if ! dry && [ -e /var/run/reboot-required ]; then
+  echo
+  warn "This box wants a reboot (/var/run/reboot-required) — provisioning itself is complete."
+  if [ -r /var/run/reboot-required.pkgs ]; then
+    warn "  asked for by: $(tr '\n' ' ' < /var/run/reboot-required.pkgs)"
+  fi
+fi
+
 # Every step ran regardless of failures; this only sets the exit code so that
 # image-build automation can detect a partial/failed provision.
 [ -n "${SOFT_FAIL_LOG:-}" ] && rm -f "$SOFT_FAIL_LOG"

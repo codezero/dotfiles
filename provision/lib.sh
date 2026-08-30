@@ -299,4 +299,35 @@ EOF
             sudo usermod -aG docker $TARGET_USER
 EOF
   fi
+  # Not a follow-up — an explanation, kept out of the actionable list above so
+  # it doesn't dilute it. "N packages can be upgraded" at login is correct in
+  # BOTH directions and surprised this repo's own author in both (2026-08-05,
+  # then live in S12), which is exactly the case for saying it where the user
+  # is looking rather than only in CLAUDE.md. Flag-keyed: step 10's upgrade
+  # branch is gated on precisely this variable.
+  echo
+  echo "Expected, no action needed:"
+  if [ "${APT_UPGRADE:-0}" = "1" ]; then
+    cat <<EOF
+
+  - "N packages can be upgraded" may STILL appear at login even though this run
+    used APT_UPGRADE=1, and the count will not reach zero. Step 10 runs
+    'apt-get upgrade', never 'full-upgrade', so anything whose new version would
+    ADD or REMOVE a package is held back — a kernel ABI bump is a brand-new
+    package NAME each time. That is the "no new kernels" promise the flag exists
+    to keep. Ubuntu's per-machine phased updates hold back a second, unrelated
+    slice. To see which is which:
+        apt-get -s upgrade
+        apt-get -s -o APT::Get::Always-Include-Phased-Updates=true upgrade
+EOF
+  else
+    cat <<EOF
+
+  - "N packages can be upgraded" at login is expected. This run installed the
+    packages the lists name and deliberately did NOT upgrade what was already
+    on the box — a blanket upgrade also bumps the kernel/grub point-releases
+    (initramfs rebuild + a pending reboot). To bring the box fully up to date,
+    re-run with APT_UPGRADE=1.
+EOF
+  fi
 }
