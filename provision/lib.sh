@@ -68,7 +68,9 @@ soft_fail() {
 #     typo in cloud-init before we silently provision the wrong account; an
 #     existing user such as the AWS AMI default `ubuntu` is honored as-is.
 #   - PROVISION_USER unset           -> best-effort: the invoking user
-#     (SUDO_USER / logname), then the uid-1000 user, then literally "ubuntu".
+#     (SUDO_USER / logname), then the uid-1000 user, then literally "ubuntu" —
+#     and if even THAT doesn't exist, die the same way: this repo never creates
+#     users, so a box with no non-root account must be told which one to use.
 # (In --dry-run a missing explicit user only warns, so previews never block.)
 if [ -n "${PROVISION_USER:-}" ]; then
   TARGET_USER="$PROVISION_USER"
@@ -85,6 +87,21 @@ else
     TARGET_USER="$(getent passwd 1000 2>/dev/null | cut -d: -f1)"
   fi
   [ -n "${TARGET_USER:-}" ] || TARGET_USER="ubuntu"
+  # That last rung is a GUESS, and nothing ever checked it landed on a real
+  # account. On a box with no non-root user at all — a bare container image, a
+  # hardened cloud image with the default user removed — the chain ends at the
+  # literal "ubuntu", which then doesn't exist: TARGET_HOME comes out EMPTY and
+  # the per-user steps chown/write into nowhere. Refuse, and name the one thing
+  # that fixes it. Deliberately NOT auto-creating the account: user creation is
+  # cloud-init's job (`users:` + ssh_authorized_keys), and inventing one here
+  # would produce a box whose login story nobody wrote down.
+  if ! id "$TARGET_USER" >/dev/null 2>&1; then
+    if dry; then
+      warn "no non-root user found (auto-detect fell through to '$TARGET_USER', which does not exist) — set PROVISION_USER to an existing account"
+    else
+      die "No non-root user on this box (auto-detect fell through to '$TARGET_USER', which does not exist). Create the account first — cloud-init's 'users:' owns that — then set PROVISION_USER=<name>."
+    fi
+  fi
 fi
 TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)"
 # Primary GROUP of the target user — do NOT assume it equals the username

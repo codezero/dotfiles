@@ -219,6 +219,32 @@ cmd_dry() {
     "the count will not reach zero" "Always-Include-Phased-Updates" \
     "!re-run with APT_UPGRADE=1"
   rm -rf "$nst_home"
+
+  # ── the "no non-root user" edge ────────────────────────────────────────────
+  # The auto-detect chain's last rung is a GUESS ("ubuntu") and was never
+  # checked, so a box with no non-root account got an EMPTY $TARGET_HOME
+  # instead of a refusal. Sourcing lib.sh mutates nothing, so exercising the
+  # real (non-dry) die path is safe in this tier.
+  #
+  # BOTH `getent` and `id` are shimmed. Shimming only getent would make the
+  # test vacuous on any host that happens to have a real `ubuntu` account —
+  # it would pass without ever reaching the guard.
+  local shim; shim="$(mktemp -d)"
+  printf '#!/bin/sh\nexit 2\n' > "$shim/getent"
+  printf '#!/bin/sh\nfor a in "$@"; do case "$a" in ubuntu|__nosuch__) exit 1;; esac; done\nexec /usr/bin/id "$@"\n' > "$shim/id"
+  chmod +x "$shim/getent" "$shim/id"
+  local nro nrc
+  nro="$(PATH="$shim:$PATH" PROVISION_USER='' SUDO_USER=__nosuch__ DRY_RUN=0 \
+         bash -c 'source "$1"/provision/lib.sh' _ "$HERE" 2>&1)"; nrc=$?
+  if [ "$nrc" = 1 ] && grep -q "No non-root user on this box" <<<"$nro"; then
+    ok "no-non-root-user — refused (exit 1)"
+  else bad "no-non-root-user — exit $nrc, said: $nro"; fi
+  nro="$(PATH="$shim:$PATH" PROVISION_USER='' SUDO_USER=__nosuch__ DRY_RUN=1 \
+         bash -c 'source "$1"/provision/lib.sh' _ "$HERE" 2>&1)"; nrc=$?
+  if [ "$nrc" = 0 ] && grep -q "no non-root user found" <<<"$nro"; then
+    ok "no-non-root-user — dry-run warns, never blocks a preview"
+  else bad "no-non-root-user (dry) — exit $nrc, said: $nro"; fi
+  rm -rf "$shim"
 }
 
 # ── scenario id -> verify tokens ────────────────────────────────────────────

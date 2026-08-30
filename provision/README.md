@@ -65,7 +65,7 @@ and in `--help` are just common combinations of it.
 | Flag | Default | Effect |
 |------|---------|--------|
 | `--dry-run` / `-n` | off | Print every planned action and change nothing. Needs neither root nor network — run it after any edit to a step script. |
-| `PROVISION_USER` | invoking user → uid 1000 → `ubuntu` | The account that gets the per-user steps (Homebrew, rustup, Claude Code, dotfiles, login shell). **Must already exist** — a typo aborts the run instead of provisioning the wrong account, and provisioning never creates users (cloud-init owns that). `--dry-run` only warns. |
+| `PROVISION_USER` | invoking user → uid 1000 → `ubuntu` | The account that gets the per-user steps (Homebrew, rustup, Claude Code, dotfiles, login shell). **Must already exist** — a typo aborts the run instead of provisioning the wrong account, and so does a box with no non-root user at all (the fallback's last rung is a guess); provisioning never creates users, cloud-init owns that. `--dry-run` only warns. |
 | `PROFILE` | `full` | `minimal` = lean headless agent box: skips Alacritty (36) and Flatpak (50), skips VSCodium + Cursor in step 20, and swaps in `apt.minimal.list` + `Brewfile.minimal`. **Keeps Docker**, Rust, Claude Code, zsh + p10k. Any other value aborts. |
 | `INSTALL_DESKTOP` | `0` | Also install the desktop/locale/IME apt set and apply the GNOME dconf settings (step 55). |
 | `GOLDEN_IMAGE` | `0` | Build a reusable image: implies `STRICT` **and** `DOTFILES_COPY`, and runs finalize (step 90). Destructive — throwaway build box only. |
@@ -175,7 +175,11 @@ actually came up gets a "nothing to do" note instead of the setup recipe.
   exist or provisioning aborts with a clear error (a typo'd username won't
   silently land on the wrong account); an existing user like the AWS AMI default
   `ubuntu` is honored as-is. Left unset, it falls back to the invoking user, then
-  the uid-1000 user, then `ubuntu`. `--dry-run` only warns, so previews never block.
+  the uid-1000 user, then `ubuntu` — and if even that account doesn't exist (a
+  bare container image, or a hardened cloud image with the default user removed)
+  the run **aborts the same way** rather than provisioning into an empty home:
+  set `PROVISION_USER` to an account that exists. `--dry-run` only warns, so
+  previews never block.
 - **Silent.** apt runs through `env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a`
   (the `env` wrapper is required so the settings survive `sudo`, which resets the
   environment), with `--force-confdef/--force-confold` to auto-resolve dpkg config
