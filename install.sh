@@ -163,7 +163,9 @@ cat <<'EOF'
 
   1. MesloLGS NF (Nerd Font) was installed for you (~/.local/share/fonts).
      Alacritty already uses it; in any OTHER terminal, select "MesloLGS NF"
-     in its font settings.
+     in its font settings. (provision.sh words this differently on a desktop
+     box because it also points GNOME's monospace font at the font — this
+     script installs no desktop, so nothing picks it up for you here.)
 
   2. Edit ~/.gitconfig — set your real name and email (it ships with a
      placeholder identity).

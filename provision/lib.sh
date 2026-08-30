@@ -202,11 +202,31 @@ load_brew() {
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 }
 
+# Is rootless Docker actually SET UP for the target user? Keyed off the artifact
+# `dockerd-rootless-setuptool.sh install` leaves behind, NOT off $DOCKER_ROOTLESS:
+# step 25 soft-fails on a userns-restricted host and deliberately leaves the box
+# rootful, so the flag says what was ASKED FOR and this says what HAPPENED.
+# A file test rather than `docker info` on purpose: both callers run as root,
+# where the user's rootless socket/context isn't reachable without their session
+# bus. Weaker than the smoke-test audit (which must read the daemon) — and the
+# right trade here, because this only decides which paragraph to print.
+rootless_docker_ready() {
+  [ -n "${TARGET_HOME:-}" ] && [ -f "$TARGET_HOME/.config/systemd/user/docker.service" ]
+}
+
 # The manual post-provision follow-ups. ONE source of truth: provision.sh prints
 # this at the end of a normal run, and step 80 writes it to
 # ~/PROVISION-NEXT-STEPS.md (+ an MOTD pointer) — a GOLDEN build exits + wipes
 # before the end-of-run summary, so without the file a clone / cloud-init user
 # would have no on-box record of these. Plain text that also reads as Markdown.
+#
+# THIS FUNCTION OWNS THE FACT. Any other surface (either README, the MOTD
+# pointer, CLAUDE.md) must point at it rather than re-list the follow-ups —
+# restating them is how the "jj/bun may warn" claim stayed wrong in two places.
+#
+# It branches on machine STATE, not only on flags: a bullet telling the user to
+# do something this very run already did is worse than no bullet, because they
+# do the work twice and lose trust in the rest of the list.
 next_steps_text() {
   cat <<EOF
 Manual follow-ups (need an interactive login session):
@@ -230,14 +250,41 @@ EOF
     font here (repo: fonts/MesloLGS-NF -> ~/.local/share/fonts && fc-cache -f)
     or re-provision without PROFILE=minimal.
 EOF
+  elif [ "${INSTALL_DESKTOP:-0}" = "1" ]; then
+    # Step 55 pointed GNOME's monospace-font-name at it (f945b93), so the stock
+    # terminals need no hand-editing any more — telling the user to go and set
+    # it is work that is already done. Flag-keyed, unlike rootless_docker_ready:
+    # step 55 is gated on exactly this flag, and a failed `dconf load` soft-fails
+    # loudly in the run output rather than passing silently.
+    cat <<EOF
+  - MesloLGS NF (Nerd Font) is installed system-wide, Alacritty pins it, and
+    GNOME's monospace font is already set to it — the stock terminals are
+    covered. Only a NON-GNOME terminal you add later needs "MesloLGS NF"
+    chosen by hand in its font settings.
+EOF
   else
     cat <<EOF
-  - MesloLGS NF (Nerd Font) is installed system-wide; Alacritty uses it. In any
-    OTHER terminal, select "MesloLGS NF" in its font settings.
+  - MesloLGS NF (Nerd Font) is installed system-wide and Alacritty pins it. No
+    desktop was installed here, so any other terminal you add later needs
+    "MesloLGS NF" chosen by hand in its font settings.
 EOF
   fi
   cat <<EOF
   - Set your real git identity in ~/.gitconfig.
+EOF
+  if rootless_docker_ready; then
+    cat <<EOF
+  - Docker for $TARGET_USER: rootless is ALREADY set up (systemd --user unit +
+    linger; the CLI defaults to the 'rootless' context). Nothing to do. Confirm
+    it any time with:
+        docker info --format '{{.SecurityOptions}} {{.DockerRootDir}}'
+    'name=rootless' plus a DockerRootDir under \$HOME means you really are on
+    the rootless daemon — a context merely NAMED rootless proves nothing.
+    The rootful system daemon is still installed but unused; to drop it:
+        sudo systemctl disable --now docker.service docker.socket
+EOF
+  else
+    cat <<EOF
   - Docker access for $TARGET_USER — choose ONE:
       - rootless (recommended, unprivileged): re-run with DOCKER_ROOTLESS=1, or:
             dockerd-rootless-setuptool.sh install && systemctl --user enable --now docker
@@ -251,4 +298,5 @@ EOF
       - rootful without sudo (convenience; the 'docker' group is ROOT-equivalent):
             sudo usermod -aG docker $TARGET_USER
 EOF
+  fi
 }

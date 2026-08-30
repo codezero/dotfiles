@@ -87,6 +87,35 @@ dry_case() {
   done
 }
 
+# ── follow-up text (next_steps_text) ────────────────────────────────────────
+# nst_case <desc> <fake-TARGET_HOME> [VAR=val ...] -- [pattern ...]
+# Same pattern language as dry_case ('!' = must NOT appear).
+#
+# next_steps_text branches on machine STATE, which is exactly the class of bug
+# a green run hides: a stale bullet still prints, it just tells the user to redo
+# work the run already did (F items 8 + 10 were both found live, not here).
+# lib.sh is sourced in a subshell and $TARGET_HOME repointed AFTER sourcing (it
+# is derived from getent), so every branch is reachable from a temp dir.
+nst_case() {
+  local desc="$1" home="$2"; shift 2
+  local envs=() pats=() in_pats=0 a out p
+  for a in "$@"; do
+    if [ "$a" = "--" ]; then in_pats=1
+    elif [ "$in_pats" = 1 ]; then pats+=("$a")
+    else envs+=("$a"); fi
+  done
+  out="$(env "${envs[@]}" DRY_RUN=1 PROVISION_USER="$(id -un)" bash -c \
+    'source "$1"/provision/lib.sh; TARGET_HOME="$2"; next_steps_text' _ "$HERE" "$home" 2>&1)"
+  for p in "${pats[@]}"; do
+    case "$p" in
+      '!'*) if grep -qF -e "${p#!}" <<<"$out"; then bad "$desc — unexpectedly saw: ${p#!}"
+            else ok "$desc — absent: ${p#!}"; fi ;;
+      *)    if grep -qF -e "$p" <<<"$out"; then ok "$desc — saw: $p"
+            else bad "$desc — MISSING: $p"; fi ;;
+    esac
+  done
+}
+
 cmd_dry() {
   hdr "dry-run matrix (no sudo, no changes)"
   dry_case "plain" 0 -- \
@@ -162,6 +191,29 @@ cmd_dry() {
     if [ "$crc" = 2 ]; then ok "combo guard — '$combo' rejected (exit 2)"
     else bad "combo guard — '$combo' gave exit $crc (want 2 = rejected unaudited)"; fi
   done
+
+  # ── the follow-up text's state branches (F items 8 + 10) ───────────────────
+  local nst_home; nst_home="$(mktemp -d)"
+  nst_case "follow-ups: full, no desktop" "$nst_home" -- \
+    "desktop was installed here" "!GNOME's monospace font" \
+    "Docker access for"
+  nst_case "follow-ups: full + desktop" "$nst_home" INSTALL_DESKTOP=1 -- \
+    "GNOME's monospace font is already set to it" \
+    "!desktop was installed here"
+  nst_case "follow-ups: minimal" "$nst_home" PROFILE=minimal -- \
+    "No Nerd Font on this profile" \
+    "!MesloLGS NF (Nerd Font) is installed system-wide"
+  # The load-bearing half of item 10: the flag says what was ASKED FOR. On a
+  # userns-restricted host step 25 soft-fails and leaves the box rootful, so
+  # the setup recipe must still print.
+  nst_case "follow-ups: rootless asked for, not up" "$nst_home" DOCKER_ROOTLESS=1 -- \
+    "Docker access for" "!ALREADY set up"
+  mkdir -p "$nst_home/.config/systemd/user" \
+    && : > "$nst_home/.config/systemd/user/docker.service"
+  nst_case "follow-ups: rootless actually up" "$nst_home" DOCKER_ROOTLESS=1 -- \
+    "rootless is ALREADY set up" "docker info --format" \
+    "!choose ONE" "!usermod -aG docker"
+  rm -rf "$nst_home"
 }
 
 # ── scenario id -> verify tokens ────────────────────────────────────────────
@@ -237,6 +289,11 @@ v_core() {
   check "docker CLI"               command -v docker
   check "step 80 notes file"       test -f "$HOME/PROVISION-NEXT-STEPS.md"
   check "step 80 MOTD drop-in"     test -x /etc/update-motd.d/99-provision-next-steps
+  # The pointer bakes in an absolute path under a 0750 home, so it must name the
+  # owner and how another account reads it — otherwise every non-target user
+  # (the cloud-init norm, seen live in S13) is aimed at a path it gets EACCES on.
+  check "MOTD names the owner (readable cross-account)" \
+    bash -c 'grep -q "sudo -iu" /etc/update-motd.d/99-provision-next-steps'
 }
 
 v_full_extras() {  # full-profile installs (skipped for minimal)
@@ -366,8 +423,20 @@ v_desktop() {
 v_rootless() {
   hdr "verify: rootless docker (run as the login user)"
   check "docker context = rootless" bash -c '[ "$(docker context show 2>/dev/null)" = rootless ]'
+  # ...but the context is only a LABEL: one NAMED rootless can point straight at
+  # the rootful daemon, which is exactly the d613f1b failure mode. Read the
+  # daemon. This pair is what actually proved S14 — and it was run by hand,
+  # never by the harness, so the audit could still have passed a rootful box.
+  check "daemon is really rootless (not just the context name)" \
+    bash -c 'docker info --format "{{.SecurityOptions}}" 2>/dev/null | grep -q "name=rootless"'
+  check "image store is the user's, not /var/lib/docker" \
+    bash -c '[ "$(docker info --format "{{.DockerRootDir}}" 2>/dev/null)" = "$HOME/.local/share/docker" ]'
   check "user docker service active" systemctl --user is-active --quiet docker
   check "linger enabled" bash -c 'loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q yes'
+  # F item 10: on a box where rootless actually came up, the follow-ups must not
+  # still recite the how-to-set-it-up recipe.
+  check "notes file has no stale rootless recipe" \
+    bash -c '! grep -q "choose ONE" "$HOME/PROVISION-NEXT-STEPS.md"'
 }
 
 v_golden_clone() {

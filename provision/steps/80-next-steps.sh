@@ -45,10 +45,18 @@ write_notes() {
 }
 write_notes || soft_fail "could not write $NOTES_FILE"
 
-# MOTD drop-in: a one-line pointer, not the full text (pam_motd runs these as
+# MOTD drop-in: a two-line pointer, not the full text (pam_motd runs these as
 # root at every login — keep it quiet and cheap). Unquoted heredoc on purpose:
-# $NOTES_FILE/$MOTD_FILE are baked in at write time. Must be executable (0755)
-# or pam_motd silently skips it.
+# $NOTES_FILE/$MOTD_FILE/$TARGET_USER are baked in at write time. Must be
+# executable (0755) or pam_motd silently skips it.
+#
+# It names the OWNER and how to read the file across accounts because the path
+# is absolute and $TARGET_HOME is 0750: when the target user is not the login
+# user (the cloud-init case — found live in S13), every other account was being
+# pointed at a file it gets EACCES on. pam_motd runs the drop-in as root with no
+# reliable per-login identity, so "print it only to the owner" isn't available;
+# one honest extra line is cheaper than a second copy of the file to keep in
+# sync (and a second copy would break the self-silencing `rm the .md` cleanup).
 write_motd() {
   $SUDO tee "$MOTD_FILE" >/dev/null <<EOF && $SUDO chmod 0755 "$MOTD_FILE"
 #!/bin/sh
@@ -58,6 +66,7 @@ write_motd() {
 [ -f "$NOTES_FILE" ] || exit 0
 echo ""
 echo ">>> Provisioning follow-ups pending — see $NOTES_FILE"
+echo ">>> (owned by $TARGET_USER; from another account:  sudo -iu $TARGET_USER cat $NOTES_FILE)"
 EOF
 }
 write_motd || soft_fail "could not install MOTD drop-in $MOTD_FILE"

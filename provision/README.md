@@ -139,11 +139,19 @@ sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/
 Each booted clone regenerates a unique machine-id + SSH host keys and re-runs
 cloud-init on first boot.
 
-The manual follow-ups (git identity, `nvm install --lts`, Docker mode choice)
-survive into every clone: step 80 writes them to `~/PROVISION-NEXT-STEPS.md`
-and adds an MOTD pointer (`/etc/update-motd.d/99-provision-next-steps`), both
-of which finalize leaves alone. The MOTD notice is self-silencing — delete the
-`.md` once done and it stops printing.
+The manual follow-ups survive into every clone: step 80 writes them to
+`~/PROVISION-NEXT-STEPS.md` and adds an MOTD pointer
+(`/etc/update-motd.d/99-provision-next-steps`), both of which finalize leaves
+alone. The MOTD notice is self-silencing — delete the `.md` once done and it
+stops printing. It names the owning user and how to read the file from another
+account, because `$TARGET_HOME` is `0750` and on the cloud-init path the target
+user usually is **not** the account you log in as.
+
+**The follow-up list itself is not written down here.** `next_steps_text()` in
+`lib.sh` owns it — the same text provision.sh prints at the end of a run and
+step 80 writes on-box — and it varies with the machine: `PROFILE=minimal` and
+`INSTALL_DESKTOP=1` change the font advice, and a box where rootless Docker
+actually came up gets a "nothing to do" note instead of the setup recipe.
 
 > **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
 > shell history, and credential stores (`.aws`/`.gnupg`/`.config/{gh,gcloud}`/
@@ -261,4 +269,6 @@ in `/var/log/provision.log`.
 > (default — even when the `kernel.unprivileged_userns_clone` sysctl is `1`); to
 > allow rootless persistently, drop a `sysctl.d` file setting it to `0` and run
 > `sudo sysctl --system` (a host-wide security trade-off). For rootless you do
-> **not** `usermod -aG docker` (that group is root-equivalent).
+> **not** `usermod -aG docker` (that group is root-equivalent). The exact
+> commands, and whether this box still needs them at all, are in
+> `~/PROVISION-NEXT-STEPS.md` on the box itself — this note is the *why*.
