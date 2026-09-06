@@ -119,7 +119,13 @@ builder. It changes three things versus a normal run:
 #    runtime once the dotfiles are copied in, and finalize wipes /tmp LAST, so a
 #    /tmp clone (and any /tmp logs) are swept from the image automatically.
 #    (Fresh box: install git first — see Usage above.)
-git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles/provision
+#    PIN THE REF: an image outlives its build and every clone inherits it, so
+#    build from a commit you reviewed — not from whatever the default branch
+#    happens to be at that moment. "cloud-init wiring" below owns the
+#    tag-vs-SHA mechanics; this is the same rule for the manual path.
+git clone <repo-url> /tmp/dotfiles && cd /tmp/dotfiles
+git checkout <reviewed-sha> && git log -1 --format='%H %s'   # confirm the ref
+cd provision
 
 # 2. Preview, then build strictly. PROVISION_USER targets the image's login user;
 #    add INSTALL_DESKTOP=1 for a desktop image. Log under /tmp so the same finalize
@@ -254,9 +260,12 @@ runcmd:
   - [ bash, -lc, "set -o pipefail; PROVISION_USER=ubuntu bash /opt/dotfiles/provision/provision.sh 2>&1 | tee /var/log/provision.log" ]
 ```
 
-For reproducible images, pin to a reviewed tag (or fetch + checkout a specific
-commit SHA as shown above) rather than the default branch, and verify it
-(signed tag / known SHA) before running.
+For reproducible images, build from a ref you reviewed rather than from the
+default branch, and confirm it before running. A **known commit SHA** works
+today (fetch + checkout, as shown above) — compare what you get against the
+SHA you reviewed. A **tag** is tidier and is what the example uses, but this
+repo doesn't tag releases yet, so treat that form as available once it does;
+`git verify-tag` only helps if the tag is signed.
 
 **Private repo + "no credentials":** don't bake a token into cloud-init.
 Either (a) make the dotfiles repo **public**, or (b) ship the files via
