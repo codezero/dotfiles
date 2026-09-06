@@ -97,6 +97,7 @@ STEPS=(
   35-rust.sh
   36-alacritty.sh
   37-claude-code.sh
+  38-kitty.sh
   50-flatpak.sh
   55-gnome-dconf.sh
   60-shell.sh

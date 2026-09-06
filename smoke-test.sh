@@ -119,6 +119,7 @@ nst_case() {
 cmd_dry() {
   hdr "dry-run matrix (no sudo, no changes)"
   dry_case "plain" 0 -- \
+    "verify the OpenPGP signature against pinned fingerprint 3CE1780F78DD88DF45194FD706BC317B515ACE7C" \
     "finalize: skipped" "rootless Docker: skipped" "GNOME dconf: skipped" \
     "step: 80-next-steps.sh" "symlink " "!PROFILE=minimal —"
   dry_case "desktop" 0 INSTALL_DESKTOP=1 -- \
@@ -132,7 +133,8 @@ cmd_dry() {
   dry_case "minimal" 0 PROFILE=minimal -- \
     "using apt.minimal.list" "using Brewfile.minimal" \
     "VSCodium: skipped (PROFILE=minimal)" "Cursor: skipped (PROFILE=minimal)" \
-    "alacritty: skipped (PROFILE=minimal)" "flatpak: skipped (PROFILE=minimal)"
+    "alacritty: skipped (PROFILE=minimal)" "flatpak: skipped (PROFILE=minimal)" \
+    "kitty: skipped (PROFILE=minimal)"
   # S14's combination. The load-bearing claim is that PROFILE=minimal drops the
   # GUI set while KEEPING Docker *and* its rootless prerequisites — a future
   # `minimal &&` gate on the Docker block would silently break rootless on the
@@ -219,6 +221,24 @@ cmd_dry() {
     "the count will not reach zero" "Always-Include-Phased-Updates" \
     "!re-run with APT_UPGRADE=1"
   rm -rf "$nst_home"
+
+  # ── every step file is REGISTERED in provision.sh ─────────────────────────
+  # provision.sh's STEPS array is hand-maintained, not a glob, so a new
+  # steps/NN-*.sh is inert until it is added there — it shellchecks clean, it
+  # dry-runs clean, and it simply never runs. (Caught exactly this while adding
+  # 38-kitty.sh.) Assert both directions: no orphan file, no phantom entry.
+  local sf sname
+  for sf in "$HERE"/provision/steps/*.sh; do
+    sname="$(basename "$sf")"
+    if grep -qE "^[[:space:]]+$sname\$" "$HERE/provision/provision.sh"; then
+      ok "step registered — $sname"
+    else bad "step NOT in provision.sh's STEPS array (dead code) — $sname"; fi
+  done
+  while read -r sname; do
+    [ -f "$HERE/provision/steps/$sname" ] \
+      || bad "STEPS lists a step that does not exist — $sname"
+  done < <(sed -n '/^STEPS=(/,/^)/p' "$HERE/provision/provision.sh" \
+           | sed -n 's/^[[:space:]]*\([0-9][0-9]*-[a-z-]*\.sh\)[[:space:]]*$/\1/p')
 
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
   # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
@@ -382,6 +402,13 @@ v_full_extras() {  # full-profile installs (skipped for minimal)
   # desktop image where snapd ships by default.
   checkno "alacritty NOT from snap (cargo build is the design)" snap list alacritty
   check "alacritty themes clone"   test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"
+  check "kitty installed (upstream bundle)" test -x "$HOME/.local/kitty.app/bin/kitty"
+  check "kitten installed"         test -x "$HOME/.local/kitty.app/bin/kitten"
+  check "kitty on PATH via ~/.local/bin" test -L "$HOME/.local/bin/kitty"
+  # A .desktop still saying `Exec=kitty` means the sed rewrite silently no-op'd
+  # and the menu entry would launch apt's kitty (or nothing) instead of ours.
+  check "kitty.desktop points at the installed build" \
+    bash -c 'grep -q "^Exec=$HOME/.local/kitty.app/bin/kitty" "$HOME/.local/share/applications/kitty.desktop"'
   check "MesloLGS NF system-wide"  bash -c 'ls /usr/local/share/fonts/MesloLGS-NF/*.ttf'
   check "_alacritty completion world-readable" \
     bash -c '[ -r /usr/share/zsh/vendor-completions/_alacritty ]'
@@ -395,6 +422,7 @@ v_minimal() {
   checkno "codium ABSENT"          dpkg-query -W codium
   checkno "cursor ABSENT"          dpkg-query -W cursor
   checkno "alacritty ABSENT"       test -e "$HOME/.cargo/bin/alacritty"
+  checkno "kitty ABSENT"           test -e "$HOME/.local/kitty.app/bin/kitty"
   checkno "flatpak ABSENT"         command -v flatpak
   checkno "bat ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/bat
   checkno "eza ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/eza
