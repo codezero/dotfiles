@@ -1,3 +1,28 @@
 [user]
 	name = codezero
 	email = codezero@local.none
+
+# delta (https://github.com/dandavison/delta) — syntax-highlighted diffs.
+# Homebrew formula is `git-delta`; the BINARY is `delta` (same trap as
+# bat/batcat). It ships in the FULL Brewfile only — Brewfile.minimal drops the
+# niceties and install.sh installs a smaller set still — but this file goes to
+# EVERY box via dotfiles.list. So both hooks are guarded with `command -v`,
+# exactly like .zshrc's bat/eza/zoxide aliases: without the guard, `git diff`
+# would break outright on a lean box. git runs these through a shell, so the
+# `if` works; the fallbacks are git's own defaults (less, and no filter).
+#
+# The QUOTES are load-bearing: in git-config syntax an unquoted `;` starts a
+# comment, so without them the value is silently truncated at the first `;`
+# and every paged git command dies with "Syntax error: end of file unexpected".
+[core]
+	pager = "if command -v delta >/dev/null 2>&1; then delta; else less; fi"
+
+[interactive]
+	diffFilter = "if command -v delta >/dev/null 2>&1; then delta --color-only; else cat; fi"
+
+[delta]
+	navigate = true
+	line-numbers = true
+	# side-by-side needs width — it is cramped under ~120 cols. Flip it per
+	# command without editing this file:  git -c delta.side-by-side=false diff
+	side-by-side = true

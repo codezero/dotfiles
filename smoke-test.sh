@@ -220,6 +220,25 @@ cmd_dry() {
     "!re-run with APT_UPGRADE=1"
   rm -rf "$nst_home"
 
+  # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
+  # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
+  # FULL Brewfile only (minimal drops the niceties; install.sh installs fewer
+  # still). Two real failure modes, one of which bit during development:
+  #   1. git-config treats an UNQUOTED `;` as a comment, so the value is
+  #      silently truncated at the first one and every paged git command dies
+  #      with "Syntax error: end of file unexpected".
+  #   2. An unguarded pager breaks `git diff` outright where delta is absent.
+  local gk gv
+  for gk in core.pager interactive.diffFilter; do
+    gv="$(git config --file "$HERE/.gitconfig" --get "$gk" 2>/dev/null)"
+    if [ "${gv%fi}" != "$gv" ]; then ok ".gitconfig $gk — value intact (not cut at ';')"
+    else bad ".gitconfig $gk — truncated or missing: '$gv'"; fi
+    # PATH without the brew prefix = a box that never installed delta.
+    if printf 'x\n' | PATH=/usr/bin:/bin LESS=FRX sh -c "$gv" >/dev/null 2>&1; then
+      ok ".gitconfig $gk — falls back cleanly with delta absent"
+    else bad ".gitconfig $gk — fails when delta is absent"; fi
+  done
+
   # ── the "no non-root user" edge ────────────────────────────────────────────
   # The auto-detect chain's last rung is a GUESS ("ubuntu") and was never
   # checked, so a box with no non-root account got an EMPTY $TARGET_HOME
@@ -327,6 +346,25 @@ v_core() {
     bash -c 'grep -q "sudo -iu" /etc/update-motd.d/99-provision-next-steps'
 }
 
+# Every `brew "..."` line in the ACTIVE Brewfile, in ONE assertion — so a newly
+# added formula is covered the day it lands, with no per-package check to
+# remember. Compares NAMES against `brew list --formula`, not binaries: the
+# formula is `git-delta` while the binary is `delta` (cf. bat/batcat). Casks and
+# taps are excluded on purpose — macOS-only casks fail-soft here by design, so
+# asserting them would go red for a documented non-problem.
+v_brewfile() {
+  local bf="$HERE/provision/packages/$1"
+  [ -f "$bf" ] || { skip "Brewfile audit ($1 missing)"; return; }
+  check "every formula in $1 is installed" bash -c '
+    bf="$1"; brew=/home/linuxbrew/.linuxbrew/bin/brew
+    [ -x "$brew" ] || exit 1
+    want=$(sed -n "s/^brew \"\([^\"]*\)\".*/\1/p" "$bf" | sed "s|.*/||" | sort -u)
+    have=$("$brew" list --formula 2>/dev/null | sort -u)
+    missing=$(comm -23 <(printf "%s\n" "$want") <(printf "%s\n" "$have"))
+    [ -z "$missing" ] || { echo "missing: $missing" >&2; exit 1; }
+  ' _ "$bf"
+}
+
 v_full_extras() {  # full-profile installs (skipped for minimal)
   hdr "verify: full-profile extras"
   check "codium installed (dpkg)"  dpkg-query -W codium
@@ -361,6 +399,7 @@ v_minimal() {
   checkno "bat ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/bat
   checkno "eza ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/eza
   checkno "zoxide ABSENT"          test -e /home/linuxbrew/.linuxbrew/bin/zoxide
+  checkno "delta ABSENT"           test -e /home/linuxbrew/.linuxbrew/bin/delta
   check  "shellcheck (brew, kept)" test -x /home/linuxbrew/.linuxbrew/bin/shellcheck
   # The notes must not CLAIM the font is installed (step 36 was skipped), but
   # must explain the tofu you'd see in a terminal opened ON this box.
@@ -553,10 +592,10 @@ cmd_verify() {
   local a
   for a in "${args[@]}"; do
     case "$a" in
-      full)         v_full_extras ;;
+      full)         v_full_extras; v_brewfile Brewfile ;;
       plain)        v_mode symlink ;;
       copy)         v_mode copy ;;
-      minimal)      v_minimal ;;
+      minimal)      v_minimal; v_brewfile Brewfile.minimal ;;
       installsh)    v_installsh ;;
       desktop)      v_desktop ;;
       rootless)     v_rootless ;;

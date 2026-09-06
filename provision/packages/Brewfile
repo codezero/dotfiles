@@ -8,6 +8,7 @@ brew "fio"
 brew "fzf"
 brew "gh"
 brew "git"
+brew "git-delta"   # binary is `delta` (cf. bat/batcat) — .gitconfig guards on it
 brew "gitleaks"
 brew "go"
 brew "httpie"
