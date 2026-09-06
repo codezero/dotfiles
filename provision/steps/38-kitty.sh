@@ -18,13 +18,27 @@
 # which is why step 36 must build from crates.io. kitty publishes a per-arch
 # .txz AND a detached OpenPGP signature — so this step VERIFIES it against a
 # PINNED fingerprint, the same fail-closed pattern verify_keyring() applies to
-# the Docker/Cursor/VSCodium apt keys. That makes kitty the best-verified thing
-# this repo installs: cargo crates are unsigned, and rustup/Claude are curl|sh.
+# the Docker/Cursor/VSCodium apt keys. That makes kitty the only artifact here
+# verified by SIGNATURE rather than by checksum-over-TLS. The others are NOT
+# unverified: cargo checks the crates.io index cksum (step 36 also passes
+# --locked), rustup checks the channel manifest's per-artifact hash, and the
+# Claude installer fails closed on a sha256sum mismatch. The difference is that
+# in all three the hash is served by the SAME host as the artifact, so it does
+# not survive that host being compromised — whereas the fingerprint pinned
+# below lives in this repo, so a swapped key fails closed.
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 # A headless agent box needs no GUI terminal — same rule as step 36.
 minimal && { log "kitty: skipped (PROFILE=minimal)"; exit 0; }
+
+# Ensure this step's own tools rather than assuming an earlier step left them —
+# the same rule step 36 states for its build deps, and it is load-bearing here:
+# `gnupg` is Priority: optional and is NOT in apt.list (the list carries `gpg`),
+# and `xz-utils` (for `tar -J`) is not there either. Today they happen to exist
+# because step 20 installs gnupg first; that is exactly the cross-step coupling
+# the convention forbids, and it would break this step run standalone.
+apt_install curl gnupg xz-utils
 
 # Kovid Goyal's release-signing key. Pinned: a mismatch must SKIP the install,
 # never fall back to installing unverified. Served from his own domain, so this
