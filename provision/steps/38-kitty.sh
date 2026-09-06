@@ -54,10 +54,19 @@ BINDIR="$TARGET_HOME/.local/bin"
 APPSDIR="$TARGET_HOME/.local/share/applications"
 
 # kitty names its assets x86_64/arm64; dpkg says amd64/arm64.
-case "$(dpkg --print-architecture 2>/dev/null)" in
+#
+# An arch upstream publishes no binary for (ppc64el, s390x, riscv64) WARNS and
+# skips rather than soft_fail-ing. soft_fail would abort a GOLDEN build, and
+# that is disproportionate for a condition the operator cannot act on: nothing
+# they change makes an upstream binary exist. This mirrors vendor_apt_update in
+# step 20, which warns instead of soft_failing even under STRICT for the same
+# reason — soft_fail is for failures worth stopping an image build over.
+# Structural non-applicability belongs with the PROFILE=minimal skip above.
+_karch_raw="$(dpkg --print-architecture 2>/dev/null)"
+case "$_karch_raw" in
   arm64) karch=arm64 ;;
   amd64) karch=x86_64 ;;
-  *)     soft_fail "kitty: unsupported architecture '$(dpkg --print-architecture 2>/dev/null)'"; exit 0 ;;
+  *)     warn "kitty: skipped — upstream ships no binary for architecture '${_karch_raw:-unknown}'"; exit 0 ;;
 esac
 
 if dry; then

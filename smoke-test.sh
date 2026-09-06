@@ -240,6 +240,21 @@ cmd_dry() {
   done < <(sed -n '/^STEPS=(/,/^)/p' "$HERE/provision/provision.sh" \
            | sed -n 's/^[[:space:]]*\([0-9][0-9]*-[a-z-]*\.sh\)[[:space:]]*$/\1/p')
 
+  # ── kitty on an arch upstream does not build for ───────────────────────────
+  # Must WARN and exit 0, never soft_fail: under STRICT a soft_fail would abort
+  # a whole golden build over something the operator cannot fix. Untestable
+  # without a shim, and an untested branch is how the wrong severity survives.
+  local kshim krc kout
+  kshim="$(mktemp -d)"
+  printf '#!/bin/sh\n[ "$1" = --print-architecture ] && { echo s390x; exit 0; }\nexec /usr/bin/dpkg "$@"\n' > "$kshim/dpkg"
+  chmod +x "$kshim/dpkg"
+  kout="$(PATH="$kshim:$PATH" DRY_RUN=1 STRICT=1 PROVISION_USER="$(id -un)" \
+          bash "$HERE/provision/steps/38-kitty.sh" 2>&1)"; krc=$?
+  if [ "$krc" = 0 ] && grep -q "upstream ships no binary for architecture" <<<"$kout"; then
+    ok "kitty — unsupported arch warns and skips (exit 0, even under STRICT)"
+  else bad "kitty — unsupported arch gave exit $krc: $kout"; fi
+  rm -rf "$kshim"
+
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
   # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
   # FULL Brewfile only (minimal drops the niceties; install.sh installs fewer
