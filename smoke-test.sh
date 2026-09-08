@@ -255,6 +255,27 @@ cmd_dry() {
   else bad "kitty — unsupported arch gave exit $krc: $kout"; fi
   rm -rf "$kshim"
 
+  # ── kitty's signature check is BOUND to the pinned fingerprint ─────────────
+  # verify_keyring compares only the FIRST key in kovid.gpg, so a file carrying
+  # the real key first plus an APPENDED attacker key still passes the pin — and
+  # a bare `gpg --verify` then accepts a tarball signed by EITHER key. That
+  # reduces "forge Kovid Goyal's signature" to "compromise a second web host",
+  # defeating the one property the pin exists to provide. --assert-signer is
+  # what ties the two together. Neither tier can exercise the real verify (it
+  # needs the network and a genuine signature), so assert the FLAG instead —
+  # this is the only guard standing between the two.
+  # Grep CODE, never comments: the paragraph above the call quotes both flags,
+  # so scanning the raw file makes the second assertion pass on prose alone.
+  local kcode kunbound
+  kcode="$(grep -vE '^[[:space:]]*#' "$HERE/provision/steps/38-kitty.sh")"
+  kunbound="$(grep -- '--verify' <<<"$kcode" | grep -v -- '--assert-signer' || true)"
+  if [ -z "$kunbound" ]; then
+    ok "kitty — every gpg --verify is bound with --assert-signer"
+  else bad "kitty — gpg --verify WITHOUT --assert-signer:$(printf '\n    %s' "$kunbound")"; fi
+  if grep -q -- '--assert-signer "\$KITTY_FP"' <<<"$kcode"; then
+    ok "kitty — --assert-signer asserts the pinned \$KITTY_FP"
+  else bad "kitty — --assert-signer does not reference \$KITTY_FP"; fi
+
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
   # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
   # FULL Brewfile only (minimal drops the niceties; install.sh installs fewer

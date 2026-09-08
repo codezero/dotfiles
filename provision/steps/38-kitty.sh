@@ -43,7 +43,16 @@ apt_install curl gnupg xz-utils
 # Kovid Goyal's release-signing key. Pinned: a mismatch must SKIP the install,
 # never fall back to installing unverified. Served from his own domain, so this
 # is trust-on-first-use rather than a web of trust — still strictly better than
-# an unsigned tarball, and the pin makes a silent key swap fail closed.
+# an unsigned tarball, and the pin makes a silent key REPLACEMENT fail closed.
+#
+# A replacement is not the only tampering worth stopping, though. verify_keyring
+# compares only the FIRST key in the file, so a kovid.gpg carrying the real key
+# first plus an APPENDED second key still passes the pin — and a bare
+# `gpg --verify` is then happy with a signature from either. That is why the
+# verify below passes --assert-signer "$KITTY_FP": it binds the signature check
+# to this exact fingerprint instead of to "anything in the keyring", which is
+# the whole point of pinning. gpg checks the fingerprint against the signing key
+# AND its primary key, so a signature made by a signing subkey still validates.
 KITTY_FP="3CE1780F78DD88DF45194FD706BC317B515ACE7C"
 KITTY_KEY_URL="https://calibre-ebook.com/signatures/kovid.gpg"
 KITTY_VER_URL="https://sw.kovidgoyal.net/kitty/current-version.txt"
@@ -106,11 +115,21 @@ curl -fsSL --max-time 300 -o "$tmp/$tarball"     "$KITTY_REL/v$ver/$tarball" \
 verify_keyring "$tmp/kovid.gpg" "$KITTY_FP" \
   || { soft_fail "kitty: signing key fingerprint mismatch — refusing to install"; exit 0; }
 
+# --assert-signer needs gnupg >= 2.4.1 (2.2.42 on the LTS branch). Ubuntu 26.04
+# ships 2.4.x so this never fires there; it exists so an unexpectedly old host
+# says WHY it stopped instead of reporting a misleading signature failure — and
+# it refuses rather than silently falling back to an unbound `gpg --verify`.
+if ! gpg --dump-options 2>/dev/null | grep -q -- '--assert-signer'; then
+  soft_fail "kitty: gpg lacks --assert-signer (needs >= 2.4.1) — refusing to verify unbound"
+  exit 0
+fi
+
 # Throwaway keyring inside $tmp so we never touch root's real GnuPG home.
 export GNUPGHOME="$tmp/gnupg"
 mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
 if ! gpg --batch --quiet --import "$tmp/kovid.gpg" 2>/dev/null \
-   || ! gpg --batch --verify "$tmp/$tarball.sig" "$tmp/$tarball" 2>/dev/null; then
+   || ! gpg --batch --verify --assert-signer "$KITTY_FP" \
+             "$tmp/$tarball.sig" "$tmp/$tarball" 2>/dev/null; then
   soft_fail "kitty: OpenPGP signature verification FAILED for $tarball — not installing"
   exit 0
 fi
