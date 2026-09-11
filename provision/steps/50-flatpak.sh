@@ -3,8 +3,8 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
-# Flatpaks here are GUI apps — nothing for a headless agent box.
-minimal && { log "flatpak: skipped (PROFILE=minimal)"; exit 0; }
+# Flatpaks here are GUI apps — nothing for a box with no GUI (lib.sh gui_wanted).
+gui_wanted || { log "flatpak: skipped ($(no_gui_reason))"; exit 0; }
 
 log "Ensuring Flatpak + Flathub remote"
 apt_install flatpak

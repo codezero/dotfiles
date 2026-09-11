@@ -29,8 +29,8 @@
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
-# A headless agent box needs no GUI terminal — same rule as step 36.
-minimal && { log "kitty: skipped (PROFILE=minimal)"; exit 0; }
+# No GUI wanted — same gate as step 36 (lib.sh gui_wanted).
+gui_wanted || { log "kitty: skipped ($(no_gui_reason))"; exit 0; }
 
 # Ensure this step's own tools rather than assuming an earlier step left them —
 # the same rule step 36 states for its build deps, and it is load-bearing here:
@@ -70,7 +70,7 @@ APPSDIR="$TARGET_HOME/.local/share/applications"
 # they change makes an upstream binary exist. This mirrors vendor_apt_update in
 # step 20, which warns instead of soft_failing even under STRICT for the same
 # reason — soft_fail is for failures worth stopping an image build over.
-# Structural non-applicability belongs with the PROFILE=minimal skip above.
+# Structural non-applicability belongs with the no-GUI skip above.
 _karch_raw="$(dpkg --print-architecture 2>/dev/null)"
 case "$_karch_raw" in
   arm64) karch=arm64 ;;

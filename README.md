@@ -6,13 +6,14 @@ Personal shell environment: Zsh + oh-my-zsh + Powerlevel10k on a Homebrew toolch
 
 Two entry points, both first-class: **`install.sh`** sets up shell + dotfiles on a
 box you already have; **`provision/provision.sh`** builds a whole machine and is
-what cloud-init runs. Five recipes cover nearly every use — each is one line, run
+what cloud-init runs. Six recipes cover nearly every use — each is one line, run
 from the repo root.
 
 | I want… | Run this |
 |---------|----------|
 | **Just my shell** on an existing box — zsh, p10k, dotfiles, core CLI tools. No Docker, no editors. | `bash install.sh` |
 | **A headless agent box** — lean apt/brew set, Docker, Rust, Claude Code, zsh + p10k. Skips every GUI package. | `sudo env PROFILE=minimal bash provision/provision.sh` |
+| **A shared headless box** — human + agent on one VM: the *full* CLI set (btop, eza, bat, delta, atuin…), Docker, Rust, Claude Code, zsh + p10k — and **no GUI apps** (no cargo-built Alacritty, no editors, no Flatpak). | `sudo env HEADLESS=1 bash provision/provision.sh` |
 | **My daily desktop** — the full set, plus the desktop/locale/IME packages and GNOME settings. | `sudo env INSTALL_DESKTOP=1 bash provision/provision.sh` |
 | **A golden image** to clone from — strict, self-contained, machine identity wiped. [Throwaway build box only](provision/README.md#building-a-golden-image). | `sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision/provision.sh` |
 | **To bring a box up to date** — re-run whichever recipe built it, plus an `apt upgrade` of what's installed. | `sudo env APT_UPGRADE=1 bash provision/provision.sh` |

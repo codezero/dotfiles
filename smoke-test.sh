@@ -14,7 +14,7 @@
 #                                  PROFILE, any number of ADD-ONs, and
 #                                  `installsh` stands alone because it REPLACES
 #                                  the core audit. `scenarios` prints the map.
-#   bash smoke-test.sh scenarios   the live runbook (S1–S14) + the verify
+#   bash smoke-test.sh scenarios   the live runbook (S1–S15) + the verify
 #                                  vocabulary and how the tokens compose
 #
 # lint+dry are the pre-commit/dev-box tier; verify codifies the hand audits
@@ -143,8 +143,26 @@ cmd_dry() {
     "docker-ce-rootless-extras uidmap dbus-user-session" \
     "preflight: require kernel.apparmor_restrict_unprivileged_userns" \
     "Cursor: skipped (PROFILE=minimal)" "!Docker: skipped"
+  # HEADLESS=1: the FULL manifests with every GUI install skipped — the shared
+  # human+agent box. The load-bearing pair: the 5 GUI markers say HEADLESS=1
+  # (not PROFILE=minimal), and NO lean-manifest marker appears. Before this flag
+  # "full without a desktop" cargo-built Alacritty and installed two Electron
+  # editors on boxes that could never display them (S2/S3/S12/S13, live).
+  dry_case "headless" 0 HEADLESS=1 -- \
+    "VSCodium: skipped (HEADLESS=1)" "Cursor: skipped (HEADLESS=1)" \
+    "alacritty: skipped (HEADLESS=1)" "kitty: skipped (HEADLESS=1)" \
+    "flatpak: skipped (HEADLESS=1)" \
+    "!using apt.minimal.list" "!using Brewfile.minimal" "Docker: repo + Engine"
+  # Redundant, not contradictory: minimal already implies no GUI. The reason
+  # string must stay PROFILE=minimal — minimal is the more specific fact.
+  dry_case "headless+minimal accepted (redundant)" 0 HEADLESS=1 PROFILE=minimal -- \
+    "using apt.minimal.list" "alacritty: skipped (PROFILE=minimal)"
   dry_case "bogus profile dies" 1 PROFILE=bogus --
   dry_case "minimal+desktop dies" 1 PROFILE=minimal INSTALL_DESKTOP=1 --
+  dry_case "headless+desktop dies" 1 HEADLESS=1 INSTALL_DESKTOP=1 -- \
+    "HEADLESS=1 and INSTALL_DESKTOP=1 conflict"
+  dry_case "lowercase headless typo warns" 0 headless=1 -- \
+    "did you mean 'HEADLESS'" "!skipped (HEADLESS=1)"
   dry_case "lowercase flag typo warns" 0 golden_image=1 -- \
     "did you mean 'GOLDEN_IMAGE'" "finalize: skipped"
 
@@ -179,7 +197,12 @@ cmd_dry() {
   else ok "scenario map — unknown id rejected"; fi
   # The composition rules (F item 5) live in `scenarios` output; assert the
   # section is actually there, since it is the only place they are written down.
-  if cmd_scenarios | grep -q "MODE (exactly one"; then ok "scenarios — composition rules present"
+  # Capture first, THEN grep: `cmd_scenarios | grep -q` under `set -o pipefail`
+  # is a race — grep -q exits on the first match, the writer takes SIGPIPE on
+  # whatever it still had to print, and the pipeline reports 141. It flaked
+  # about 1 run in 8 once the vocabulary grew past the matched line.
+  local scen; scen="$(cmd_scenarios)"
+  if grep -q "MODE (exactly one" <<<"$scen"; then ok "scenarios — composition rules present"
   else bad "scenarios — composition rules MISSING"; fi
   # ...and that they are ENFORCED, not merely printed. These exit before any
   # audit runs, so they are safe in the no-changes tier.
@@ -203,7 +226,13 @@ cmd_dry() {
     "GNOME's monospace font is already set to it" \
     "!desktop was installed here"
   nst_case "follow-ups: minimal" "$nst_home" PROFILE=minimal -- \
-    "No Nerd Font on this profile" \
+    "No Nerd Font on this box (PROFILE=minimal skips it)" \
+    "!MesloLGS NF (Nerd Font) is installed system-wide"
+  # Same no-font branch, other reason — and the reason must be the flag that
+  # actually skipped step 36, because `verify` auto-detect reads it back.
+  nst_case "follow-ups: headless" "$nst_home" HEADLESS=1 -- \
+    "No Nerd Font on this box (HEADLESS=1 skips it)" \
+    "re-provision without HEADLESS=1" \
     "!MesloLGS NF (Nerd Font) is installed system-wide"
   # The load-bearing half of item 10: the flag says what was ASKED FOR. On a
   # userns-restricted host step 25 soft-fails and leaves the box rootful, so
@@ -352,6 +381,7 @@ scenario_tokens() {
     s10)           echo "installsh" ;;
     s11)           echo "minimal plain" ;;
     s14)           echo "minimal plain rootless" ;;
+    s15)           echo "plain full headless" ;;
     s1)            return 1 ;;   # lint+dry tier — there is no box end-state to audit
     *)             return 2 ;;
   esac
@@ -375,6 +405,8 @@ verify_validate() {
   _tok_has installsh "$list" && { _tok_has full "$list" || _tok_has minimal "$list" \
                                   || _tok_has golden-clone "$list"; } \
     && conflict="installsh + a provision profile — installsh REPLACES the core audit because install.sh has a different contract"
+  _tok_has headless "$list"  && _tok_has desktop "$list" \
+    && conflict="headless + desktop — headless asserts every GUI install is absent, desktop asserts GNOME is configured"
   [ -z "$conflict" ] && return 0
   echo "contradictory verify tokens: $conflict" >&2
   echo "see the vocabulary at the end of: bash smoke-test.sh scenarios" >&2
@@ -434,8 +466,20 @@ v_brewfile() {
   ' _ "$bf"
 }
 
-v_full_extras() {  # full-profile installs (skipped for minimal)
-  hdr "verify: full-profile extras"
+# The full profile is audited on two axes, matching lib.sh: the CLI set comes
+# from the manifests (PROFILE), the GUI installs from gui_wanted. `full` runs
+# v_full_cli and then EITHER v_gui or, with the `headless` add-on, v_no_gui.
+v_full_cli() {
+  hdr "verify: full-profile CLI set (the things .zshrc/.gitconfig guard on)"
+  check "bat (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/bat
+  check "eza (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/eza
+  check "zoxide (brew)"            test -x /home/linuxbrew/.linuxbrew/bin/zoxide
+  check "delta (brew)"             test -x /home/linuxbrew/.linuxbrew/bin/delta
+  check "atuin (brew)"             test -x /home/linuxbrew/.linuxbrew/bin/atuin
+}
+
+v_gui() {  # GUI installs — present only when gui_wanted (full, not headless)
+  hdr "verify: GUI installs (editors, terminals, font, flatpak)"
   check "codium installed (dpkg)"  dpkg-query -W codium
   check "cursor installed (dpkg)"  dpkg-query -W cursor
   check "cursor.sources arch-pinned (single arch)" \
@@ -461,28 +505,34 @@ v_full_extras() {  # full-profile installs (skipped for minimal)
   check "MesloLGS NF system-wide"  bash -c 'ls /usr/local/share/fonts/MesloLGS-NF/*.ttf'
   check "_alacritty completion world-readable" \
     bash -c '[ -r /usr/share/zsh/vendor-completions/_alacritty ]'
-  check "bat (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/bat
-  check "eza (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/eza
-  check "atuin (brew)"             test -x /home/linuxbrew/.linuxbrew/bin/atuin
   check "flatpak + flathub"        bash -c 'flatpak remotes 2>/dev/null | grep -q flathub'
+  # The notes must say the font IS installed — v_no_gui asserts the opposite.
+  check "notes say the font is installed system-wide" \
+    bash -c 'grep -q "installed system-wide" "$HOME/PROVISION-NEXT-STEPS.md"'
 }
 
-v_minimal() {
-  hdr "verify: minimal profile (lean assertions)"
+v_minimal_cli() {  # the lean box's whole claim is what it did NOT install
+  hdr "verify: minimal profile CLI set (lean assertions)"
+  checkno "bat ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/bat
+  checkno "eza ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/eza
+  checkno "zoxide ABSENT"          test -e /home/linuxbrew/.linuxbrew/bin/zoxide
+  checkno "delta ABSENT"           test -e /home/linuxbrew/.linuxbrew/bin/delta
+  checkno "atuin ABSENT"           test -e /home/linuxbrew/.linuxbrew/bin/atuin
+  check  "shellcheck (brew, kept)" test -x /home/linuxbrew/.linuxbrew/bin/shellcheck
+}
+
+v_no_gui() {  # shared by `minimal` and `full headless`: every GUI install absent
+  hdr "verify: no GUI installs (PROFILE=minimal or HEADLESS=1)"
   checkno "codium ABSENT"          dpkg-query -W codium
   checkno "cursor ABSENT"          dpkg-query -W cursor
   checkno "alacritty ABSENT"       test -e "$HOME/.cargo/bin/alacritty"
   checkno "kitty ABSENT"           test -e "$HOME/.local/kitty.app/bin/kitty"
   checkno "flatpak ABSENT"         command -v flatpak
-  checkno "bat ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/bat
-  checkno "eza ABSENT"             test -e /home/linuxbrew/.linuxbrew/bin/eza
-  checkno "zoxide ABSENT"          test -e /home/linuxbrew/.linuxbrew/bin/zoxide
-  checkno "delta ABSENT"           test -e /home/linuxbrew/.linuxbrew/bin/delta
-  check  "shellcheck (brew, kept)" test -x /home/linuxbrew/.linuxbrew/bin/shellcheck
   # The notes must not CLAIM the font is installed (step 36 was skipped), but
-  # must explain the tofu you'd see in a terminal opened ON this box.
+  # must explain the tofu you'd see in a terminal opened ON this box — and name
+  # the flag that skipped it, which is the box's own record of how it was built.
   check   "notes carry the no-Nerd-Font note" \
-    bash -c 'grep -q "No Nerd Font on this profile" "$HOME/PROVISION-NEXT-STEPS.md"'
+    bash -c 'grep -q "No Nerd Font on this box" "$HOME/PROVISION-NEXT-STEPS.md"'
   checkno "notes do NOT claim the font is installed" \
     bash -c 'grep -q "installed system-wide" "$HOME/PROVISION-NEXT-STEPS.md"'
   checkno "MesloLGS ABSENT system-wide" \
@@ -620,8 +670,18 @@ cmd_verify() {
     if [ ! -f "$HOME/PROVISION-NEXT-STEPS.md" ] && \
        [ ! -e /etc/update-motd.d/99-provision-next-steps ]; then
       args+=(installsh)
-    elif dpkg-query -W codium >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/alacritty" ]; then
-      args+=(full); else args+=(minimal); fi
+    else
+      # Profile = which MANIFESTS landed (bat is in the full Brewfile only);
+      # GUI = the box's own record in the step-80 notes, which name the flag
+      # that skipped the font — falling back to the binaries if the notes were
+      # tidied away (deleting them is the documented cleanup).
+      local notes="$HOME/PROVISION-NEXT-STEPS.md"
+      if grep -qs "(PROFILE=minimal skips it)" "$notes"; then args+=(minimal)
+      elif grep -qs "(HEADLESS=1 skips it)" "$notes"; then args+=(full headless)
+      elif dpkg-query -W codium >/dev/null 2>&1 || [ -x "$HOME/.cargo/bin/alacritty" ]; then args+=(full)
+      elif [ -x /home/linuxbrew/.linuxbrew/bin/bat ]; then args+=(full headless)
+      else args+=(minimal); fi
+    fi
     if [ -L "$HOME/.zshrc" ]; then args+=(plain); else args+=(copy); fi
     echo "auto-detected: ${args[*]}"
   fi
@@ -653,6 +713,19 @@ cmd_verify() {
       local kept=(); for x in "${args[@]}"; do [ "$x" = copy ] || kept+=("$x"); done
       args=("${kept[@]}")
     fi
+    # headless only means something against the FULL profile (minimal has no
+    # GUI by definition): with minimal it is redundant, with no profile it
+    # implies full.
+    if _tok_has headless "${args[*]}"; then
+      if _tok_has minimal "${args[*]}"; then
+        echo "note: dropping redundant 'headless' — minimal already asserts no GUI"
+        local kept2=(); for x in "${args[@]}"; do [ "$x" = headless ] || kept2+=("$x"); done
+        args=("${kept2[@]}")
+      elif ! _tok_has full "${args[*]}"; then
+        echo "note: 'headless' implies the full profile — adding 'full'"
+        args+=(full)
+      fi
+    fi
   fi
 
   # Guard: verify audits a PROVISIONED box or clone. Without this, auditing a box
@@ -678,10 +751,13 @@ cmd_verify() {
   local a
   for a in "${args[@]}"; do
     case "$a" in
-      full)         v_full_extras; v_brewfile Brewfile ;;
+      full)         v_full_cli
+                    if _tok_has headless "${args[*]}"; then v_no_gui; else v_gui; fi
+                    v_brewfile Brewfile ;;
+      headless)     ;;   # consumed by `full` above
       plain)        v_mode symlink ;;
       copy)         v_mode copy ;;
-      minimal)      v_minimal; v_brewfile Brewfile.minimal ;;
+      minimal)      v_minimal_cli; v_no_gui; v_brewfile Brewfile.minimal ;;
       installsh)    v_installsh ;;
       desktop)      v_desktop ;;
       rootless)     v_rootless ;;
@@ -764,12 +840,18 @@ the tokens it expands to, and how they compose, are listed at the bottom.)
                       bash provision/provision.sh   -> verify S14
                     (minimal KEEPS Docker on purpose — a headless agent box
                     running containers is a plausible daily configuration.)
+ S15 headless       sudo env HEADLESS=1 PROVISION_USER=$USER bash provision/provision.sh
+                    -> verify S15   (the shared human+agent box: FULL manifests —
+                    btop/eza/bat/delta/atuin — with every GUI install skipped:
+                    no cargo-built Alacritty, no kitty, no VSCodium/Cursor, no
+                    flatpak, no font. Fast: nothing to compile.)
 
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
 S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05),
 S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource),
 S14 (2026-08-21, minimal+rootless).
-Pending live: none — every sunny-day scenario above has now run on real hardware.
+Pending live: S15 (HEADLESS=1, added 2026-09-11 — dry-tier pinned, not yet run
+on hardware).
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
@@ -781,7 +863,7 @@ EOF
   echo "you can still pass tokens directly, and mix them: \`verify S11 rootless\`."
   echo
   local id toks
-  for id in S2 S3 S4 S5 S6 S7 S8 S9 S10 S11 S12 S13 S14; do
+  for id in S2 S3 S4 S5 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15; do
     toks="$(scenario_tokens "$id")" && printf '  %-4s = verify %s\n' "$id" "$toks"
   done
   cat <<'EOF'
@@ -793,12 +875,16 @@ The tokens are NOT peers — this is the part that was only ever in code comment
     golden-clone   a booted clone: implies `copy`, adds the identity/credential
                    sweep. Don't pass `copy` as well — it's already in there.
   PROFILE (exactly one)
-    full           asserts the GUI toolchain is PRESENT (codium/cursor/alacritty…)
-    minimal        asserts those same things are ABSENT — the lean box's whole
-                   claim is what it did NOT install
+    full           asserts the full CLI set is PRESENT (bat/eza/zoxide/delta/atuin)
+                   and — unless `headless` is also given — the GUI installs too
+                   (codium/cursor/alacritty/kitty/font/flatpak)
+    minimal        asserts the CLI extras AND every GUI install are ABSENT — the
+                   lean box's whole claim is what it did NOT install
   ADD-ON (any number, order-free — they only add assertions)
     desktop        GNOME dconf settings, read back off the box
     rootless       docker context + user service + linger
+    headless       (with `full`) the GUI installs are ABSENT — HEADLESS=1's box.
+                   Redundant with `minimal` (dropped); contradicts `desktop`.
   STANDALONE (never combine)
     installsh      install.sh's own contract, and it REPLACES the core audit
                    rather than adding to it: no tmux/rustup/claude/docker/step-80
@@ -817,7 +903,7 @@ case "${1:-}" in
   all)       cmd_lint; cmd_dry; summary ;;
   *) echo "usage: bash smoke-test.sh {lint|dry|all|scenarios|verify [S<n> | token...]}"
      echo "       verify takes a runbook id (verify S4), raw tokens"
-     echo "       (auto|plain|copy|full|minimal|desktop|rootless|golden-clone|installsh),"
+     echo "       (auto|plain|copy|full|minimal|desktop|rootless|headless|golden-clone|installsh),"
      echo "       or nothing (auto-detect). Map + composition rules: smoke-test.sh scenarios"
      exit 2 ;;
 esac

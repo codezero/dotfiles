@@ -67,6 +67,7 @@ and in `--help` are just common combinations of it.
 | `--dry-run` / `-n` | off | Print every planned action and change nothing. Needs neither root nor network — run it after any edit to a step script. |
 | `PROVISION_USER` | invoking user → uid 1000 → `ubuntu` | The account that gets the per-user steps (Homebrew, rustup, Claude Code, dotfiles, login shell). **Must already exist** — a typo aborts the run instead of provisioning the wrong account, and so does a box with no non-root user at all (the fallback's last rung is a guess); provisioning never creates users, cloud-init owns that. `--dry-run` only warns. |
 | `PROFILE` | `full` | `minimal` = lean headless agent box: skips Alacritty (36) and Flatpak (50), skips VSCodium + Cursor in step 20, and swaps in `apt.minimal.list` + `Brewfile.minimal`. **Keeps Docker**, Rust, Claude Code, zsh + p10k. Any other value aborts. |
+| `HEADLESS` | `0` | `1` = the **full** manifests with **no GUI installs**: skips Alacritty (36), kitty (38), Flatpak (50) and VSCodium + Cursor in step 20, keeps everything else — btop/eza/bat/delta/atuin, Docker, Rust, Claude Code, zsh + p10k. The shared headless box a human and an agent both work on. `PROFILE=minimal` already implies it; with `INSTALL_DESKTOP=1` it is refused. |
 | `INSTALL_DESKTOP` | `0` | Also install the desktop/locale/IME apt set and apply the GNOME dconf settings (step 55). |
 | `GOLDEN_IMAGE` | `0` | Build a reusable image: implies `STRICT` **and** `DOTFILES_COPY`, and runs finalize (step 90). Destructive — throwaway build box only. |
 | `DOTFILES_COPY` | `0` | Copy the dotfiles into `$HOME` instead of symlinking them to the repo: self-contained, so the repo can be deleted afterwards, but edits no longer flow back. |
@@ -81,6 +82,15 @@ and in `--help` are just common combinations of it.
 - **`PROFILE=minimal` + `INSTALL_DESKTOP=1` is refused** — the run dies rather
   than half-installing. A minimal box has no GUI, so the combination would pull in
   the desktop apt set while the GUI steps (36/50/55) skip.
+- **`HEADLESS=1` + `INSTALL_DESKTOP=1` is refused** for the same reason on the
+  other axis: a desktop with every GUI app skipped is not a box anyone asked for.
+  `HEADLESS=1` + `PROFILE=minimal` is merely redundant and accepted.
+- **`PROFILE` and `HEADLESS` are two axes, not three profiles.** `PROFILE` picks
+  the package *manifests* (full lists or the lean ones); `HEADLESS` — or minimal,
+  which implies it — turns the *GUI installs* off. So: `full` = everything;
+  `HEADLESS=1` = full CLI set, no GUI; `PROFILE=minimal` = lean CLI set, no GUI.
+  Before `HEADLESS` existed, "full without a desktop" cargo-built Alacritty and
+  installed two Electron editors on boxes that could never display them.
 - **`GOLDEN_IMAGE=1` + `DOCKER_ROOTLESS=1` is deliberately unsupported.** Rootless
   needs a host-wide AppArmor relaxation (below), which would bake into the image
   and be inherited by every clone. Build the image without it; each clone opts in.

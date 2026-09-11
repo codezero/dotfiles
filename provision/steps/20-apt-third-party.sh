@@ -103,8 +103,9 @@ fi
 # ── VSCodium (official) ──────────────────────────────────────────────────────
 log "VSCodium: repo + codium"
 vscodium_ok=1
-# GUI editor — skipped on a headless agent box (Docker above is kept).
-minimal && { vscodium_ok=0; log "VSCodium: skipped (PROFILE=minimal)"; }
+# GUI editor — skipped when no GUI is wanted (lib.sh gui_wanted: PROFILE=minimal
+# or HEADLESS=1). Docker above is kept on every combination.
+gui_wanted || { vscodium_ok=0; log "VSCodium: skipped ($(no_gui_reason))"; }
 VSCODIUM_KR=/usr/share/keyrings/vscodium-archive-keyring.gpg
 if [ "$vscodium_ok" = 0 ]; then
   :
@@ -145,8 +146,8 @@ fi
 #   mode, which is the common one.)
 log "Cursor: AI editor (signed apt repo)"
 cursor_ok=1
-# GUI editor — skipped on a headless agent box.
-minimal && { cursor_ok=0; log "Cursor: skipped (PROFILE=minimal)"; }
+# GUI editor — same gate as VSCodium.
+gui_wanted || { cursor_ok=0; log "Cursor: skipped ($(no_gui_reason))"; }
 CURSOR_KR=/usr/share/keyrings/anysphere.gpg
 if [ "$cursor_ok" = 1 ]; then
   case "$ARCH" in

@@ -31,6 +31,8 @@ Pick a recipe (run from the repo; `git` is the only bootstrap dependency):
 
   full machine, this user     sudo bash provision.sh
   lean headless agent box     sudo env PROFILE=minimal bash provision.sh
+  shared headless box         sudo env HEADLESS=1 bash provision.sh
+    (human + agent: full CLI set, Docker, Rust, Claude — no GUI apps)
   daily desktop               sudo env INSTALL_DESKTOP=1 bash provision.sh
   golden image (strict)       sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh
   bring a box up to date      sudo env APT_UPGRADE=1 bash provision.sh
@@ -54,7 +56,7 @@ done
 export DRY_RUN
 
 # Flags are UPPERCASE env vars; warn on the common lowercase typo before defaulting.
-for _lc in install_desktop golden_image docker_rootless apt_upgrade profile strict dotfiles_copy; do
+for _lc in install_desktop golden_image docker_rootless apt_upgrade profile strict dotfiles_copy headless; do
   _uc="${_lc^^}"
   [ -n "${!_lc:-}" ] && [ -z "${!_uc:-}" ] && \
     echo "[warn] env '$_lc' is set but IGNORED — flags are UPPERCASE; did you mean '$_uc'?" >&2
@@ -65,7 +67,8 @@ export INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"   # 1 = also install the desktop/
 export GOLDEN_IMAGE="${GOLDEN_IMAGE:-0}"         # 1 = strict build + finalize + self-contained dotfile copies
 export DOCKER_ROOTLESS="${DOCKER_ROOTLESS:-0}"   # 1 = set up rootless Docker for the target user (step 25)
 export APT_UPGRADE="${APT_UPGRADE:-0}"           # 1 = apt-get upgrade already-installed pkgs first (step 10)
-export PROFILE="${PROFILE:-full}"                # minimal = lean headless agent box (no GUI steps/editors)
+export PROFILE="${PROFILE:-full}"                # minimal = lean headless agent box (lean manifests, no GUI)
+export HEADLESS="${HEADLESS:-0}"                 # 1 = full manifests but NO GUI installs (see lib.sh gui_wanted)
 
 source "$HERE/lib.sh"
 
@@ -78,6 +81,11 @@ esac
 # the GUI steps (36/50/55) skip — a half-state. Refuse the combination outright.
 if minimal && [ "$INSTALL_DESKTOP" = "1" ]; then
   die "PROFILE=minimal and INSTALL_DESKTOP=1 conflict — a minimal agent box has no GUI; drop one of the flags"
+fi
+# Same contradiction, other axis: a desktop with no GUI apps is not a box anyone
+# asked for. HEADLESS=1 + PROFILE=minimal is merely redundant and accepted.
+if [ "$HEADLESS" = "1" ] && [ "$INSTALL_DESKTOP" = "1" ]; then
+  die "HEADLESS=1 and INSTALL_DESKTOP=1 conflict — HEADLESS skips every GUI install; drop one of the flags"
 fi
 
 if dry; then

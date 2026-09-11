@@ -27,14 +27,28 @@ would() { printf '   \033[2m[would]\033[0m %s\n' "$*"; }
 # Execute a plain command (no pipes/redirects), or just print it in dry-run.
 run()   { if dry; then would "$*"; else "$@"; fi; }
 
-# --- profile -----------------------------------------------------------------
-# PROFILE=minimal = lean headless box for AI agents: GUI steps (36-alacritty,
-# 50-flatpak) and GUI editors (VSCodium/Cursor in step 20) are skipped, and the
-# lean package lists (apt.minimal.list / Brewfile.minimal) are used. zsh + p10k
-# + dotfiles + Docker + rust + Claude Code are kept. provision.sh validates the
-# value and rejects PROFILE=minimal + INSTALL_DESKTOP=1.
+# --- profile + GUI -----------------------------------------------------------
+# Two independent axes, on purpose:
+#   PROFILE      picks the package MANIFESTS (steps 10/30): full lists, or the
+#                lean apt.minimal.list / Brewfile.minimal for an AI-agent box.
+#   gui_wanted   gates the GUI INSTALLS (36-alacritty, 38-kitty, 50-flatpak and
+#                the VSCodium/Cursor block of step 20). Off under PROFILE=minimal
+#                (an agent box has no display) and under HEADLESS=1, which is how
+#                a full-toolset box with no GUI is built — e.g. a headless VM a
+#                human and an agent share: btop/eza/bat/delta wanted, a cargo-built
+#                Alacritty and two Electron editors not. Before HEADLESS existed,
+#                "full without a desktop" built all of that on boxes that could
+#                never show it (S2/S3/S12/S13 did, live).
+# zsh + p10k + dotfiles + Docker + rust + Claude Code are kept on every
+# combination. provision.sh validates PROFILE and refuses INSTALL_DESKTOP=1 with
+# either PROFILE=minimal or HEADLESS=1. A GUI step needs exactly one line:
+#   gui_wanted || { log "<step>: skipped ($(no_gui_reason))"; exit 0; }
 PROFILE="${PROFILE:-full}"
-minimal() { [ "$PROFILE" = "minimal" ]; }
+HEADLESS="${HEADLESS:-0}"
+minimal()    { [ "$PROFILE" = "minimal" ]; }
+gui_wanted() { ! minimal && [ "$HEADLESS" != "1" ]; }
+# The reason string for skip logs — the dry tier asserts these exact markers.
+no_gui_reason() { if minimal; then echo "PROFILE=minimal"; else echo "HEADLESS=1"; fi; }
 
 # --- strict / golden-image mode ---------------------------------------------
 # GOLDEN_IMAGE=1 builds a reusable image: it implies STRICT (fail hard on the
@@ -253,19 +267,20 @@ Manual follow-ups (need an interactive login session):
   - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
 EOF
-  # Step 36 (which installs the vendored Nerd Font) is skipped under
-  # PROFILE=minimal, so the two profiles need opposite advice. Fonts render
-  # CLIENT-side: over SSH the glyphs come from the font on the machine you're
-  # sitting at, so a headless box genuinely doesn't need one. But if you open a
-  # terminal ON a minimal box that happens to have a desktop, p10k's glyphs are
-  # tofu — say so rather than staying silent (observed live, S11).
-  if minimal; then
+  # Step 36 (which installs the vendored Nerd Font) is skipped whenever the GUI
+  # is off (PROFILE=minimal or HEADLESS=1), so the two cases need opposite
+  # advice. Fonts render CLIENT-side: over SSH the glyphs come from the font on
+  # the machine you're sitting at, so a headless box genuinely doesn't need one.
+  # But if you open a terminal ON such a box that happens to have a desktop,
+  # p10k's glyphs are tofu — say so rather than staying silent (observed live,
+  # S11). Keyed on gui_wanted, not on the profile: the font follows the GUI.
+  if ! gui_wanted; then
     cat <<EOF
-  - No Nerd Font on this profile (PROFILE=minimal skips it). Over SSH that's
+  - No Nerd Font on this box ($(no_gui_reason) skips it). Over SSH that's
     fine — glyphs render with YOUR local terminal's font. Only if you open a
     terminal ON this box will p10k show boxes/tofu; then either install the
     font here (repo: fonts/MesloLGS-NF -> ~/.local/share/fonts && fc-cache -f)
-    or re-provision without PROFILE=minimal.
+    or re-provision without $(no_gui_reason).
 EOF
   elif [ "${INSTALL_DESKTOP:-0}" = "1" ]; then
     # Step 55 pointed GNOME's monospace-font-name at it (f945b93), so the stock
