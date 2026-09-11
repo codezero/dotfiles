@@ -113,9 +113,6 @@ source $ZSH/oh-my-zsh.sh
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 export CLAUDE_CODE_NO_FLICKER=1
-export NVM_DIR="$HOME/.nvm"
-  [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"  # This loads nvm
-  [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 [ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # Rust toolchain (rustup) — installed per-user under ~/.cargo (provision step 35).
@@ -129,6 +126,10 @@ command -v bat    >/dev/null && alias cat="bat"
 # atuin takes Ctrl-R (full-screen fuzzy history search); --disable-up-arrow keeps
 # zsh's native up-arrow. Its DB lives in ~/.local/share/atuin — finalize scrubs it.
 command -v atuin  >/dev/null && eval "$(atuin init zsh --disable-up-arrow)"
+# mise: runtimes (node/python/go…) per .tool-versions — `mise use -g node@lts`.
+# Interactive activation only; for node in non-interactive shells put
+# ~/.local/share/mise/shims on PATH (see ~/PROVISION-NEXT-STEPS.md).
+command -v mise   >/dev/null && eval "$(mise activate zsh)"
 
 [ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh

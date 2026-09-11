@@ -46,7 +46,7 @@ prints the recipes above at the point of use.
 
 | Path | Purpose |
 |------|---------|
-| `.zshrc` | Zsh config: oh-my-zsh, plugins, aliases, brew/nvm/zoxide |
+| `.zshrc` | Zsh config: oh-my-zsh, plugins, aliases, brew/mise/zoxide/atuin |
 | `.p10k.zsh` | Powerlevel10k prompt (from `p10k configure`) |
 | `.gitconfig` | Git identity — **set your real name/email** |
 | `.config/`, `.claude/` | Ported app configs symlinked into `$HOME`: Alacritty (`alacritty.toml` + cloned theme repo), Claude Code (`settings.json`, `statusline-command.sh`) |
@@ -109,7 +109,7 @@ must exist before it's sourced**:
 
 - **apt:** `zsh`, `git`, `curl`, `build-essential`, `zsh-autosuggestions`,
   `zsh-syntax-highlighting` (the last two are sourced from `/usr/share/...`)
-- **Homebrew** at `/home/linuxbrew/.linuxbrew` (hardcoded), providing **nvm, eza, bat, zoxide**
+- **Homebrew** at `/home/linuxbrew/.linuxbrew` (hardcoded), providing **mise, eza, bat, zoxide**
 - **oh-my-zsh** + **Powerlevel10k** (in `$ZSH_CUSTOM/themes`)
 - A **Nerd Font** (e.g. MesloLGS NF) selected in your terminal
 

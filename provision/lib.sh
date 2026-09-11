@@ -263,7 +263,11 @@ next_steps_text() {
 Manual follow-ups (need an interactive login session):
 
   - Open a new terminal so zsh + Powerlevel10k load.
-  - Node:  nvm install --lts
+  - Node:  mise use -g node@lts        (mise replaced nvm; .tool-versions per
+           project also works: 'mise use node@22' inside a repo.) Interactive
+           shells get it via 'mise activate' in .zshrc; for scripts, cron or an
+           agent's non-interactive shell, add its shims to PATH:
+             export PATH="\$HOME/.local/share/mise/shims:\$PATH"
   - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
 EOF

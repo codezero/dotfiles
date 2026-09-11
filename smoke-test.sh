@@ -219,9 +219,13 @@ cmd_dry() {
 
   # ── the follow-up text's state branches (F items 8 + 10) ───────────────────
   local nst_home; nst_home="$(mktemp -d)"
+  # The mise bullet's PATH line must reach the user LITERALLY — the heredoc is
+  # unquoted, so an unescaped $PATH expands to the builder's PATH and a backtick
+  # runs a command (both happened on first writing it).
   nst_case "follow-ups: full, no desktop" "$nst_home" -- \
     "desktop was installed here" "!GNOME's monospace font" \
-    "Docker access for"
+    "Docker access for" "mise use -g node@lts" \
+    'export PATH="$HOME/.local/share/mise/shims:$PATH"'
   nst_case "follow-ups: full + desktop" "$nst_home" INSTALL_DESKTOP=1 -- \
     "GNOME's monospace font is already set to it" \
     "!desktop was installed here"
@@ -561,10 +565,9 @@ v_installsh() {
   done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   check "brew"                   test -x /home/linuxbrew/.linuxbrew/bin/brew
   local b
-  for b in nvm eza bat zoxide jq; do
+  for b in mise eza bat zoxide jq; do
     check "$b (brew subset)"     bash -c "test -e /home/linuxbrew/.linuxbrew/bin/$b || /home/linuxbrew/.linuxbrew/bin/brew list --formula $b"
   done
-  check "\$HOME/.nvm dir (brew nvm needs it)" test -d "$HOME/.nvm"
   check "alacritty themes clone" test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"
   check "MesloLGS NF (user font dir)" \
     bash -c 'ls "$HOME"/.local/share/fonts/MesloLGS*.ttf'

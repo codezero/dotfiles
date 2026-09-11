@@ -20,7 +20,6 @@ if dry; then
   would "pre-create /home/linuxbrew owned by $TARGET_USER (so the non-root brew installer needs no sudo)"
   would "install Homebrew (if missing) as $TARGET_USER"
   would "brew bundle: $n formulae/casks from $(basename "$BREWFILE") (flatpak/npm/mas/vscode lines ignored)"
-  as_user 'mkdir -p "$HOME/.nvm"'
 else
   # Homebrew won't run as root, but its FIRST install needs root to create
   # /home/linuxbrew (which lives in root-owned /home). Run as the non-root user,
@@ -55,7 +54,4 @@ else
     || soft_fail "brew bundle reported issues"
 
   rm -f "$FILTERED" 2>/dev/null || true
-
-  # nvm needs its data dir (referenced by .zshrc).
-  as_user 'mkdir -p "$HOME/.nvm"' || true
 fi

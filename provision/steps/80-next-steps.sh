@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step 80 — persistent post-provision follow-ups. The manual follow-ups (git
-# identity, `nvm install --lts`, Docker mode choice, …) otherwise print to
+# identity, `mise use -g node@lts`, Docker mode choice, …) otherwise print to
 # stdout ONCE at the end of a run — and a GOLDEN build never prints them at all
 # (it exits + wipes before the summary), so a clone / cloud-init user would
 # have no on-box record. This step writes them to ~/PROVISION-NEXT-STEPS.md and
