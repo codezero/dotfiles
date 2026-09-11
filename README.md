@@ -64,12 +64,18 @@ prints the recipes above at the point of use.
 
 ## Smoke tests
 
+[![smoke](https://github.com/codezero/dotfiles/actions/workflows/smoke.yml/badge.svg)](https://github.com/codezero/dotfiles/actions/workflows/smoke.yml)
+[![gitleaks](https://github.com/codezero/dotfiles/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/codezero/dotfiles/actions/workflows/gitleaks.yml)
+
 `bash smoke-test.sh lint` + `bash smoke-test.sh dry` run anywhere (no sudo, no
 changes): shellcheck the tree + assert the `--dry-run` behavior of every
-provisioning flag. `bash smoke-test.sh verify S4` audits a provisioned box's end
-state read-only — it takes the runbook's scenario id and expands it to the right
-assertions. `bash smoke-test.sh scenarios` prints the runbook, the id → token
-map, and how the tokens compose.
+provisioning flag. **CI runs both on every push and pull request** — on an
+arm64 runner (the target) and an x86_64 one — with shellcheck pinned to the
+version the tree is kept clean against (`.github/workflows/smoke.yml`).
+`bash smoke-test.sh verify S4` audits a provisioned box's end state read-only —
+it takes the runbook's scenario id and expands it to the right assertions.
+`bash smoke-test.sh scenarios` prints the runbook, the id → token map, and how
+the tokens compose.
 
 ## `install.sh` in detail
 

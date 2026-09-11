@@ -240,6 +240,19 @@ cmd_dry() {
   done < <(sed -n '/^STEPS=(/,/^)/p' "$HERE/provision/provision.sh" \
            | sed -n 's/^[[:space:]]*\([0-9][0-9]*-[a-z-]*\.sh\)[[:space:]]*$/\1/p')
 
+  # ── CI actually runs both tiers ────────────────────────────────────────────
+  # The tiers need no sudo, root or network precisely so they can gate a PR;
+  # .github/workflows/smoke.yml is what cashes that in. Deleting or renaming it
+  # breaks nothing locally — this is the only thing that would notice.
+  local wf="$HERE/.github/workflows/smoke.yml" tier
+  if [ -f "$wf" ]; then
+    for tier in lint dry; do
+      if grep -qE "^[[:space:]]*run: bash smoke-test\.sh ${tier}[[:space:]]*\$" "$wf"; then
+        ok "CI runs the $tier tier (smoke.yml)"
+      else bad "CI does NOT run the $tier tier — smoke.yml has no 'run: bash smoke-test.sh $tier'"; fi
+    done
+  else bad "CI workflow missing — .github/workflows/smoke.yml"; fi
+
   # ── kitty on an arch upstream does not build for ───────────────────────────
   # Must WARN and exit 0, never soft_fail: under STRICT a soft_fail would abort
   # a whole golden build over something the operator cannot fix. Untestable
