@@ -25,6 +25,9 @@ id_*
 !.claude/settings.json
 !.claude/statusline-command.sh
 .claude.json
+# Personal working memory (closed-TODO log). Claude Code auto-loads it next to
+# CLAUDE.md; hand-carry it to a new box together with ~/.claude/projects/…/memory/
+CLAUDE.local.md
 
 # Cloud / tool credentials
 .config/gh/hosts.yml
