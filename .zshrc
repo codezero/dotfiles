@@ -122,10 +122,13 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # Niceties — each guarded so a lean box (provision PROFILE=minimal installs
-# no bat/eza/zoxide) gets a clean shell instead of "command not found" noise.
+# no bat/eza/zoxide/atuin) gets a clean shell instead of "command not found" noise.
 command -v eza    >/dev/null && alias ls="eza --icons=always"
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 command -v bat    >/dev/null && alias cat="bat"
+# atuin takes Ctrl-R (full-screen fuzzy history search); --disable-up-arrow keeps
+# zsh's native up-arrow. Its DB lives in ~/.local/share/atuin — finalize scrubs it.
+command -v atuin  >/dev/null && eval "$(atuin init zsh --disable-up-arrow)"
 
 [ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh

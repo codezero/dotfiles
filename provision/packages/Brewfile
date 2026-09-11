@@ -1,6 +1,8 @@
+brew "atuin"       # shell history: fuzzy Ctrl-R, cwd/exit/duration; .zshrc guards on it; finalize scrubs its DB
 brew "bat"
 brew "btop"
 brew "curl"
+brew "dive"        # explore a Docker image layer by layer (wasted bytes, efficiency score)
 brew "eza"
 brew "fastfetch"
 brew "fd"
@@ -15,6 +17,7 @@ brew "httpie"
 brew "jj"
 brew "jq"
 brew "k9s"
+brew "ktop"        # top-like TUI for a k8s cluster (needs metrics-server); lighter read-only view beside k9s
 brew "lazydocker"
 brew "lazygit"
 brew "neovim"

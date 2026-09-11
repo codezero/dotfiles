@@ -27,8 +27,11 @@ cloud_init_reinjects() {
 # NOTE: .docker/config.json is KEPT but credential-SCRUBBED below — its
 # currentContext pointer is useful (rootless), but any auths/credHelpers a stray
 # `docker login` wrote are stripped so they can't bake into a shared image.
+# .local/share/atuin: every shell command ever run (history.db) plus the sync
+# key/session if sync was ever set up — history AND a credential. The LAST-phase
+# wipe below only knows .bash_history/.zsh_history, so it goes here.
 CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .netrc \
-  .git-credentials .codex \
+  .git-credentials .codex .local/share/atuin \
   .claude/.credentials.json .claude/projects .claude/sessions \
   .claude/history.jsonl .claude/shell-snapshots)
 

@@ -463,6 +463,7 @@ v_full_extras() {  # full-profile installs (skipped for minimal)
     bash -c '[ -r /usr/share/zsh/vendor-completions/_alacritty ]'
   check "bat (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/bat
   check "eza (brew)"               test -x /home/linuxbrew/.linuxbrew/bin/eza
+  check "atuin (brew)"             test -x /home/linuxbrew/.linuxbrew/bin/atuin
   check "flatpak + flathub"        bash -c 'flatpak remotes 2>/dev/null | grep -q flathub'
 }
 
@@ -590,10 +591,18 @@ v_golden_clone() {
   hdr "verify: golden clone (booted from a captured image)"
   check  "machine-id regenerated (non-empty)" test -s /etc/machine-id
   check  "SSH host keys regenerated" bash -c 'ls /etc/ssh/ssh_host_* >/dev/null 2>&1'
-  local p
-  for p in .aws .gnupg .config/gh .config/gcloud .kube .npmrc .claude/.credentials.json; do
-    checkno "cred path ABSENT: ~/$p" test -e "$HOME/$p"
-  done
+  # The list is read from 90-finalize.sh's CRED_PATHS — the scrub's own source
+  # of truth — so this audit can't drift from what finalize actually removes
+  # (it used to be a hand-copied subset that had already fallen behind).
+  local -a cred_paths=()
+  eval "$(sed -n '/^CRED_PATHS=(/,/)/p' "$HERE/provision/steps/90-finalize.sh" \
+          | sed 's/^CRED_PATHS=/cred_paths=/')"
+  if [ "${#cred_paths[@]}" -gt 0 ]; then
+    local p
+    for p in "${cred_paths[@]}"; do
+      checkno "cred path ABSENT: ~/$p" test -e "$HOME/$p"
+    done
+  else bad "could not read CRED_PATHS from 90-finalize.sh"; fi
   checkno "no private keys in ~/.ssh" \
     bash -c 'grep -rlI "PRIVATE KEY" "$HOME/.ssh" 2>/dev/null | grep -q .'
   checkno "no repo clone in /tmp" test -d /tmp/dotfiles
