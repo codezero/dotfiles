@@ -145,3 +145,28 @@ Provision has the mirror-image trap: a re-run **on** a golden image must keep
 A `~/.zshrc.backup.<timestamp>` on a fresh box is expected once: oh-my-zsh's
 installer writes a template `.zshrc` before ours is installed, and that template
 gets backed up rather than deleted.
+
+## License
+
+Copyright (c) 2026 codezero. Licensed under the **GNU Affero General Public
+License v3.0** (`AGPL-3.0-only`) — full text in [`LICENSE`](LICENSE).
+
+In plain English:
+
+- **You may** use it for anything, including commercially; modify it; and
+  redistribute it, original or modified.
+- **If you share a modified version** — or run one as a network service — you
+  must release your source under this same license and keep the notices.
+- **Private use needs nothing**, including on company machines: copyleft
+  triggers on distribution, not on use.
+- **Different terms:** if AGPL does not fit your organization, open an issue to
+  discuss a separate license.
+
+Third-party components keep their own licenses and are usable under them
+independently of this repo:
+
+| Component | License |
+|---|---|
+| `fonts/MesloLGS-NF/` | Apache-2.0 — see its `LICENSE`, `NOTICE` and `ATTRIBUTION.md` |
+| `.config/nvim/` | Apache-2.0 — the LazyVim starter template, its `LICENSE` retained |
+| `.p10k.zsh` | generated from powerlevel10k's `p10k-lean.zsh` config template (MIT) |
