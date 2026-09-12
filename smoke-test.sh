@@ -860,9 +860,13 @@ S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05),
 S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource),
 S14 (2026-08-21, minimal+rootless), S15 (2026-09-12, HEADLESS=1: 38/38, zsh
 silent with atuin+mise, all 5 new formulae run on arm64, mise the sole owner of
-node 24 LTS + go 1.27).
-Pending live: S10 re-run — install.sh's brew set changed nvm -> mise
-(2026-09-11) and that path is not exercised by any provision scenario.
+node 24 LTS + go 1.27), S10 RE-RUN (2026-09-12, install.sh with mise: 22/22;
+first run's chsh failed on a mistyped password because sudo's cached timestamp
+made it the only prompt -> dc1ff2d announces it; the converged re-run at
+dc1ff2d completed with NO prompt — [0/7]/[1/7]/[7/7] all skipped — and 1
+backup total, i.e. the idempotency half of S10 finally demonstrated).
+Pending live: none — every scenario above has run on real hardware at or
+after 1844563.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF

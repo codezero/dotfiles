@@ -6,7 +6,7 @@ Personal dotfiles backup + full-machine provisioning for **Ubuntu 26.04 ("resolu
 Everything here is Bash + config files — there is no build system, test suite, or linter.
 
 ## Commands
-- `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, tmux, oh-my-zsh, p10k, core brew CLI, symlinks). Run as yourself, not under sudo.
+- `bash install.sh` — lightweight bootstrap: **shell + dotfiles only** (zsh, tmux, oh-my-zsh, p10k, core brew CLI, symlinks). Run as yourself, not under sudo. First run prompts twice (sudo, then **your login password** for `chsh` — announced right before, because a fresh sudo timestamp makes it the only prompt and it was mistaken for sudo live); a **converged re-run prompts for nothing** (`[0/7]`/`[1/7]` skip when the apt set + brew are present, `[7/7]` gates on the passwd entry via `getent`, not `$SHELL`) — S10 re-run 2026-09-12, `dc1ff2d`.
 - `bash provision/provision.sh --dry-run` — **the verification path**. Prints every planned action, makes no changes, needs no sudo. Run this after editing any step script.
 - `sudo bash provision/provision.sh` — full machine replication. `sudo env PROVISION_USER=alice bash …` targets a user; `sudo env INSTALL_DESKTOP=1 bash …` adds the desktop/locale/IME set. **The canonical flag reference is `provision/README.md#flags`** (table + how they combine); `provision.sh --help` prints the recipes. Keep those two the owners — don't restate flag syntax elsewhere.
 - `bash provision/inventory-export.sh` — run on the **source** machine to regenerate `packages/{apt.list,flatpak.list,Brewfile}` from live state.
