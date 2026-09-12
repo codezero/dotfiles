@@ -92,11 +92,16 @@ bash install.sh        # not chmod +x in the repo, so invoke with bash — as
 exec zsh
 ```
 
-Two password prompts are expected: sudo (apt + Homebrew — step `[0/7]` primes it
-up front) and `chsh` at step `[7/7]`, which asks for **your own** password via
-PAM to change your login shell. If you redirect the output to a log
-(`bash install.sh > log 2>&1`), run `sudo -v` first — otherwise sudo's prompt
-goes to the log while it waits on the terminal, and the run looks like a hang.
+Two password prompts are expected on a **first** run: sudo (apt + Homebrew's
+first install — step `[0/7]` primes it up front) and `chsh` at step `[7/7]`,
+which asks for **your own login password** via PAM to change your shell — the
+script says so right before it prompts, because if sudo's timestamp is still
+fresh this is the only prompt you'll see and it is easy to mistake for sudo. A
+**re-run on a converged box asks for nothing**: `[0/7]` is skipped when the apt
+set and Homebrew are already present, and `[7/7]` when the passwd entry already
+says zsh. If you redirect the output to a log (`bash install.sh > log 2>&1`),
+run `sudo -v` first — otherwise sudo's prompt goes to the log while it waits on
+the terminal, and the run looks like a hang.
 
 Installs zsh + tmux + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
 the dotfiles listed in `dotfiles.list` into `$HOME` — `.zshrc`, `.p10k.zsh`,

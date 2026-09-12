@@ -42,20 +42,42 @@ done
 #     a confusing apt error.
 # NB: step [7/7]'s `chsh` prompts for YOUR OWN password via PAM regardless — that
 # one is unrelated to sudo and cannot be primed away.
-echo "==> [0/7] sudo access (needed for apt + Homebrew)"
-sudo -v || { echo "    this script needs sudo (apt + Homebrew) — aborting" >&2; exit 1; }
-
-echo "==> [1/7] Base apt packages"
-sudo apt update
-sudo apt install -y \
-  zsh git curl wget build-essential tmux \
-  zsh-autosuggestions zsh-syntax-highlighting
+# Root is needed in exactly two places: apt ([1/7]) and Homebrew's FIRST install
+# ([2/7] — its installer sudo's internally to create /home/linuxbrew). Everything
+# else is user-level. So a CONVERGED box re-runs with no password at all: prime
+# sudo only when one of those two actually has work to do. (Found live, S10
+# re-run 2026-09-12: a re-run that stalls on a prompt has demonstrated nothing
+# about idempotency, whatever the backup count says afterwards.)
+APT_PKGS=(zsh git curl wget build-essential tmux zsh-autosuggestions zsh-syntax-highlighting)
 # ^ tmux: we install .tmux.conf from dotfiles.list AND .zshrc loads omz's `tmux`
 #   plugin, which prints "tmux not found. Please install tmux before using this
 #   plugin." on every shell start when it's missing. Shipping the config without
 #   the binary was incoherent (found live, S10).
 # ^ zsh-autosuggestions & zsh-syntax-highlighting land in /usr/share/...,
 #   which is exactly where .zshrc sources them from.
+apt_needed=0
+for p in "${APT_PKGS[@]}"; do
+  dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q 'install ok installed' || apt_needed=1
+done
+brew_needed=0
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] || command -v brew >/dev/null 2>&1 || brew_needed=1
+
+if [ "$apt_needed" = 1 ] || [ "$brew_needed" = 1 ]; then
+  echo "==> [0/7] sudo access (needed for apt + Homebrew's first install)"
+  sudo -v || { echo "    this script needs sudo (apt + Homebrew) — aborting" >&2; exit 1; }
+else
+  echo "==> [0/7] sudo access — skipped: apt set + Homebrew already present, nothing needs root"
+fi
+
+if [ "$apt_needed" = 1 ]; then
+  echo "==> [1/7] Base apt packages"
+  sudo apt update
+  sudo apt install -y "${APT_PKGS[@]}"
+else
+  # No `apt update` either: install.sh is not the bring-to-latest path (that is
+  # provision.sh with APT_UPGRADE=1), and refreshing the index is root work.
+  echo "==> [1/7] Base apt packages — all ${#APT_PKGS[@]} present, skipped"
+fi
 
 echo "==> [2/7] Homebrew (linuxbrew)"
 if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ] && ! command -v brew >/dev/null 2>&1; then
@@ -151,11 +173,23 @@ else
 fi
 
 echo "==> [7/7] Make zsh the default shell"
-# chsh authenticates YOU via PAM — it prompts for your own password (bare
-# "Password:", not "[sudo] password for …"). Expected, and not primeable.
-if [ "${SHELL:-}" != "$(command -v zsh)" ]; then
+# Gate on the passwd entry, NOT $SHELL: $SHELL is the CURRENT session's value
+# and only changes at login, so after a successful chsh a re-run in the same
+# terminal would prompt for the password again for nothing (found live, S10
+# re-run 2026-09-12). getent is the source of truth; $SHELL is the fallback.
+login_shell="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"
+login_shell="${login_shell:-${SHELL:-}}"
+if [ "$login_shell" != "$(command -v zsh)" ]; then
+  # chsh authenticates YOU via PAM — it prompts for your own password (bare
+  # "Password:", not "[sudo] password for …"). Expected, and not primeable.
+  # Say so right before it happens: with sudo's timestamp still fresh from an
+  # earlier command, this can be the ONLY prompt of the run, and it was read
+  # as a sudo prompt live (wrong password -> PAM failure -> bash stayed).
+  echo "    chsh asks for YOUR login password (not sudo's) — answer the next prompt:"
   chsh -s "$(command -v zsh)" || \
     echo "    chsh failed — run manually: chsh -s $(command -v zsh)"
+else
+  echo "    already zsh — skipped"
 fi
 
 cat <<'EOF'

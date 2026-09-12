@@ -798,7 +798,9 @@ the tokens it expands to, and how they compose, are listed at the bottom.)
  S9  iterate-golden re-run S7/S8 ON a booted golden clone (MUST keep GOLDEN_IMAGE=1
                     or DOTFILES_COPY=1 — plain re-run would symlink over the copies)
                     [+ APT_UPGRADE=1 for a true bring-to-latest]   -> verify S9
- S10 install.sh     bash install.sh && exec zsh; re-run for idempotency; --copy variant
+ S10 install.sh     bash install.sh && exec zsh; re-run: must COMPLETE with NO
+                    password prompt on the converged box (sudo + chsh both
+                    skipped) and mint zero backups; --copy variant
                     -> verify S10   (installsh is its OWN contract and REPLACES
                     the core audit — not verify S2: install.sh ships no
                     tmux/rustup/claude/docker/step-80, and a 5-formula brew subset)
