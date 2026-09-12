@@ -623,6 +623,24 @@ v_desktop() {
   # font is installed system-wide (found live, S4).
   check "dconf applied: monospace font = MesloLGS NF" \
     bash -c 'dconf read /org/gnome/desktop/interface/monospace-font-name 2>/dev/null | grep -q "MesloLGS NF"'
+  # favorite-apps: GNOME silently drops any entry whose .desktop file is not
+  # installed, so "the value landed" is not enough — each id must RESOLVE on
+  # this box. The Gen-3 clone had the list applied and still no Alacritty in
+  # the dock: the id was the old snap's (found live, 2026-09-12).
+  check "dconf applied: favorite-apps set" \
+    bash -c 'dconf read /org/gnome/shell/favorite-apps 2>/dev/null | grep -q "\.desktop"'
+  local fav dir found
+  for fav in $(dconf read /org/gnome/shell/favorite-apps 2>/dev/null | grep -oE "'[^']+'" | tr -d "'"); do
+    found=0
+    for dir in "$HOME/.local/share/applications" /usr/share/applications \
+               /usr/local/share/applications /var/lib/snapd/desktop/applications \
+               /var/lib/flatpak/exports/share/applications \
+               "$HOME/.local/share/flatpak/exports/share/applications"; do
+      [ -f "$dir/$fav" ] && { found=1; break; }
+    done
+    if [ "$found" = 1 ]; then ok "favorite resolves: $fav"
+    else bad "favorite does NOT resolve (GNOME will silently drop it from the dock): $fav"; fi
+  done
 }
 
 v_rootless() {
@@ -647,18 +665,37 @@ v_rootless() {
 v_golden_clone() {
   hdr "verify: golden clone (booted from a captured image)"
   check  "machine-id regenerated (non-empty)" test -s /etc/machine-id
-  check  "SSH host keys regenerated" bash -c 'ls /etc/ssh/ssh_host_* >/dev/null 2>&1'
+  # Host keys only matter where sshd exists. finalize removes them
+  # unconditionally; a desktop golden has no openssh-server (not in apt.list),
+  # so "absent" is correct there — the Gen-3 clone showed exactly that.
+  if dpkg-query -W -f='${Status}' openssh-server 2>/dev/null | grep -q 'install ok installed'; then
+    check "SSH host keys regenerated (sshd installed)" bash -c 'ls /etc/ssh/ssh_host_* >/dev/null 2>&1'
+  else ok "SSH host keys — not applicable (openssh-server not installed)"; fi
   # The list is read from 90-finalize.sh's CRED_PATHS — the scrub's own source
   # of truth — so this audit can't drift from what finalize actually removes
   # (it used to be a hand-copied subset that had already fallen behind).
   local -a cred_paths=()
   eval "$(sed -n '/^CRED_PATHS=(/,/)/p' "$HERE/provision/steps/90-finalize.sh" \
           | sed 's/^CRED_PATHS=/cred_paths=/')"
+  # A cred path that EXISTS on the clone is a leak only if it came from the
+  # build. Some are legitimately recreated at first login — gpg-agent's user
+  # units make ~/.gnupg, atuin's .zshrc init makes ~/.local/share/atuin — and
+  # both did, 27s after boot on the Gen-3 clone. The birth time (statx, ext4)
+  # separates the cases: born after this boot = regenerated, fine; born before
+  # = inherited from the image = finalize missed it. Unknown birth time is
+  # treated as a leak (conservative).
   if [ "${#cred_paths[@]}" -gt 0 ]; then
-    local p
+    local p born boot; boot="$(awk '/^btime/{print $2}' /proc/stat)"
     for p in "${cred_paths[@]}"; do
-      checkno "cred path ABSENT: ~/$p" test -e "$HOME/$p"
+      if [ ! -e "$HOME/$p" ]; then ok "cred path ABSENT: ~/$p"; continue; fi
+      born="$(stat -c %W "$HOME/$p" 2>/dev/null || echo 0)"
+      if [ "${born:-0}" -gt "${boot:-0}" ] 2>/dev/null; then
+        ok "cred path regenerated after boot (+$((born-boot))s, not inherited): ~/$p"
+      else bad "cred path INHERITED from the image (born before this boot): ~/$p"; fi
     done
+    # ~/.gnupg may be recreated, but it must never carry a private key.
+    checkno "no private keys in ~/.gnupg" \
+      bash -c 'find "$HOME/.gnupg" \( -path "*private-keys-v1.d/*.key" -o -name secring.gpg \) 2>/dev/null | grep -q .'
   else bad "could not read CRED_PATHS from 90-finalize.sh"; fi
   checkno "no private keys in ~/.ssh" \
     bash -c 'grep -rlI "PRIVATE KEY" "$HOME/.ssh" 2>/dev/null | grep -q .'

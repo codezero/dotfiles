@@ -104,6 +104,16 @@ done
 $SUDO truncate -s 0 /etc/machine-id 2>/dev/null || true
 $SUDO rm -f /var/lib/dbus/machine-id 2>/dev/null || true
 $SUDO rm -f /etc/ssh/ssh_host_* 2>/dev/null || true
+# Who puts them back? cloud-init's ssh module, on a clone where it RUNS. On a
+# desktop install cloud-init is disabled, so an image that also carries sshd
+# would boot clones whose sshd has no keys and fails to start. Say so — the
+# desktop golden today has no openssh-server (not in apt.list), so this is a
+# warning about a combination, not a state. Fix if it ever applies: a oneshot
+# unit running `ssh-keygen -A` before ssh.service, or keep cloud-init enabled.
+if dpkg-query -W -f='${Status}' openssh-server 2>/dev/null | grep -q 'install ok installed' \
+   && ! cloud_init_reinjects; then
+  warn "openssh-server is installed but cloud-init will NOT run on the clone — SSH host keys will not regenerate and sshd will fail to start; add a first-boot 'ssh-keygen -A' unit or keep cloud-init enabled"
+fi
 
 # cloud-init re-runs on the clone with fresh instance metadata.
 command -v cloud-init >/dev/null 2>&1 && { $SUDO cloud-init clean --logs --seed >/dev/null 2>&1 || true; }

@@ -91,6 +91,12 @@ and in `--help` are just common combinations of it.
   `HEADLESS=1` = full CLI set, no GUI; `PROFILE=minimal` = lean CLI set, no GUI.
   Before `HEADLESS` existed, "full without a desktop" cargo-built Alacritty and
   installed two Electron editors on boxes that could never display them.
+- **`APT_UPGRADE=1` composes with any recipe** — `HEADLESS=1 APT_UPGRADE=1`,
+  `PROFILE=minimal APT_UPGRADE=1`, a golden build. It stays opt-in everywhere
+  because `apt install` already lands the *newest* version of everything the
+  lists name; the only thing it adds is upgrading what the base image shipped
+  (kernel, libc, systemd…) — which Ubuntu's `unattended-upgrades` patches for
+  security on its own within a day, and which drags a reboot into the run.
 - **`GOLDEN_IMAGE=1` + `DOCKER_ROOTLESS=1` is deliberately unsupported.** Rootless
   needs a host-wide AppArmor relaxation (below), which would bake into the image
   and be inherited by every clone. Build the image without it; each clone opts in.
