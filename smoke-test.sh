@@ -856,9 +856,11 @@ the tokens it expands to, and how they compose, are listed at the bottom.)
 Covered live so far: S2/S3 (Phase A, C2), S5 (C2), S7 abort-gate (Phase B),
 S8 (C Run 1), S9 (Phase D), S11 + S10 + S4 + S6 + S12 (2026-08-05),
 S13 (2026-08-16, AWS t4g.large arm64, real Ec2 datasource),
-S14 (2026-08-21, minimal+rootless).
-Pending live: S15 (HEADLESS=1, added 2026-09-11 — dry-tier pinned, not yet run
-on hardware).
+S14 (2026-08-21, minimal+rootless), S15 (2026-09-12, HEADLESS=1: 38/38, zsh
+silent with atuin+mise, all 5 new formulae run on arm64, mise the sole owner of
+node 24 LTS + go 1.27).
+Pending live: S10 re-run — install.sh's brew set changed nvm -> mise
+(2026-09-11) and that path is not exercised by any provision scenario.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
