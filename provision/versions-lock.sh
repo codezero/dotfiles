@@ -56,26 +56,30 @@ src_system() {
   printf 'system\tarch\t%s\n' "$(uname -m)"
 }
 
+# The step-20 third-party debs — from their own repos, so they float
+# independently of the Ubuntu release. dpkg only: NEVER Electron --version
+# (codium/cursor hang headless). Owned by the `deb` kind; excluded from `apt`
+# even though apt.list (an apt-mark export) names them too — one line each.
+DEB_PKGS="docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+docker-compose-plugin docker-ce-rootless-extras codium cursor"
+
 # Only what the repo NAMES (decided): the union of the apt manifests. Base-image
 # packages are the Ubuntu release's business and would drown the tool drift.
 src_apt() {
   command -v dpkg-query >/dev/null 2>&1 || return 0
   local names
   names="$(cat "$PKG_DIR/apt.list" "$PKG_DIR/apt.minimal.list" 2>/dev/null \
-           | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | sort -u)"
+           | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | sort -u \
+           | grep -vxF -f <(tr ' ' '\n' <<<"$DEB_PKGS"))"
   [ -n "$names" ] || return 0
   # shellcheck disable=SC2086
   _dpkg_versions $names | sed 's/^/apt\t/'
 }
 
-# The step-20 third-party debs — from their own repos, so they float
-# independently of the Ubuntu release. dpkg only: NEVER Electron --version
-# (codium/cursor hang headless).
 src_deb() {
   command -v dpkg-query >/dev/null 2>&1 || return 0
-  _dpkg_versions docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
-                 docker-compose-plugin docker-ce-rootless-extras codium cursor \
-    | sed 's/^/deb\t/'
+  # shellcheck disable=SC2086
+  _dpkg_versions $DEB_PKGS | sed 's/^/deb\t/'
 }
 
 _brew() { /home/linuxbrew/.linuxbrew/bin/brew "$@"; }
