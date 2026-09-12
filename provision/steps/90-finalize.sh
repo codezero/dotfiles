@@ -119,6 +119,8 @@ fi
 command -v cloud-init >/dev/null 2>&1 && { $SUDO cloud-init clean --logs --seed >/dev/null 2>&1 || true; }
 $SUDO rm -rf /var/lib/cloud/* 2>/dev/null || true
 
+# Step 80's notes/MOTD and step 85's ~/versions.lock survive by construction:
+# neither path is a cred path, and finalize never sweeps $HOME wholesale.
 # Heads-up (operator-facing, NON-destructive): finalize does NOT touch $HOME, so a
 # repo clone or run-log left there bakes into the image. We never delete user files
 # blindly — just flag them so you can rm before capture. (Cloning + logging under

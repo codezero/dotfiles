@@ -187,6 +187,44 @@ actually came up gets a "nothing to do" note instead of the setup recipe.
 > For a *full* image use `provision.sh`; `install.sh` only sets up shell +
 > dotfiles and is for an existing box you don't want to fully provision.
 
+## Versions — recorded, not pinned
+
+Every install source here floats by design (brew, rustup, mise, Claude, kitty,
+flatpak, three git clones at HEAD), and Homebrew — the largest group — cannot be
+version-pinned at all. So "reproducible" means *re-runnable*, and the honest
+claim for a golden is **"SHA X built on DATE produced these versions."** The
+record that makes the claim checkable is `versions.lock`:
+
+- **Every run writes `~/versions.lock`** (step 85, as the target user): sorted
+  `kind  name  version` lines for what the repo *names* — the apt manifests, the
+  third-party debs, brew formulae and casks, flatpaks, the rustup toolchain, the
+  cargo-built Alacritty, Claude, kitty, mise's global tools, and the commit of
+  each git clone. No hostnames, usernames, paths or tokens. Its header records
+  when, from which repo SHA, and with which flags.
+- **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
+  clone boots with "what this image contains" on the box, and `verify` on a
+  clone asserts **zero drift** against it.
+- **Every re-run says what moved.** Step 85 compares the previous lock before
+  overwriting it, so a bring-to-latest (`APT_UPGRADE=1`, or just re-running
+  `brew bundle`) is an observed act: `brew bat 0.26.0 -> 0.26.1`, not a silent
+  change.
+- **`provision/versions.lock` in the repo is the latest golden's copy.** After
+  each golden build, copy the lock from a booted clone into the repo and commit
+  it; the build SHA gets an annotated tag `golden/gen-N`. Git history is the
+  Gen-N series, and `git diff <a> <b> -- provision/versions.lock` is the
+  generation-to-generation diff.
+
+```bash
+bash provision/versions-lock.sh emit -o ~/versions.lock     # record this box
+bash provision/versions-lock.sh check ~/versions.lock        # drift since then: exit 0 none, 1 drift, 2 error
+bash provision/versions-lock.sh check provision/versions.lock # this box vs the latest golden
+```
+
+What it never does: install, upgrade, or downgrade anything. A `PIN_VERSIONS`
+mode was considered and rejected — it would be ~70 % real with an invisible
+30 % hole (brew), and a flag that *reads* as reproducible while the largest
+group floats underneath is worse than no flag.
+
 ## Key design points
 
 - **Root vs user.** cloud-init runs as root, but **Homebrew/oh-my-zsh/rustup/

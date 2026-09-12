@@ -110,6 +110,7 @@ STEPS=(
   55-gnome-dconf.sh
   60-shell.sh
   80-next-steps.sh
+  85-versions-lock.sh
   90-finalize.sh
 )
 

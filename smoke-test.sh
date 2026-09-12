@@ -58,7 +58,7 @@ cmd_lint() {
       shellcheck -x --severity=warning --source-path="$HERE/provision" "$s"
   done
   for s in provision/provision.sh provision/lib.sh provision/inventory-export.sh \
-           install.sh smoke-test.sh; do
+           provision/versions-lock.sh install.sh smoke-test.sh; do
     [ -f "$HERE/$s" ] || { skip "$s (missing)"; continue; }
     check "$s" shellcheck -x --severity=warning --source-path="$HERE/provision" "$HERE/$s"
   done
@@ -121,7 +121,8 @@ cmd_dry() {
   dry_case "plain" 0 -- \
     "verify the OpenPGP signature against pinned fingerprint 3CE1780F78DD88DF45194FD706BC317B515ACE7C" \
     "finalize: skipped" "rootless Docker: skipped" "GNOME dconf: skipped" \
-    "step: 80-next-steps.sh" "symlink " "!PROFILE=minimal —"
+    "step: 80-next-steps.sh" "symlink " "!PROFILE=minimal —" \
+    "step: 85-versions-lock.sh" "versions-lock.sh emit -o" "[flags: PROFILE=full"
   dry_case "desktop" 0 INSTALL_DESKTOP=1 -- \
     "!GNOME dconf: skipped"
   dry_case "golden" 0 GOLDEN_IMAGE=1 -- \
@@ -290,6 +291,37 @@ cmd_dry() {
     else bad "CI config missing — $wf"; fi
   done
 
+  # ── versions.lock: emit + check, self-contained ────────────────────────────
+  # No shims, no brew needed: every source is optional, so the emitter is valid
+  # on this box AND on a bare CI runner (system + apt kinds at least). The
+  # checker must report exactly what changed, in both directions, and stay
+  # silent when nothing did — a drift report that lies is worse than none.
+  local vl="$HERE/provision/versions-lock.sh" vlt vrc vout
+  vlt="$(mktemp -d)"
+  if bash "$vl" emit -o "$vlt/a.lock" >/dev/null 2>&1 \
+     && grep -q '^system	kernel	' "$vlt/a.lock" && grep -q '^# generated: ' "$vlt/a.lock"; then
+    ok "versions.lock — emit writes a parseable lock with the system kind"
+  else bad "versions.lock — emit failed or produced no system kind"; fi
+  vout="$(bash "$vl" check "$vlt/a.lock" 2>&1)"; vrc=$?
+  if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — check against its own emit: no drift, exit 0"
+  else bad "versions.lock — self-check gave exit $vrc: $vout"; fi
+  # Mutate: change the kernel's version, drop the arch line, add a phantom.
+  sed -e 's/^\(system	kernel	\).*/\1x.y.z-mutated/' -e '/^system	arch	/d' "$vlt/a.lock" > "$vlt/b.lock"
+  printf 'brew\tphantom\t0.0\n' >> "$vlt/b.lock"
+  vout="$(bash "$vl" check "$vlt/b.lock" 2>&1)"; vrc=$?
+  if [ "$vrc" = 1 ] && grep -q '1 changed, 1 added, 1 removed' <<<"$vout" \
+     && grep -q 'changed  system/kernel' <<<"$vout" && grep -q 'added    system/arch' <<<"$vout" \
+     && grep -q 'removed  brew/phantom' <<<"$vout"; then
+    ok "versions.lock — check reports changed/added/removed exactly, exit 1"
+  else bad "versions.lock — mutated check gave exit $vrc: $vout"; fi
+  bash "$vl" check "$vlt/does-not-exist" >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ]; then ok "versions.lock — missing lock is exit 2 (error, not drift)"
+  else bad "versions.lock — missing lock gave exit $vrc"; fi
+  # No PII: the lock must carry no username, hostname or home path.
+  if grep -qE "$(id -un)|$(hostname)|$HOME" "$vlt/a.lock"; then bad "versions.lock — emit leaked a username/hostname/path"
+  else ok "versions.lock — no username, hostname or home path in the lock"; fi
+  rm -rf "$vlt"
+
   # ── kitty on an arch upstream does not build for ───────────────────────────
   # Must WARN and exit 0, never soft_fail: under STRICT a soft_fail would abort
   # a whole golden build over something the operator cannot fix. Untestable
@@ -446,6 +478,7 @@ v_core() {
   check "rustup toolchain"         test -x "$HOME/.cargo/bin/cargo"
   check "claude installed"         test -x "$HOME/.local/bin/claude"
   check "docker CLI"               command -v docker
+  check "step 85 versions.lock"     test -s "$HOME/versions.lock"
   check "step 80 notes file"       test -f "$HOME/PROVISION-NEXT-STEPS.md"
   check "step 80 MOTD drop-in"     test -x /etc/update-motd.d/99-provision-next-steps
   # The pointer bakes in an absolute path under a 0750 home, so it must name the
@@ -700,6 +733,14 @@ v_golden_clone() {
   checkno "no private keys in ~/.ssh" \
     bash -c 'grep -rlI "PRIVATE KEY" "$HOME/.ssh" 2>/dev/null | grep -q .'
   checkno "no repo clone in /tmp" test -d /tmp/dotfiles
+  # The image's own record vs the booted clone: zero drift proves the clone IS
+  # what the build recorded, and that nothing upgraded brew/rustup behind our
+  # backs between capture and audit. (A clone provisioned before step 85
+  # existed has no lock — that is a skip, not a pass.)
+  if [ -s "$HOME/versions.lock" ]; then
+    check "no drift vs the image's own versions.lock" \
+      bash "$HERE/provision/versions-lock.sh" check "$HOME/versions.lock" --brief
+  else skip "drift vs ~/versions.lock (no lock on this clone — provisioned before step 85)"; fi
 }
 
 cmd_verify() {

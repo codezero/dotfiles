@@ -42,6 +42,12 @@ Every flag, its default, and how they interact:
 [**provision/README — Flags**](provision/README.md#flags). `provision.sh --help`
 prints the recipes above at the point of use.
 
+Nothing here is version-pinned (Homebrew can't be), so every run **records**
+what it installed instead: `~/versions.lock` on the box, and
+`provision/versions.lock` in the repo for the latest golden. Re-runs print what
+moved; a clone is audited for zero drift against its image's lock. See
+[**Versions — recorded, not pinned**](provision/README.md#versions--recorded-not-pinned).
+
 ## What's in here
 
 | Path | Purpose |
