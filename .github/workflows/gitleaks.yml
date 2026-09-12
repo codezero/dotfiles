@@ -21,8 +21,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The action downloads a gitleaks RELEASE at run time — "latest" when
           # unset, which quietly undoes the point of pinning the action itself.
-          # Same version as .gitlab-ci.yml's image; bump both together.
-          GITLEAKS_VERSION: v8.30.1
+          # Same version as .gitlab-ci.yml's image; bump both together. NO "v"
+          # here — the action adds it (v8.30.1 became vv8.30.1 → 404, live).
+          GITLEAKS_VERSION: 8.30.1
           # Free for personal/individual and public repos. ORGANIZATION repos
           # need a (free) license key — uncomment and set the secret:
           # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
