@@ -268,6 +268,8 @@ Manual follow-ups (need an interactive login session):
            shells get it via 'mise activate' in .zshrc; for scripts, cron or an
            agent's non-interactive shell, add its shims to PATH:
              export PATH="\$HOME/.local/share/mise/shims:\$PATH"
+  - Go:    mise use -g go@latest        (no brew go any more — one global owner
+           per runtime; a project pins its own with 'mise use go@1.24')
   - corepack (was in your Brewfile as 'npm "corepack"' — it ships with Node):
         corepack enable
 EOF

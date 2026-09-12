@@ -224,7 +224,7 @@ cmd_dry() {
   # runs a command (both happened on first writing it).
   nst_case "follow-ups: full, no desktop" "$nst_home" -- \
     "desktop was installed here" "!GNOME's monospace font" \
-    "Docker access for" "mise use -g node@lts" \
+    "Docker access for" "mise use -g node@lts" "mise use -g go@latest" \
     'export PATH="$HOME/.local/share/mise/shims:$PATH"'
   nst_case "follow-ups: full + desktop" "$nst_home" INSTALL_DESKTOP=1 -- \
     "GNOME's monospace font is already set to it" \

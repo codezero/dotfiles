@@ -30,7 +30,7 @@ cloud_init_reinjects() {
 # .local/share/atuin: every shell command ever run (history.db) plus the sync
 # key/session if sync was ever set up — history AND a credential. The LAST-phase
 # wipe below only knows .bash_history/.zsh_history, so it goes here.
-CRED_PATHS=(.aws .gnupg .config/gh .config/gcloud .kube .npmrc .netrc \
+CRED_PATHS=(.aws .gnupg .config/gh .config/glab-cli .config/gcloud .kube .npmrc .netrc \
   .git-credentials .codex .local/share/atuin \
   .claude/.credentials.json .claude/projects .claude/sessions \
   .claude/history.jsonl .claude/shell-snapshots)

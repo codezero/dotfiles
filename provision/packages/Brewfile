@@ -9,10 +9,10 @@ brew "fd"
 brew "fio"
 brew "fzf"
 brew "gh"
+brew "glab"        # GitLab CLI — brew is current with upstream; apt is 2y stale + ESM-gated; finalize scrubs its token
 brew "git"
 brew "git-delta"   # binary is `delta` (cf. bat/batcat) — .gitconfig guards on it
 brew "gitleaks"
-brew "go"
 brew "httpie"
 brew "jj"
 brew "jq"
