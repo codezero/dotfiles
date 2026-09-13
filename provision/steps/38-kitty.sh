@@ -32,6 +32,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 # No GUI wanted — same gate as step 36 (lib.sh gui_wanted).
 gui_wanted || { log "kitty: skipped ($(no_gui_reason))"; exit 0; }
 
+# kitty names its assets x86_64/arm64; dpkg says amd64/arm64.
+#
+# An arch upstream publishes no binary for (ppc64el, s390x, riscv64) WARNS and
+# skips rather than soft_fail-ing. soft_fail would abort a GOLDEN build, and
+# that is disproportionate for a condition the operator cannot act on: nothing
+# they change makes an upstream binary exist. This mirrors vendor_apt_update in
+# step 20, which warns instead of soft_failing even under STRICT for the same
+# reason — soft_fail is for failures worth stopping an image build over.
+# Structural non-applicability belongs with the no-GUI skip above.
+_karch_raw="$(dpkg --print-architecture 2>/dev/null)"
+case "$_karch_raw" in
+  arm64) karch=arm64 ;;
+  amd64) karch=x86_64 ;;
+  *)     warn "kitty: skipped — upstream ships no binary for architecture '${_karch_raw:-unknown}'"; exit 0 ;;
+esac
+
 # Ensure this step's own tools rather than assuming an earlier step left them —
 # the same rule step 36 states for its build deps, and it is load-bearing here:
 # `gnupg` is Priority: optional and is NOT in apt.list (the list carries `gpg`),
@@ -62,21 +78,6 @@ APP="$TARGET_HOME/.local/kitty.app"
 BINDIR="$TARGET_HOME/.local/bin"
 APPSDIR="$TARGET_HOME/.local/share/applications"
 
-# kitty names its assets x86_64/arm64; dpkg says amd64/arm64.
-#
-# An arch upstream publishes no binary for (ppc64el, s390x, riscv64) WARNS and
-# skips rather than soft_fail-ing. soft_fail would abort a GOLDEN build, and
-# that is disproportionate for a condition the operator cannot act on: nothing
-# they change makes an upstream binary exist. This mirrors vendor_apt_update in
-# step 20, which warns instead of soft_failing even under STRICT for the same
-# reason — soft_fail is for failures worth stopping an image build over.
-# Structural non-applicability belongs with the no-GUI skip above.
-_karch_raw="$(dpkg --print-architecture 2>/dev/null)"
-case "$_karch_raw" in
-  arm64) karch=arm64 ;;
-  amd64) karch=x86_64 ;;
-  *)     warn "kitty: skipped — upstream ships no binary for architecture '${_karch_raw:-unknown}'"; exit 0 ;;
-esac
 
 if dry; then
   would "resolve the current kitty version from $KITTY_VER_URL"

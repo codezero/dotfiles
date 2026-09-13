@@ -344,6 +344,15 @@ cmd_dry() {
   bash "$vl" check "$vlt/a.lock" --bogus >/dev/null 2>&1; vrc=$?
   if [ "$vrc" = 2 ]; then ok "versions.lock — unknown check option is exit 2"
   else bad "versions.lock — unknown check option gave exit $vrc"; fi
+  # Option order is free: `check --brief LOCK` must not read --brief as the path.
+  if bash "$vl" check --brief --ignore-boot "$vlt/a.lock" >/dev/null 2>&1 \
+     && bash "$vl" check "$vlt/a.lock" --ignore-boot --brief >/dev/null 2>&1; then
+    ok "versions.lock — check accepts options before or after the lock path"
+  else bad "versions.lock — check is position-sensitive about its options"; fi
+  bash "$vl" check >/dev/null 2>&1; vrc=$?
+  bash "$vl" check "$vlt/a.lock" "$vlt/a.lock" >/dev/null 2>&1; local vrc3=$?
+  if [ "$vrc" = 2 ] && [ "$vrc3" = 2 ]; then ok "versions.lock — check with no lock, or two, is exit 2"
+  else bad "versions.lock — check arg-count errors gave $vrc / $vrc3"; fi
   # One owner for "boot package": step 10's deny list and the lock's --ignore-boot
   # both source provision/boot-pkgs.sh, and the predicate says what it must.
   if grep -q 'source "\$PROVISION_DIR/boot-pkgs.sh"' "$HERE/provision/lib.sh" \

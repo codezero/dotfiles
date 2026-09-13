@@ -202,14 +202,19 @@ _drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row 
 # unattended-upgrades bumps them minutes after a fresh boot. A first-boot audit
 # wants provisioning's drift, not Ubuntu's — everything else still counts.
 cmd_check() {
-  local lock="${1:-}" brief=0 ignore_boot=0; shift || true
+  local lock="" brief=0 ignore_boot=0
+  # Options and the lock path in any order — `check --brief LOCK` and
+  # `check LOCK --brief` both work (the first draft took $1 as the path
+  # unconditionally, so the former reported "no such lock: '--brief'").
   while [ $# -gt 0 ]; do
     case "$1" in
       --brief) brief=1 ;;
       --ignore-boot) ignore_boot=1 ;;
-      *) usage ;;
+      -*) usage ;;
+      *) [ -z "$lock" ] || usage; lock="$1" ;;
     esac; shift
   done
+  [ -n "$lock" ] || usage
   [ -f "$lock" ] || { echo "no such lock: '$lock'" >&2; exit 2; }
   # Global, not local: the EXIT trap fires after the function's locals are gone
   # (and `set -u` would then abort the cleanup itself).
