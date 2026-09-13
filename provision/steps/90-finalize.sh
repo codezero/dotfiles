@@ -193,7 +193,15 @@ fi
 # the first-boot audit flagged it). `unset HISTFILE` only ever covered zsh's
 # own history. Opt-in, because an operator may want to inspect before capture;
 # the runbook recommends it.
+# --check-inhibitors=no: a GNOME desktop session holds a logind block
+# inhibitor, and a plain `systemctl poweroff` refuses ("Operation denied due
+# to active block inhibitor") — the first GOLDEN_POWEROFF build hit exactly
+# that, after a clean scrub (2026-09-13). Root may override it; -i is the
+# older spelling, kept as a fallback for a systemd without the long option.
 if [ "${GOLDEN_POWEROFF:-0}" = 1 ]; then
   log "GOLDEN_POWEROFF=1 — powering off now; capture the image once the VM is stopped."
-  sync; $SUDO systemctl poweroff
+  sync
+  $SUDO systemctl poweroff --check-inhibitors=no 2>/dev/null \
+    || $SUDO systemctl poweroff -i 2>/dev/null \
+    || die "GOLDEN_POWEROFF: systemctl poweroff refused — power off from the GUI or the hypervisor WITHOUT typing in a shell (atuin/zsh would record it)"
 fi
