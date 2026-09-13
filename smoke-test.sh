@@ -1070,8 +1070,10 @@ first run's chsh failed on a mistyped password because sudo's cached timestamp
 made it the only prompt -> dc1ff2d announces it; the converged re-run at
 dc1ff2d completed with NO prompt — [0/7]/[1/7]/[7/7] all skipped — and 1
 backup total, i.e. the idempotency half of S10 finally demonstrated).
-Pending live: none — every scenario above has run on real hardware at or
-after 1844563.
+Pending live (TODO K): S13×S11 — one cloud-init launch with PROFILE=minimal —
+and an S10 re-run, both AFTER the J pins + step 85 landed (2026-09-13); the
+desktop golden (Gen-4, b5a1856) proved the shared code, these prove the paths
+it does not take. HEADLESS (S15) is pre-J too but differs only in skips.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
