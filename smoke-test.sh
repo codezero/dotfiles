@@ -490,10 +490,12 @@ cmd_dry() {
   done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   [ "$mmiss" = 0 ] && ok "dotfiles.list — every entry exists in the repo ($(grep -cvE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list") entries)"
   # The tracked dotfiles must PARSE with their own tools — a syntax slip in a
-  # file that ships to every box is the cheapest bug to catch here. zsh and git
-  # are always present; tmux is checked where it is installed (CI runners lack
-  # it). Added with the 2026-09-13 housekeeping pass (T1/T3/T5/T7/T11).
-  check "dotfiles — .zshrc parses (zsh -n)" zsh -n "$HERE/.zshrc"
+  # file that ships to every box is the cheapest bug to catch here. git is
+  # always present; zsh and tmux are checked where installed — the stock
+  # GitHub runners have neither (the first push went red on zsh). Added with
+  # the 2026-09-13 housekeeping pass (T1/T3/T5/T7/T11).
+  if command -v zsh >/dev/null 2>&1; then check "dotfiles — .zshrc parses (zsh -n)" zsh -n "$HERE/.zshrc"
+  else skip "dotfiles — .zshrc parse (zsh not installed here — the GitHub runners lack it; found in CI 2026-09-13)"; fi
   check "dotfiles — .gitconfig parses (git config --list)" git config --file "$HERE/.gitconfig" --list
   # tmux never fails on a bad config — `start-server -f bad.conf` exits 0 and
   # hides the error behind a "config error" prompt at attach time, and
