@@ -464,10 +464,12 @@ v_core() {
   check "oh-my-zsh present"        test -d "$HOME/.oh-my-zsh"
   check "p10k theme present"       test -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
   check "zsh starts clean"         zsh -ic true
+  # Every entry in dotfiles.list — step 60 installs the whole set on every
+  # profile, and the list is the single owner of what that set is.
   local f
-  for f in .zshrc .p10k.zsh .gitconfig .tmux.conf; do
+  while IFS= read -r f; do
     check "dotfile $f installed"   test -e "$HOME/$f"
-  done
+  done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   check "git"                      command -v git
   check "tmux"                     command -v tmux
   check "brew"                     test -x /home/linuxbrew/.linuxbrew/bin/brew

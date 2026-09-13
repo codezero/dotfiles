@@ -15,6 +15,7 @@
 .gitconfig
 .tmux.conf
 .config/alacritty/alacritty.toml
+.config/kitty/kitty.conf
 .config/nvim
 .claude/settings.json
 .claude/statusline-command.sh
