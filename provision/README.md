@@ -70,6 +70,7 @@ and in `--help` are just common combinations of it.
 | `HEADLESS` | `0` | `1` = the **full** manifests with **no GUI installs**: skips Alacritty (36), kitty (38), Flatpak (50) and VSCodium + Cursor in step 20, keeps everything else — btop/eza/bat/delta/atuin, Docker, Rust, Claude Code, zsh + p10k. The shared headless box a human and an agent both work on. `PROFILE=minimal` already implies it; with `INSTALL_DESKTOP=1` it is refused. |
 | `INSTALL_DESKTOP` | `0` | Also install the desktop/locale/IME apt set and apply the GNOME dconf settings (step 55). |
 | `GOLDEN_IMAGE` | `0` | Build a reusable image: implies `STRICT` **and** `DOTFILES_COPY`, and runs finalize (step 90). Destructive — throwaway build box only. |
+| `GOLDEN_POWEROFF` | `0` | With `GOLDEN_IMAGE=1`: finalize powers the box off as its **last** action, so nothing is typed after the scrub (a post-finalize command in a zsh with atuin recreates its history DB and bakes it in). Recommended for every golden build. |
 | `DOTFILES_COPY` | `0` | Copy the dotfiles into `$HOME` instead of symlinking them to the repo: self-contained, so the repo can be deleted afterwards, but edits no longer flow back. |
 | `DOCKER_ROOTLESS` | `0` | Set up rootless Docker for the target user (step 25): the official setuptool, linger, the `--user` service, and the `rootless` context. Needs unprivileged user namespaces — see the note at the end of this file. |
 | `APT_UPGRADE` | `0` | `apt-get upgrade` the already-installed packages before installing anything (step 10). Off by default because it bumps installed kernel/grub point-releases. |
@@ -147,12 +148,20 @@ cd provision
 #    add INSTALL_DESKTOP=1 for a desktop image. Log under /tmp so the same finalize
 #    tmp-wipe removes the log too (never tee a golden build to /var/log or $HOME).
 sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh --dry-run
-sudo env GOLDEN_IMAGE=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/golden.log
+sudo env GOLDEN_IMAGE=1 GOLDEN_POWEROFF=1 PROVISION_USER=ubuntu bash provision.sh 2>&1 | tee /tmp/golden.log
+#    GOLDEN_POWEROFF=1 makes finalize power the box off as its LAST action, so
+#    you type NOTHING after the scrub. That matters: in a zsh with atuin, every
+#    command you run — a look around, `sudo poweroff` itself — is recorded at
+#    pre-exec, recreating ~/.local/share/atuin after finalize wiped it and baking
+#    your build session into the image (the Gen-4 first-boot audit caught exactly
+#    this). `unset HISTFILE` protects zsh's own history only. Leave it off only
+#    if you must inspect the box before capture — then power off from a shell
+#    that records nothing (bash), and re-run `verify S8` on a clone to be sure.
 
 # 3. Repo + log were under /tmp → finalize already removed them; nothing to clean.
 #    (If you cloned into $HOME or logged there instead, finalize does NOT touch
 #    $HOME — it WARNS about a leftover repo/*.log, but you must rm them yourself.)
-# 4. Power off and capture:
+# 4. Capture once the VM has stopped (with GOLDEN_POWEROFF=1 it stops itself):
 #      cloud (AWS/GCP/Azure) : create an image/AMI from the stopped instance
 #      Packer                : run provision.sh as the provisioner
 #      local VM              : export/snapshot the disk

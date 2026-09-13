@@ -131,7 +131,11 @@ cmd_dry() {
   dry_case "desktop" 0 INSTALL_DESKTOP=1 -- \
     "!GNOME dconf: skipped"
   dry_case "golden" 0 GOLDEN_IMAGE=1 -- \
-    "truncate /etc/machine-id" "copy " "!symlink "
+    "truncate /etc/machine-id" "copy " "!symlink " "!power off as the last action"
+  dry_case "golden+poweroff" 0 GOLDEN_IMAGE=1 GOLDEN_POWEROFF=1 -- \
+    "power off as the last action (GOLDEN_POWEROFF=1)"
+  dry_case "lowercase golden_poweroff typo warns" 0 golden_poweroff=1 GOLDEN_IMAGE=1 -- \
+    "did you mean 'GOLDEN_POWEROFF'" "!power off as the last action"
   dry_case "copy" 0 DOTFILES_COPY=1 -- \
     "(self-contained)" "finalize: skipped"
   dry_case "rootless" 0 DOCKER_ROOTLESS=1 -- \

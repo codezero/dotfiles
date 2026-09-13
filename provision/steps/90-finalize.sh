@@ -46,6 +46,7 @@ if dry; then
   would "scan $TARGET_HOME + /root for a leftover repo clone / *.log and WARN (never delete)"
   would "LAST: truncate /var/log/* + journal, rm shell history, clear /tmp & /var/tmp (incl. hidden)"
   would "verify (STRICT): machine-id empty, no host keys, no cred dirs / private keys remain — else die"
+  [ "${GOLDEN_POWEROFF:-0}" = 1 ] && would "power off as the last action (GOLDEN_POWEROFF=1) — nothing typed on the box after the scrub"
   exit 0
 fi
 
@@ -182,4 +183,17 @@ if strict; then
     fi
   done
   [ "${#probs[@]}" -eq 0 ] || die "finalize verification FAILED — image not clean: ${probs[*]}"
+fi
+
+# GOLDEN_POWEROFF=1: power off as finalize's OWN last action, so nothing is
+# typed on the build box after the scrub. Anything typed in an interactive zsh
+# after this point is recorded by atuin at pre-exec — the `sudo poweroff`
+# itself included — which recreates ~/.local/share/atuin AFTER finalize wiped
+# it and bakes the build session's commands into the image (Gen-4, 2026-09-13:
+# the first-boot audit flagged it). `unset HISTFILE` only ever covered zsh's
+# own history. Opt-in, because an operator may want to inspect before capture;
+# the runbook recommends it.
+if [ "${GOLDEN_POWEROFF:-0}" = 1 ]; then
+  log "GOLDEN_POWEROFF=1 — powering off now; capture the image once the VM is stopped."
+  sync; $SUDO systemctl poweroff
 fi
