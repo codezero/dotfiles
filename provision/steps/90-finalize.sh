@@ -82,10 +82,15 @@ for home in "$TARGET_HOME" /root; do
   # clone (see cloud_init_reinjects) — not merely when it's installed — so a local
   # / disabled-cloud-init image isn't locked out. When kept, SAY SO loudly: it is
   # a deliberate lockout-safety trade-off against a fully key-free image.
+  # An EMPTY authorized_keys can lock nobody in or out: drop it silently rather
+  # than warn about keeping nothing (the Gen-4 build warned twice, both files
+  # 0 bytes, 2026-09-13). Warn only when there are actual keys being kept.
   if cloud_init_reinjects; then
     $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
-  elif $SUDO test -f "$home/.ssh/authorized_keys" 2>/dev/null; then
+  elif $SUDO test -s "$home/.ssh/authorized_keys" 2>/dev/null; then
     warn "KEEPING $home/.ssh/authorized_keys (cloud-init won't re-inject keys — removing it would lock the image out); rm it manually if this image must be key-free"
+  else
+    $SUDO rm -f "$home"/.ssh/authorized_keys 2>/dev/null || true
   fi
 done
 
