@@ -16,8 +16,10 @@ LOCK_FILE="$TARGET_HOME/versions.lock"
 TOOL="$PROVISION_DIR/versions-lock.sh"
 # What this run was asked for — recorded in the lock's header, so a lock read
 # months later still says which recipe produced it.
+# DOTFILES_COPY is recorded as its EFFECTIVE value: GOLDEN_IMAGE implies it.
+COPY_EFF="${DOTFILES_COPY:-0}"; [ "${GOLDEN_IMAGE:-0}" = 1 ] && COPY_EFF=1
 FLAGS="PROFILE=$PROFILE HEADLESS=${HEADLESS:-0} INSTALL_DESKTOP=${INSTALL_DESKTOP:-0} \
-GOLDEN_IMAGE=${GOLDEN_IMAGE:-0} DOTFILES_COPY=${DOTFILES_COPY:-0} \
+GOLDEN_IMAGE=${GOLDEN_IMAGE:-0} DOTFILES_COPY=$COPY_EFF \
 DOCKER_ROOTLESS=${DOCKER_ROOTLESS:-0} APT_UPGRADE=${APT_UPGRADE:-0}"
 
 log "versions.lock: recording what landed -> $LOCK_FILE"

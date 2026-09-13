@@ -49,8 +49,14 @@ if dry; then
   exit 0
 fi
 
-$SUDO apt-get autoremove -y >/dev/null 2>&1 || true
-$SUDO apt-get clean 2>/dev/null || true
+# Through the apt_get WRAPPER, not bare apt-get: the wrapper is what makes apt
+# non-interactive (DEBIAN_FRONTEND, NEEDRESTART_MODE=a, stdin detached). Bare,
+# an autoremove that drops an old kernel — exactly what APT_UPGRADE=1 sets up —
+# let needrestart draw its "restart services?" dialog into /dev/null and wait
+# on the tty forever. Found live in the Gen-4 build (2026-09-13): finalize
+# "hung". Gen-3 never removed a kernel, so it never asked.
+apt_get autoremove -y >/dev/null 2>&1 || true
+apt_get clean >/dev/null 2>&1 || true
 $SUDO rm -rf /var/lib/apt/lists/* 2>/dev/null || true
 
 # Cargo download cache (~/.cargo/registry/{cache,src}) — re-downloadable crate

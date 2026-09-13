@@ -338,6 +338,18 @@ cmd_dry() {
     if grep -qE '\bgit clone\b' <<<"$jcode"; then bad "supply chain — raw git clone in $jf (use clone_pinned)"; jhit=1; fi
   done
   [ "$jhit" = 0 ] && ok "supply chain — no curl|sh pipeline and no raw git clone in any install path"
+  # The helper contract, enforced: apt only through apt_get/apt_install. A bare
+  # apt-get is not just dry-run-blind — it is INTERACTIVE. finalize's bare
+  # `apt-get autoremove` hung the Gen-4 build on needrestart's dialog once the
+  # upgrade had a kernel to remove (2026-09-13).
+  local af ahit=0
+  for af in provision/steps/*.sh; do
+    # Command position only: line start or after && || ; | { ( — optionally
+    # prefixed by $SUDO/sudo. Not the word inside a soft_fail/would message.
+    if grep -vE '^[[:space:]]*#' "$HERE/$af" | grep -qE '(^|&&|\|\||;|\||\{|\()[[:space:]]*(\$SUDO |sudo )?apt-get[[:space:]]'; then
+      bad "helper contract — bare apt-get in $af (use apt_get / apt_install)"; ahit=1; fi
+  done
+  [ "$ahit" = 0 ] && ok "helper contract — no bare apt-get in any step"
   # rustup's binary dispatches on its own filename (rustup-init = installer; any
   # other name = toolchain proxy that does nothing). A mktemp name verified fine
   # and silently did nothing in the J rehearsal — so the target must literally
