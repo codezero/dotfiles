@@ -376,6 +376,21 @@ cmd_dry() {
       ok ".gitconfig $gk — falls back cleanly with delta absent"
     else bad ".gitconfig $gk — fails when delta is absent"; fi
   done
+  # Same two failure modes for the gh credential helper (added 2026-09-13 after
+  # the Gen-3 clone had gh logged in and still could not push): the value must
+  # survive git-config's `;`-comment rule, and with gh ABSENT it must stay
+  # silent so git falls through to its own prompt instead of erroring.
+  local ch
+  ch="$(git config --file "$HERE/.gitconfig" --get 'credential.https://github.com.helper' 2>/dev/null)"
+  if [ "${ch%\}; f}" != "$ch" ] && grep -q 'command -v gh' <<<"$ch"; then
+    ok ".gitconfig credential helper — intact and guarded on gh"
+  else bad ".gitconfig credential helper — truncated, unguarded or missing: '$ch'"; fi
+  if out="$(printf 'protocol=https\nhost=github.com\n' | PATH=/usr/bin:/bin GIT_TERMINAL_PROMPT=0 \
+             git -c "credential.https://github.com.helper=$ch" credential fill 2>&1)"; then
+    bad ".gitconfig credential helper — produced credentials with gh absent?!"
+  elif grep -q 'Syntax error\|not found' <<<"$out"; then
+    bad ".gitconfig credential helper — errors when gh is absent: $out"
+  else ok ".gitconfig credential helper — silent with gh absent (git falls through to its prompt)"; fi
 
   # ── the "no non-root user" edge ────────────────────────────────────────────
   # The auto-detect chain's last rung is a GUESS ("ubuntu") and was never

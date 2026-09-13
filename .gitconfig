@@ -26,3 +26,12 @@
 	# side-by-side needs width — it is cramped under ~120 cols. Flip it per
 	# command without editing this file:  git -c delta.side-by-side=false diff
 	side-by-side = true
+
+# Credentials: hand https://github.com off to gh when it is installed (and
+# logged in — the carried ~/.config/gh); silent no-op otherwise, so a box
+# without gh gets git's normal prompt instead of a "helper not found" error.
+# Same guard pattern as the delta pager above. Found on the Gen-3 clone
+# (2026-09-13): gh was logged in, yet `git push` had no helper to ask.
+[credential "https://github.com"]
+	helper = "!f() { command -v gh >/dev/null 2>&1 && exec gh auth git-credential \"$@\"; }; f"
+
