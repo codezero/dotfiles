@@ -27,7 +27,7 @@ provision/
     ├── 30-brew.sh            # Homebrew + `brew bundle`  (runs as the user)
     ├── 35-rust.sh            # rustup + stable toolchain (as user)
     ├── 36-alacritty.sh       # Alacritty via `cargo install` + theme clone + desktop integration + completions + MesloLGS NF font
-    ├── 37-claude-code.sh     # Claude Code CLI (native installer, stable; as user)
+    ├── 37-claude-code.sh     # Claude Code CLI (native installer, latest; as user)
     ├── 50-flatpak.sh         # flatpak + Flathub remote
     ├── 55-gnome-dconf.sh     # GNOME dconf settings (only with INSTALL_DESKTOP=1)
     ├── 60-shell.sh           # zsh + oh-my-zsh + p10k + dotfile symlinks/copies (as user)
@@ -245,7 +245,7 @@ purpose:
 |---|---|---|
 | Homebrew installer | `curl …/HEAD/install.sh \| bash` | raw URL at a pinned **commit**, file verified against a pinned sha256, then run |
 | `rustup-init` | `curl https://sh.rustup.rs \| sh` — no checksum anywhere | the **versioned** binary from `static.rust-lang.org/rustup/archive/<ver>`, verified against a hash recorded **in the repo**; saved under its own name (rustup dispatches on argv[0]) |
-| Claude bootstrap | `curl https://claude.ai/install.sh \| bash` | the 302 target `bootstrap.sh` verified against a pinned sha256, then `bash … stable` |
+| Claude bootstrap | `curl https://claude.ai/install.sh \| bash` | the 302 target `bootstrap.sh` verified against a pinned sha256, then `bash … latest` |
 | oh-my-zsh | its installer script from `master`, cloning `master` | `clone_pinned` at `OMZ_SHA` — shallow, detached; the installer's five `git config` lines reproduced so `omz` works |
 | powerlevel10k, alacritty-theme | `git clone --depth=1` at HEAD | `clone_pinned` at their SHAs |
 
