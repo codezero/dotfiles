@@ -21,7 +21,7 @@ brew "ktop"        # top-like TUI for a k8s cluster (needs metrics-server); ligh
 brew "lazydocker"
 brew "lazygit"
 brew "neovim"
-brew "mise"        # runtimes (node/python/go/ruby…) via .tool-versions; replaced nvm 2026-09-11 — .zshrc guards on it
+brew "mise"        # runtimes (node/python/go/ruby…); global source ~/.config/mise/config.toml; replaced nvm 2026-09-11 — .zshrc guards on it
 brew "ripgrep"
 brew "shellcheck"
 brew "socat"

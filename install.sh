@@ -113,8 +113,9 @@ echo "==> [5/7] CLI tools via brew (mise, eza, bat, zoxide, jq)"
 # Installed via brew on purpose: brew's 'bat' binary is named `bat`, so the
 # `alias cat="bat"` in .zshrc works. Ubuntu's apt 'bat' is named `batcat`.
 # jq is required by the Claude Code statusline script symlinked below.
-# mise manages runtimes (node/python/go…) from .tool-versions; it replaced nvm
-# 2026-09-11 — one tool instead of one per language, built-in core plugins.
+# mise manages runtimes (node/python/go…): `mise use -g` writes
+# ~/.config/mise/config.toml, a project's mise.toml layers on top. It replaced
+# nvm 2026-09-11 — one tool instead of one per language, built-in core plugins.
 brew install mise eza bat zoxide jq
 
 echo "==> [6/7] Install dotfiles (+ Alacritty theme) into \$HOME ($([ "$DOTFILES_COPY" = 1 ] && echo copy || echo symlink) mode)"
@@ -215,8 +216,8 @@ cat <<'EOF'
 
 Notes:
   - .zshrc loads oh-my-zsh plugins for tools this lightweight bootstrap does
-    NOT install (golang, httpie, kubectl, rust, docker, docker-compose, jj,
-    bun). Those plugins only add completions/aliases and stay quiet when the
+    NOT install (golang, httpie, rust, docker, docker-compose, jj).
+    Those plugins only add completions/aliases and stay quiet when the
     binary is absent — verified on a fresh box. Install what you actually use
     (`brew install jj`), or trim the plugins=() line in .zshrc.
     For the full set, use provision/provision.sh instead.

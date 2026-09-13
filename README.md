@@ -57,10 +57,10 @@ running, refusing on mismatch. See
 
 | Path | Purpose |
 |------|---------|
-| `.zshrc` | Zsh config: oh-my-zsh, plugins, aliases, brew/mise/zoxide/atuin |
+| `.zshrc` | Zsh config: oh-my-zsh, plugins, aliases, `$EDITOR`, brew/mise/zoxide/fzf/atuin/bat (each `command -v`-guarded) |
 | `.p10k.zsh` | Powerlevel10k prompt (from `p10k configure`) |
-| `.gitconfig` | Git identity — **set your real name/email** |
-| `.config/`, `.claude/` | Ported app configs symlinked into `$HOME`: Alacritty (`alacritty.toml` + cloned theme repo), kitty (`kitty.conf` — the same font/geometry/cursor/clipboard rules as Alacritty, plus a **vendored** Catppuccin Mocha in `themes/`), Claude Code (`settings.json`, `statusline-command.sh`) |
+| `.gitconfig` | Git identity — **set your real name/email** — plus modern defaults (`pull.rebase`, `zdiff3`, `rerere`, `autoSetupRemote`…), the guarded delta pager and the global-ignore hook |
+| `.config/`, `.claude/` | Ported app configs symlinked into `$HOME`: Alacritty (`alacritty.toml` + cloned theme repo), kitty (`kitty.conf` — the same font/geometry/cursor/clipboard rules as Alacritty, plus a **vendored** Catppuccin Mocha in `themes/`), git's global ignore (`git/ignore`), atuin, lazygit, bat, Claude Code (`settings.json`, `statusline-command.sh`). Each is inert without its tool, so the set is the same on a lean box |
 | `dotfiles.list` | Manifest of the files installed into `$HOME` — single source of truth shared by `install.sh` and provision step 60 |
 | `.gitignore` | Keeps secrets/credentials out of the repo |
 | `install.sh` | Lightweight bootstrap: shell + dotfiles only |
@@ -117,7 +117,7 @@ the terminal, and the run looks like a hang.
 Installs zsh + tmux + oh-my-zsh + Powerlevel10k + the core brew CLI tools, then installs
 the dotfiles listed in `dotfiles.list` into `$HOME` — `.zshrc`, `.p10k.zsh`,
 `.gitconfig`, `.tmux.conf`, `.config/alacritty/alacritty.toml` (+ theme clone),
-`.config/kitty/{kitty.conf,themes/catppuccin-mocha.conf}`, `.config/nvim/` (LazyVim) and the tracked `.claude/` configs — symlinked by
+`.config/kitty/{kitty.conf,themes/catppuccin-mocha.conf}`, `.config/{git/ignore,atuin/config.toml,lazygit/config.yml,bat/config}`, `.config/nvim/` (LazyVim) and the tracked `.claude/` configs — symlinked by
 default (`--copy` to copy instead), plus the MesloLGS NF Nerd Font. Existing
 files are backed up. Idempotent.
 

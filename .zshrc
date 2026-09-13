@@ -5,9 +5,6 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
-
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -17,101 +14,20 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
-# Set list of themes to pick from when loading at random
-# Setting this variable when ZSH_THEME=random will cause zsh to load
-# a theme from this variable instead of looking in $ZSH/themes/
-# If set to an empty array, this variable will have no effect.
-# ZSH_THEME_RANDOM_CANDIDATES=( "robbyrussell" "agnoster" )
-
-# Uncomment the following line to use case-sensitive completion.
-# CASE_SENSITIVE="true"
-
-# Uncomment the following line to use hyphen-insensitive completion.
-# Case-sensitive completion must be off. _ and - will be interchangeable.
-# HYPHEN_INSENSITIVE="true"
-
-# Uncomment one of the following lines to change the auto-update behavior
-# zstyle ':omz:update' mode disabled  # disable automatic updates
-# zstyle ':omz:update' mode auto      # update automatically without asking
 # oh-my-zsh is a PINNED checkout (provision/pins.sh OMZ_SHA): `omz update` would
 # move it off the pin, which versions.lock and `verify` then report. Remind,
 # never act; the pin is bumped in the repo instead (TODO J, 2026-09-13).
 zstyle ':omz:update' mode reminder
 
-# Uncomment the following line to change how often to auto-update (in days).
-# zstyle ':omz:update' frequency 13
-
-# Uncomment the following line if pasting URLs and other text is messed up.
-# DISABLE_MAGIC_FUNCTIONS="true"
-
-# Uncomment the following line to disable colors in ls.
-# DISABLE_LS_COLORS="true"
-
-# Uncomment the following line to disable auto-setting terminal title.
-# DISABLE_AUTO_TITLE="true"
-
-# Uncomment the following line to enable command auto-correction.
-# ENABLE_CORRECTION="true"
-
-# Uncomment the following line to display red dots whilst waiting for completion.
-# You can also set it to another string to have that shown instead of the default red dots.
-# e.g. COMPLETION_WAITING_DOTS="%F{yellow}waiting...%f"
-# Caution: this setting can cause issues with multiline prompts in zsh < 5.7.1 (see #5765)
-# COMPLETION_WAITING_DOTS="true"
-
-# Uncomment the following line if you want to disable marking untracked files
-# under VCS as dirty. This makes repository status check for large repositories
-# much, much faster.
-# DISABLE_UNTRACKED_FILES_DIRTY="true"
-
-# Uncomment the following line if you want to change the command execution time
-# stamp shown in the history command output.
-# You can set one of the optional three formats:
-# "mm/dd/yyyy"|"dd.mm.yyyy"|"yyyy-mm-dd"
-# or set a custom format using the strftime function format specifications,
-# see 'man strftime' for details.
-# HIST_STAMPS="mm/dd/yyyy"
-
-# Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
-
-# Which plugins would you like to load?
-# Standard plugins can be found in $ZSH/plugins/
-# Custom plugins may be added to $ZSH_CUSTOM/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
-# Add wisely, as too many plugins slow down shell startup.
-plugins=(git golang httpie jj kubectl rust tmux alias-finder bun docker docker-compose)
+# Plugins only add completions/aliases; each stays quiet when its binary is
+# missing (verified on a fresh box), except tmux — install.sh installs tmux
+# for that reason. kubectl and bun were dropped 2026-09-13: no profile installs
+# either binary (re-add with the tool). Everything below the theme that oh-my-zsh's
+# template ships commented out was removed the same day; `omz` reads variables,
+# not comments — the template is at $ZSH/templates/zshrc.zsh-template.
+plugins=(git golang httpie jj rust tmux alias-finder docker docker-compose)
 
 source $ZSH/oh-my-zsh.sh
-
-# User configuration
-
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
-
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='nvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch $(uname -m)"
-
-# Set personal aliases, overriding those provided by Oh My Zsh libs,
-# plugins, and themes. Aliases can be placed here, though Oh My Zsh
-# users are encouraged to define aliases within a top-level file in
-# the $ZSH_CUSTOM folder, with .zsh extension. Examples:
-# - $ZSH_CUSTOM/aliases.zsh
-# - $ZSH_CUSTOM/macos.zsh
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -121,15 +37,40 @@ export CLAUDE_CODE_NO_FLICKER=1
 # Rust toolchain (rustup) — installed per-user under ~/.cargo (provision step 35).
 [ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
+# Editor: git/gh/jj/crontab/`sudo -e` fall back to nano when this is unset —
+# both were empty on the box (found on-box 2026-09-13). nvim is full-Brewfile
+# only, so fall through to vim/vi on a lean box. Sits AFTER brew shellenv:
+# nvim is a brew binary and is not on PATH before that line.
+for _e in nvim vim vi; do
+  command -v "$_e" >/dev/null && { export EDITOR="$_e" VISUAL="$_e"; break; }
+done; unset _e
+
 # Niceties — each guarded so a lean box (provision PROFILE=minimal installs
 # no bat/eza/zoxide/atuin) gets a clean shell instead of "command not found" noise.
 command -v eza    >/dev/null && alias ls="eza --icons=always"
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
-command -v bat    >/dev/null && alias cat="bat"
-# atuin takes Ctrl-R (full-screen fuzzy history search); --disable-up-arrow keeps
-# zsh's native up-arrow. Its DB lives in ~/.local/share/atuin — finalize scrubs it.
+# BAT_THEME rather than bat's config file: delta honours the same variable, so
+# `cat`, `git diff` and lazygit share the terminal palette. The alias never
+# pages; a direct `bat file` still does (paging stays auto in .config/bat/config).
+command -v bat    >/dev/null && { export BAT_THEME="Catppuccin Mocha"; alias cat="bat --paging=never"; }
+# fzf keybindings + completion: Ctrl-T (files), Alt-C (cd), `**<Tab>`. Sourced
+# BEFORE atuin so atuin keeps Ctrl-R (last binding wins). `--zsh` needs fzf
+# >= 0.48 — brew is current; the 2>/dev/null makes an older fzf a silent no-op.
+# fd-backed sources when fd is present: hidden files show, .git is skipped.
+if command -v fzf >/dev/null; then
+  eval "$(fzf --zsh 2>/dev/null)"
+  if command -v fd >/dev/null; then
+    export FZF_DEFAULT_COMMAND='fd --type f --hidden --strip-cwd-prefix --exclude .git'
+    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
+  fi
+fi
+# atuin takes Ctrl-R (inline fuzzy history search — .config/atuin/config.toml);
+# --disable-up-arrow keeps zsh's native up-arrow. Its DB lives in
+# ~/.local/share/atuin — finalize scrubs it.
 command -v atuin  >/dev/null && eval "$(atuin init zsh --disable-up-arrow)"
-# mise: runtimes (node/python/go…) per .tool-versions — `mise use -g node@lts`.
+# mise: runtimes (node/python/go…) — `mise use -g node@lts` writes the global
+# source, ~/.config/mise/config.toml; a project's own mise.toml layers on top.
 # Interactive activation only; for node in non-interactive shells put
 # ~/.local/share/mise/shims on PATH (see ~/PROVISION-NEXT-STEPS.md).
 command -v mise   >/dev/null && eval "$(mise activate zsh)"

@@ -489,6 +489,36 @@ cmd_dry() {
     [ -e "$HERE/$mf" ] || { bad "dotfiles.list names a path missing from the repo: $mf"; mmiss=1; }
   done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   [ "$mmiss" = 0 ] && ok "dotfiles.list — every entry exists in the repo ($(grep -cvE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list") entries)"
+  # The tracked dotfiles must PARSE with their own tools — a syntax slip in a
+  # file that ships to every box is the cheapest bug to catch here. zsh and git
+  # are always present; tmux is checked where it is installed (CI runners lack
+  # it). Added with the 2026-09-13 housekeeping pass (T1/T3/T5/T7/T11).
+  check "dotfiles — .zshrc parses (zsh -n)" zsh -n "$HERE/.zshrc"
+  check "dotfiles — .gitconfig parses (git config --list)" git config --file "$HERE/.gitconfig" --list
+  # tmux never fails on a bad config — `start-server -f bad.conf` exits 0 and
+  # hides the error behind a "config error" prompt at attach time, and
+  # `source-file` prints "invalid option: …" but still exits 0. The only honest
+  # signal is source-file's stderr, so assert it is EMPTY (mutation-checked
+  # with a bogus option).
+  if command -v tmux >/dev/null 2>&1; then
+    local tmo
+    tmo="$(command tmux -L smoke-dry -f /dev/null start-server \; source-file "$HERE/.tmux.conf" \; kill-server 2>&1)"
+    if [ -z "$tmo" ]; then ok "dotfiles — .tmux.conf sources with no errors (headless server)"
+    else bad "dotfiles — .tmux.conf errors: $tmo"; fi
+  else skip "dotfiles — .tmux.conf parse (tmux not installed here)"; fi
+  # The modern-defaults keys and the global ignore hook (2026-09-13). One
+  # representative from each concern: a behaviour key, the ignore file the
+  # manifest ships, and the delta feature lazygit's config selects by name.
+  local gd
+  for gd in pull.rebase=true core.excludesfile=~/.config/git/ignore delta.lazygit.side-by-side=false init.defaultbranch=main; do
+    if [ "$(git config --file "$HERE/.gitconfig" --get "${gd%%=*}" 2>/dev/null)" = "${gd#*=}" ]; then ok ".gitconfig ${gd%%=*} = ${gd#*=}"
+    else bad ".gitconfig ${gd%%=*} — expected ${gd#*=}, got '$(git config --file "$HERE/.gitconfig" --get "${gd%%=*}" 2>/dev/null)'"; fi
+  done
+  # The two zsh integrations must keep their order: fzf binds Ctrl-R too, and
+  # only because atuin's init runs LATER does atuin keep it (last binding wins).
+  if [ "$(grep -n 'fzf --zsh' "$HERE/.zshrc" | cut -d: -f1 | head -1)" -lt "$(grep -n 'atuin init zsh' "$HERE/.zshrc" | cut -d: -f1 | head -1)" ] 2>/dev/null; then
+    ok ".zshrc — fzf integration is sourced BEFORE atuin (atuin keeps Ctrl-R)"
+  else bad ".zshrc — fzf must be sourced before atuin, or fzf steals Ctrl-R"; fi
   # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
   # FULL Brewfile only (minimal drops the niceties; install.sh installs fewer
   # still). Two real failure modes, one of which bit during development:
