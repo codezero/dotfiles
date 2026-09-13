@@ -649,9 +649,15 @@ v_mode() {  # $1 = symlink|copy
   # repo (no drift); in COPY mode they diverge legitimately. Read a red here as
   # "home and repo differ", then judge the direction — it is not automatically
   # a provisioning failure.
+  # .claude/settings.json is installed from the repo but OWNED by Claude Code
+  # afterwards: it rewrites the file with runtime preferences (model,
+  # notification flags, autocompact, an expanded $HOME), so it drifts by
+  # design like .config/nvim — presence is asserted (v_core), content is not.
+  # Found on the adopted Gen-3 clone, 2026-09-13.
   local f bad_n=0
   while IFS= read -r f; do
     [ -f "$HERE/$f" ] || continue          # skip dirs + entries missing from the repo
+    [ "$f" = ".claude/settings.json" ] && { ok "dotfile $f — content owned by Claude Code after install, not compared"; continue; }
     cmp -s "$HERE/$f" "$HOME/$f" || { bad "content differs from repo: $f"; bad_n=$((bad_n+1)); }
   done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   [ "$bad_n" -eq 0 ] && ok "file dotfiles match the repo byte-for-byte"
@@ -713,7 +719,7 @@ v_rootless() {
 }
 
 v_golden_clone() {
-  hdr "verify: golden clone (booted from a captured image)"
+  hdr "verify: golden clone (a freshly booted clone — once adopted, audit with: verify copy full desktop)"
   check  "machine-id regenerated (non-empty)" test -s /etc/machine-id
   # Host keys only matter where sshd exists. finalize removes them
   # unconditionally; a desktop golden has no openssh-server (not in apt.list),
@@ -728,20 +734,26 @@ v_golden_clone() {
   eval "$(sed -n '/^CRED_PATHS=(/,/)/p' "$HERE/provision/steps/90-finalize.sh" \
           | sed 's/^CRED_PATHS=/cred_paths=/')"
   # A cred path that EXISTS on the clone is a leak only if it came from the
-  # build. Some are legitimately recreated at first login — gpg-agent's user
-  # units make ~/.gnupg, atuin's .zshrc init makes ~/.local/share/atuin — and
-  # both did, 27s after boot on the Gen-3 clone. The birth time (statx, ext4)
-  # separates the cases: born after this boot = regenerated, fine; born before
-  # = inherited from the image = finalize missed it. Unknown birth time is
-  # treated as a leak (conservative).
+  # image. Some are legitimately created afterwards — gpg-agent's user units
+  # make ~/.gnupg and atuin's init makes ~/.local/share/atuin at first login,
+  # and the owner restores real creds by hand once the clone is adopted. The
+  # birth time (statx, ext4) separates the cases, measured against the
+  # clone's FIRST boot: finalize empties /etc/machine-id and systemd writes
+  # the new id on first boot, so that file's mtime is the clone's birth and
+  # survives later reboots. (The first draft compared against the CURRENT
+  # boot — right on a fresh clone, wrong after the first reboot: every carried
+  # cred read as "inherited". Found on the adopted Gen-3 clone, 2026-09-13.)
+  # Unknown birth time is treated as a leak (conservative).
   if [ "${#cred_paths[@]}" -gt 0 ]; then
-    local p born boot; boot="$(awk '/^btime/{print $2}' /proc/stat)"
+    local p born birth
+    if [ -s /etc/machine-id ]; then birth="$(stat -c %Y /etc/machine-id)"
+    else birth="$(awk '/^btime/{print $2}' /proc/stat)"; fi
     for p in "${cred_paths[@]}"; do
       if [ ! -e "$HOME/$p" ]; then ok "cred path ABSENT: ~/$p"; continue; fi
       born="$(stat -c %W "$HOME/$p" 2>/dev/null || echo 0)"
-      if [ "${born:-0}" -gt "${boot:-0}" ] 2>/dev/null; then
-        ok "cred path regenerated after boot (+$((born-boot))s, not inherited): ~/$p"
-      else bad "cred path INHERITED from the image (born before this boot): ~/$p"; fi
+      if [ "${born:-0}" -gt "${birth:-0}" ] 2>/dev/null; then
+        ok "cred path created on this clone (+$((born-birth))s after first boot, not inherited): ~/$p"
+      else bad "cred path INHERITED from the image (born before this clone's first boot): ~/$p"; fi
     done
     # ~/.gnupg may be recreated, but it must never carry a private key.
     checkno "no private keys in ~/.gnupg" \
@@ -752,10 +764,12 @@ v_golden_clone() {
   checkno "no repo clone in /tmp" test -d /tmp/dotfiles
   # The image's own record vs the booted clone: zero drift proves the clone IS
   # what the build recorded, and that nothing upgraded brew/rustup behind our
-  # backs between capture and audit. (A clone provisioned before step 85
-  # existed has no lock — that is a skip, not a pass.)
+  # backs between capture and audit. A FIRST-BOOT property: once the box is
+  # adopted and upgraded, drift here is the owner's doing and expected — which
+  # is why the header says to audit an adopted box with `copy full desktop`.
+  # (A clone provisioned before step 85 existed has no lock — a skip, not a pass.)
   if [ -s "$HOME/versions.lock" ]; then
-    check "no drift vs the image's own versions.lock" \
+    check "no drift vs the image's own versions.lock (first-boot property)" \
       bash "$HERE/provision/versions-lock.sh" check "$HOME/versions.lock" --brief
   else skip "drift vs ~/versions.lock (no lock on this clone — provisioned before step 85)"; fi
 }
@@ -889,7 +903,10 @@ the tokens it expands to, and how they compose, are listed at the bottom.)
                     -> verify S6
  S7  golden         sudo env GOLDEN_IMAGE=1 PROVISION_USER=$USER bash provision/provision.sh
                     (clone+log under /tmp!)  -> on a BOOTED CLONE: verify S7
- S8  golden-desktop S7 + INSTALL_DESKTOP=1   -> on a booted clone: verify S8
+ S8  golden-desktop S7 + INSTALL_DESKTOP=1   -> on a FRESHLY booted clone: verify S8
+                    (first-boot audit: cred sweep + zero drift vs the image's
+                    lock. Once the clone is ADOPTED — creds restored, upgraded —
+                    audit it with `verify copy full desktop` instead.)
  S9  iterate-golden re-run S7/S8 ON a booted golden clone (MUST keep GOLDEN_IMAGE=1
                     or DOTFILES_COPY=1 — plain re-run would symlink over the copies)
                     [+ APT_UPGRADE=1 for a true bring-to-latest]   -> verify S9
@@ -982,7 +999,7 @@ The tokens are NOT peers — this is the part that was only ever in code comment
   MODE (exactly one, and every scenario has one)
     plain          dotfiles are symlinks into the repo
     copy           dotfiles are real files (DOTFILES_COPY / GOLDEN_IMAGE)
-    golden-clone   a booted clone: implies `copy`, adds the identity/credential
+    golden-clone   a FRESHLY booted clone: implies `copy`, adds the identity/credential
                    sweep. Don't pass `copy` as well — it's already in there.
   PROFILE (exactly one)
     full           asserts the full CLI set is PRESENT (bat/eza/zoxide/delta/atuin)
