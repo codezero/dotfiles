@@ -12,6 +12,8 @@ PKG_DIR="$PROVISION_DIR/packages"
 PINS="$PROVISION_DIR/pins.sh"     # the commits/hashes of code executed at install time (TODO J)
 # shellcheck source=pins.sh
 source "$PINS"
+# shellcheck source=boot-pkgs.sh
+source "$PROVISION_DIR/boot-pkgs.sh"   # is_boot_pkg: shared with versions-lock.sh
 STEPS_DIR="$PROVISION_DIR/steps"
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

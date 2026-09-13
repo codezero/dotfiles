@@ -11,10 +11,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 INSTALL_DESKTOP="${INSTALL_DESKTOP:-0}"
 
 # Always skip (boot/firmware, kernels, and third-party-repo packages).
+# The boot/kernel patterns live in ../boot-pkgs.sh (via lib.sh), shared with
+# versions-lock.sh so the lock's first-boot audit ignores exactly what this
+# step refuses to touch.
 is_denied() {
+  is_boot_pkg "$1" && return 0
   case "$1" in
-    efibootmgr|grub-*|shim-signed) return 0 ;;
-    linux-generic*|linux-image-*|linux-headers-*|linux-modules-*|linux-*-hwe-*|linux-hwe-*) return 0 ;;
     docker-ce|docker-ce-cli|docker-ce-rootless-extras|docker-buildx-plugin|docker-compose-plugin|containerd.io|uidmap) return 0 ;;
     codium|cursor) return 0 ;;
     bruno) return 0 ;;   # removed from the project; still skip if a re-export re-adds it

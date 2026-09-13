@@ -4,8 +4,11 @@
 # drift against a previous record. Never installs, never downgrades.
 #
 #   bash versions-lock.sh emit [-o FILE]      write the lock (stdout by default)
-#   bash versions-lock.sh check LOCK [--brief] compare this box to LOCK:
-#                                              exit 0 = no drift, 1 = drift, 2 = error
+#   bash versions-lock.sh check LOCK [--brief] [--ignore-boot]
+#                                     compare this box to LOCK: exit 0 = no
+#                                     drift, 1 = drift, 2 = error. --ignore-boot
+#                                     leaves out the running kernel and the
+#                                     kernel/bootloader packages (boot-pkgs.sh)
 #
 # Why a record and not a pin: every install source here floats by design
 # (brew, rustup, mise, Claude, kitty, flatpak, three git clones at HEAD), and
@@ -30,7 +33,9 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$HERE/packages"
 
-usage() { sed -n '5,8p' "$0" >&2; exit 2; }
+usage() { sed -n '5,11p' "$0" >&2; exit 2; }
+# shellcheck source=boot-pkgs.sh
+source "$HERE/boot-pkgs.sh"   # is_boot_pkg — the same list step 10 refuses to install
 
 # ── emit ────────────────────────────────────────────────────────────────────
 # Each source is a function that prints `kind<TAB>name<TAB>version` lines, or
@@ -185,9 +190,26 @@ cmd_emit() {
 }
 
 # ── check ───────────────────────────────────────────────────────────────────
+# Row filters for --ignore-boot (TSV on stdin): a boot row is `system/kernel`
+# or an `apt` row whose name is_boot_pkg.
+_is_boot_row() { { [ "$1" = system ] && [ "$2" = kernel ]; } || { [ "$1" = apt ] && is_boot_pkg "$2"; }; }
+_boot_rows()      { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row "$k" "$n" && printf '%s\t%s\t%s\n' "$k" "$n" "$v"; done; true; }
+_drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row "$k" "$n" || printf '%s\t%s\t%s\n' "$k" "$n" "$v"; done; true; }
+# --ignore-boot: `system/kernel` is `uname -r` at emit time — for a lock
+# written INSIDE a golden build that is the build box's kernel, and a clone
+# that boots a newer installed one is correct, not drifted. Likewise the
+# kernel/bootloader packages apt.list names: step 10 never installs them, and
+# unattended-upgrades bumps them minutes after a fresh boot. A first-boot audit
+# wants provisioning's drift, not Ubuntu's — everything else still counts.
 cmd_check() {
-  local lock="${1:-}" brief=0; shift || true
-  [ "${1:-}" = "--brief" ] && brief=1
+  local lock="${1:-}" brief=0 ignore_boot=0; shift || true
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --brief) brief=1 ;;
+      --ignore-boot) ignore_boot=1 ;;
+      *) usage ;;
+    esac; shift
+  done
   [ -f "$lock" ] || { echo "no such lock: '$lock'" >&2; exit 2; }
   # Global, not local: the EXIT trap fires after the function's locals are gone
   # (and `set -u` would then abort the cleanup itself).
@@ -196,6 +218,13 @@ cmd_check() {
   emit_body > "$now"
   # Compare by (kind, name). Both files are sorted TSV without headers here.
   local old; old="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u)"
+  local nb=0
+  if [ "$ignore_boot" = 1 ]; then
+    local cur
+    cur="$(_drop_boot_rows < "$now")"; printf '%s\n' "$cur" > "$now"
+    old="$(_drop_boot_rows <<<"$old")"
+    nb="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u | _boot_rows | grep -c .)"
+  fi
   local added removed changed
   added="$(join -t $'\t' -v 2 -j1 <(printf '%s\n' "$old" | awk -F'\t' '{print $1"/"$2"\t"$3}' | LC_ALL=C sort) \
                               <(awk -F'\t' '{print $1"/"$2"\t"$3}' "$now" | LC_ALL=C sort))"
@@ -207,10 +236,11 @@ cmd_check() {
   local na nr nc
   na="$(printf '%s' "$added"   | grep -c .)"; nr="$(printf '%s' "$removed" | grep -c .)"
   nc="$(printf '%s' "$changed" | grep -c .)"
+  local ign=""; [ "$ignore_boot" = 1 ] && ign=" ($nb boot rows ignored)"
   if [ "$na" = 0 ] && [ "$nr" = 0 ] && [ "$nc" = 0 ]; then
-    echo "no drift vs $lock ($(grep -vc '^#' "$lock") entries)"; return 0
+    echo "no drift vs $lock ($(grep -vc '^#' "$lock") entries)$ign"; return 0
   fi
-  echo "drift vs $lock: $nc changed, $na added, $nr removed"
+  echo "drift vs $lock: $nc changed, $na added, $nr removed$ign"
   if [ "$brief" = 0 ]; then
     [ -n "$changed" ] && printf '%s\n' "$changed" | awk -F'\t' '{printf "  changed  %-32s %s -> %s\n", $1, $2, $3}'
     [ -n "$added"   ] && printf '%s\n' "$added"   | awk -F'\t' '{printf "  added    %-32s %s\n", $1, $2}'

@@ -60,7 +60,7 @@ cmd_lint() {
       shellcheck -x --severity=warning --source-path="$HERE/provision" "$s"
   done
   for s in provision/provision.sh provision/lib.sh provision/inventory-export.sh \
-           provision/versions-lock.sh provision/pins.sh install.sh smoke-test.sh; do
+           provision/versions-lock.sh provision/pins.sh provision/boot-pkgs.sh install.sh smoke-test.sh; do
     [ -f "$HERE/$s" ] || { skip "$s (missing)"; continue; }
     check "$s" shellcheck -x --severity=warning --source-path="$HERE/provision" "$HERE/$s"
   done
@@ -326,6 +326,36 @@ cmd_dry() {
   bash "$vl" check "$vlt/does-not-exist" >/dev/null 2>&1; vrc=$?
   if [ "$vrc" = 2 ]; then ok "versions.lock — missing lock is exit 2 (error, not drift)"
   else bad "versions.lock — missing lock gave exit $vrc"; fi
+  # --ignore-boot: the running kernel and the kernel/bootloader apt rows are
+  # Ubuntu's, not provisioning's. A lock with a different kernel and a kernel
+  # meta this box lacks must be drift plainly and NO drift with the flag —
+  # and the flag must not blanket-ignore: a brew phantom stays drift.
+  sed -e 's/^\(system	kernel	\).*/\1x.y.z-mutated/' "$vlt/a.lock" > "$vlt/c.lock"
+  printf 'apt\tlinux-generic-hwe-24.04\t0.0-mutated\napt\tshim-signed\t0.0-mutated\n' >> "$vlt/c.lock"
+  bash "$vl" check "$vlt/c.lock" --brief >/dev/null 2>&1; vrc=$?
+  vout="$(bash "$vl" check "$vlt/c.lock" --brief --ignore-boot 2>&1)"; local vrc2=$?
+  if [ "$vrc" = 1 ] && [ "$vrc2" = 0 ] && grep -q 'boot rows ignored' <<<"$vout"; then
+    ok "versions.lock — check --ignore-boot: kernel + boot-package rows are not drift (plain: exit 1, flag: exit 0)"
+  else bad "versions.lock — --ignore-boot gave plain=$vrc flag=$vrc2: $vout"; fi
+  printf 'brew\tphantom\t0.0\n' >> "$vlt/c.lock"
+  bash "$vl" check "$vlt/c.lock" --brief --ignore-boot >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 1 ]; then ok "versions.lock — --ignore-boot ignores ONLY boot rows (a brew phantom is still drift)"
+  else bad "versions.lock — --ignore-boot swallowed a non-boot drift (exit $vrc)"; fi
+  bash "$vl" check "$vlt/a.lock" --bogus >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ]; then ok "versions.lock — unknown check option is exit 2"
+  else bad "versions.lock — unknown check option gave exit $vrc"; fi
+  # One owner for "boot package": step 10's deny list and the lock's --ignore-boot
+  # both source provision/boot-pkgs.sh, and the predicate says what it must.
+  if grep -q 'source "\$PROVISION_DIR/boot-pkgs.sh"' "$HERE/provision/lib.sh" \
+     && grep -q 'source "\$HERE/boot-pkgs.sh"' "$vl" \
+     && grep -q 'is_boot_pkg "\$1" && return 0' "$HERE/provision/steps/10-apt.sh"; then
+    ok "boot-pkgs.sh — sourced by lib.sh (step 10) and versions-lock.sh; is_denied delegates to it"
+  else bad "boot-pkgs.sh — step 10 and versions-lock.sh no longer share one boot-package definition"; fi
+  if ( source "$HERE/provision/boot-pkgs.sh"; is_boot_pkg linux-generic-hwe-24.04 && is_boot_pkg linux-image-7.0.0-31-generic \
+       && is_boot_pkg grub-efi-arm64-signed && is_boot_pkg shim-signed && is_boot_pkg efibootmgr \
+       && ! is_boot_pkg curl && ! is_boot_pkg util-linux && ! is_boot_pkg flatpak ); then
+    ok "boot-pkgs.sh — is_boot_pkg: kernel/grub/shim/efibootmgr yes; curl/util-linux/flatpak no"
+  else bad "boot-pkgs.sh — is_boot_pkg misclassifies"; fi
   # No PII: the lock must carry no username, hostname or home path.
   if grep -qE "$(id -un)|$(hostname)|$HOME" "$vlt/a.lock"; then bad "versions.lock — emit leaked a username/hostname/path"
   else ok "versions.lock — no username, hostname or home path in the lock"; fi
@@ -344,8 +374,9 @@ cmd_dry() {
   [ "$jhit" = 0 ] && ok "supply chain — no curl|sh pipeline and no raw git clone in any install path"
   # The helper contract, enforced: apt only through apt_get/apt_install. A bare
   # apt-get is not just dry-run-blind — it is INTERACTIVE. finalize's bare
-  # `apt-get autoremove` hung the Gen-4 build on needrestart's dialog once the
-  # upgrade had a kernel to remove (2026-09-13).
+  # `apt-get autoremove` hung the Gen-4 build on needrestart's dialog (stdin
+  # was /dev/null) once APT_UPGRADE=1 had left a newer kernel installed than
+  # the one running (2026-09-13).
   local af ahit=0
   for af in provision/steps/*.sh; do
     # Command position only: line start or after && || ; | { ( — optionally
@@ -861,9 +892,18 @@ v_golden_clone() {
   # adopted and upgraded, drift here is the owner's doing and expected — which
   # is why the header says to audit an adopted box with `copy full desktop`.
   # (A clone provisioned before step 85 existed has no lock — a skip, not a pass.)
+  # --ignore-boot: the lock's `system/kernel` is the BUILD box's `uname -r`
+  # (step 85 runs before any reboot), so a clone that boots a newer installed
+  # kernel is correct, not drifted — without the flag this check passed on Gen-4
+  # only BECAUSE the clone booted the stale kernel (2026-09-13). The kernel/
+  # bootloader apt rows go with it: step 10 never installs them and
+  # unattended-upgrades bumps them minutes after first boot. Everything
+  # provisioning owns still counts.
   if [ -s "$HOME/versions.lock" ]; then
-    check "no drift vs the image's own versions.lock (first-boot property)" \
-      bash "$HERE/provision/versions-lock.sh" check "$HOME/versions.lock" --brief
+    check "no drift vs the image's own versions.lock (first-boot property; boot rows ignored)" \
+      bash "$HERE/provision/versions-lock.sh" check "$HOME/versions.lock" --brief --ignore-boot
+    local lk; lk="$(awk -F'\t' '$1=="system" && $2=="kernel"{print $3}' "$HOME/versions.lock")"
+    printf '    running kernel %s; the lock recorded %s (the build box'"'"'s — informational)\n' "$(uname -r)" "${lk:-?}"
   else skip "drift vs ~/versions.lock (no lock on this clone — provisioned before step 85)"; fi
 }
 

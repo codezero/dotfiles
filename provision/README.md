@@ -212,7 +212,17 @@ record that makes the claim checkable is `versions.lock`:
   when, from which repo SHA, and with which flags.
 - **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
   clone boots with "what this image contains" on the box, and `verify` on a
-  clone asserts **zero drift** against it.
+  clone asserts **zero drift** against it — with `--ignore-boot`. Two rows are
+  Ubuntu's, not provisioning's: `system kernel` is `uname -r` *at emit time*,
+  which inside a golden build is the **build box's** running kernel (step 85
+  runs before any reboot), so a clone that boots a newer installed kernel is
+  correct, not drifted; and the kernel/bootloader packages `apt.list` names
+  (`linux-generic-*`, `grub-*`, `shim-signed`, `efibootmgr` — one list,
+  `boot-pkgs.sh`, shared with step 10, which never installs them) are bumped by
+  unattended-upgrades minutes after a fresh boot. Without the flag the Gen-4
+  clone passed only *because* it booted the stale kernel (2026-09-13). The rows
+  stay in the lock — a re-run's drift log still shows a kernel move — the
+  first-boot audit just doesn't count them.
 - **Every re-run says what moved.** Step 85 compares the previous lock before
   overwriting it, so a bring-to-latest (`APT_UPGRADE=1`, or just re-running
   `brew bundle`) is an observed act: `brew bat 0.26.0 -> 0.26.1`, not a silent
@@ -227,6 +237,7 @@ record that makes the claim checkable is `versions.lock`:
 bash provision/versions-lock.sh emit -o ~/versions.lock     # record this box
 bash provision/versions-lock.sh check ~/versions.lock        # drift since then: exit 0 none, 1 drift, 2 error
 bash provision/versions-lock.sh check provision/versions.lock # this box vs the latest golden
+bash provision/versions-lock.sh check ~/versions.lock --ignore-boot  # what verify runs on a clone
 ```
 
 What it never does: install, upgrade, or downgrade anything. A `PIN_VERSIONS`
