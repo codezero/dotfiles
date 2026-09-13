@@ -479,6 +479,16 @@ cmd_dry() {
   else bad "kitty — --assert-signer does not reference \$KITTY_FP"; fi
 
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
+  # Every dotfiles.list entry must EXIST in the repo. Step 60 and install.sh
+  # only `warn "missing … — skipping"` for a path that isn't there, so a typo'd
+  # manifest line would bake a golden without that file and nothing would go
+  # red until someone looked (found while adding the vendored kitty theme,
+  # 2026-09-13). The manifest is the single owner of the set — keep it honest.
+  local mf mmiss=0
+  while IFS= read -r mf; do
+    [ -e "$HERE/$mf" ] || { bad "dotfiles.list names a path missing from the repo: $mf"; mmiss=1; }
+  done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
+  [ "$mmiss" = 0 ] && ok "dotfiles.list — every entry exists in the repo ($(grep -cvE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list") entries)"
   # .gitconfig ships to EVERY box via dotfiles.list, but git-delta is in the
   # FULL Brewfile only (minimal drops the niceties; install.sh installs fewer
   # still). Two real failure modes, one of which bit during development:

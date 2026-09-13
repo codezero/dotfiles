@@ -16,6 +16,7 @@
 .tmux.conf
 .config/alacritty/alacritty.toml
 .config/kitty/kitty.conf
+.config/kitty/themes/catppuccin-mocha.conf
 .config/nvim
 .claude/settings.json
 .claude/statusline-command.sh
