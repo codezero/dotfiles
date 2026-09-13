@@ -33,7 +33,10 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Uncomment one of the following lines to change the auto-update behavior
 # zstyle ':omz:update' mode disabled  # disable automatic updates
 # zstyle ':omz:update' mode auto      # update automatically without asking
-# zstyle ':omz:update' mode reminder  # just remind me to update when it's time
+# oh-my-zsh is a PINNED checkout (provision/pins.sh OMZ_SHA): `omz update` would
+# move it off the pin, which versions.lock and `verify` then report. Remind,
+# never act; the pin is bumped in the repo instead (TODO J, 2026-09-13).
+zstyle ':omz:update' mode reminder
 
 # Uncomment the following line to change how often to auto-update (in days).
 # zstyle ':omz:update' frequency 13

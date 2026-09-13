@@ -47,6 +47,11 @@ what it installed instead: `~/versions.lock` on the box, and
 `provision/versions.lock` in the repo for the latest golden. Re-runs print what
 moved; a clone is audited for zero drift against its image's lock. See
 [**Versions — recorded, not pinned**](provision/README.md#versions--recorded-not-pinned).
+What *is* pinned is every script and clone that **executes** during install —
+Homebrew's installer, `rustup-init`, Claude's bootstrap, oh-my-zsh, powerlevel10k,
+the Alacritty themes — by commit or sha256 in `provision/pins.sh`, verified before
+running, refusing on mismatch. See
+[**Supply chain**](provision/README.md#supply-chain--what-is-pinned-what-is-verified-what-floats).
 
 ## What's in here
 

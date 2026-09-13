@@ -6,22 +6,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 
 log "Shell setup for '$TARGET_USER'"
 
-# oh-my-zsh (unattended; don't let it run zsh or overwrite our .zshrc).
-# Gate on the SENTINEL FILE, not the directory: an interrupted install leaves a
-# partial ~/.oh-my-zsh that a dir-only check would skip forever. (The installer
-# refuses to run over an existing dir, so a partial install surfaces as a loud
-# failure here instead of a silently broken shell — remove the dir and re-run.)
-as_user 'test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" || \
-  RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended' \
-  || soft_fail "oh-my-zsh install failed"
+# oh-my-zsh: a PINNED clone (pins.sh OMZ_SHA) instead of its installer script
+# from master (TODO J). With --unattended KEEP_ZSHRC=yes RUNZSH=no that script
+# was a clone plus five git-config lines, which clone_pinned reproduces; our
+# .zshrc is never touched and chsh is ours below. Gate on the SENTINEL FILE,
+# not the directory: an interrupted clone leaves a partial ~/.oh-my-zsh that a
+# dir-only check would skip forever; clone_pinned replaces the dir wholesale.
+as_user "test -f \"\$HOME/.oh-my-zsh/oh-my-zsh.sh\" || \
+  bash '$PINS' clone_pinned '$OMZ_URL' '$OMZ_SHA' \"\$HOME/.oh-my-zsh\"" \
+  || soft_fail "oh-my-zsh clone failed (see pins.sh)"
 as_user 'test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"' \
   || soft_fail "oh-my-zsh incomplete: ~/.oh-my-zsh/oh-my-zsh.sh missing after install"
 
 # Powerlevel10k theme (same sentinel-file pattern).
-as_user 'ZC="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"; \
-  test -f "$ZC/themes/powerlevel10k/powerlevel10k.zsh-theme" || \
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k "$ZC/themes/powerlevel10k"' \
-  || soft_fail "powerlevel10k clone failed"
+as_user "ZC=\"\${ZSH_CUSTOM:-\$HOME/.oh-my-zsh/custom}\"; \
+  test -f \"\$ZC/themes/powerlevel10k/powerlevel10k.zsh-theme\" || \
+  bash '$PINS' clone_pinned '$P10K_URL' '$P10K_SHA' \"\$ZC/themes/powerlevel10k\"" \
+  || soft_fail "powerlevel10k clone failed (see pins.sh)"
 as_user 'test -f "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k/powerlevel10k.zsh-theme"' \
   || soft_fail "powerlevel10k incomplete: powerlevel10k.zsh-theme missing after install"
 

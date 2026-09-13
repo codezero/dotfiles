@@ -24,6 +24,8 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# shellcheck source=provision/pins.sh
+source "$HERE/provision/pins.sh"   # pin values for the v_core checkout assertions
 PASS=0; FAIL=0; SKIP=0
 ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; PASS=$((PASS+1)); }
 bad()  { printf '  \033[1;31m✗\033[0m %s\n' "$*"; FAIL=$((FAIL+1)); }
@@ -58,7 +60,7 @@ cmd_lint() {
       shellcheck -x --severity=warning --source-path="$HERE/provision" "$s"
   done
   for s in provision/provision.sh provision/lib.sh provision/inventory-export.sh \
-           provision/versions-lock.sh install.sh smoke-test.sh; do
+           provision/versions-lock.sh provision/pins.sh install.sh smoke-test.sh; do
     [ -f "$HERE/$s" ] || { skip "$s (missing)"; continue; }
     check "$s" shellcheck -x --severity=warning --source-path="$HERE/provision" "$HERE/$s"
   done
@@ -122,7 +124,10 @@ cmd_dry() {
     "verify the OpenPGP signature against pinned fingerprint 3CE1780F78DD88DF45194FD706BC317B515ACE7C" \
     "finalize: skipped" "rootless Docker: skipped" "GNOME dconf: skipped" \
     "step: 80-next-steps.sh" "symlink " "!PROFILE=minimal —" \
-    "step: 85-versions-lock.sh" "versions-lock.sh emit -o" "[flags: PROFILE=full"
+    "step: 85-versions-lock.sh" "versions-lock.sh emit -o" "[flags: PROFILE=full" \
+    "installer pinned to Homebrew/install@" "rustup/archive/" "fetch_pinned 'https://downloads.claude.ai/claude-code-releases/bootstrap.sh'" \
+    "clone_pinned 'https://github.com/ohmyzsh/ohmyzsh'" "clone_pinned 'https://github.com/romkatv/powerlevel10k'" \
+    "clone_pinned 'https://github.com/alacritty/alacritty-theme'"
   dry_case "desktop" 0 INSTALL_DESKTOP=1 -- \
     "!GNOME dconf: skipped"
   dry_case "golden" 0 GOLDEN_IMAGE=1 -- \
@@ -322,6 +327,65 @@ cmd_dry() {
   else ok "versions.lock — no username, hostname or home path in the lock"; fi
   rm -rf "$vlt"
 
+  # ── supply chain (TODO J): nothing executes from a moving branch ──────────
+  # The assertion that keeps J true: no `curl … | sh|bash` pipeline and no raw
+  # `git clone` anywhere code runs during provisioning. Comment-stripped, so a
+  # prose mention (like the ones in pins.sh's header) cannot satisfy or trip it.
+  local jf jcode jhit=0
+  for jf in provision/steps/*.sh provision/lib.sh provision/pins.sh install.sh; do
+    jcode="$(grep -vE '^[[:space:]]*#' "$HERE/$jf")"
+    if grep -qE 'curl[^|#]*\|[[:space:]]*(sh|bash)\b' <<<"$jcode"; then bad "supply chain — curl|sh pipeline in $jf"; jhit=1; fi
+    if grep -qE '\bgit clone\b' <<<"$jcode"; then bad "supply chain — raw git clone in $jf (use clone_pinned)"; jhit=1; fi
+  done
+  [ "$jhit" = 0 ] && ok "supply chain — no curl|sh pipeline and no raw git clone in any install path"
+  # rustup's binary dispatches on its own filename (rustup-init = installer; any
+  # other name = toolchain proxy that does nothing). A mktemp name verified fine
+  # and silently did nothing in the J rehearsal — so the target must literally
+  # end in /rustup-init.
+  if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/35-rust.sh" | grep -q 'fetch_pinned .*/rustup-init\\"'; then
+    ok "step 35 — rustup-init is downloaded under its own name (argv[0] dispatch)"
+  else bad "step 35 — rustup-init download target is not named rustup-init"; fi
+  # Every pin has the shape it claims: 40-hex commits, 64-hex sha256.
+  local pk pv
+  while IFS='=' read -r pk pv; do
+    pv="${pv%%[[:space:]]*}"; pv="${pv%%#*}"
+    case "$pk" in
+      *_SHA|*_COMMIT) [[ "$pv" =~ ^[0-9a-f]{40}$ ]] && ok "pin $pk is a 40-hex commit" || bad "pin $pk is not a 40-hex commit: '$pv'" ;;
+      *_SHA256*)      [[ "$pv" =~ ^[0-9a-f]{64}$ ]] && ok "pin $pk is a sha256" || bad "pin $pk is not a sha256: '$pv'" ;;
+    esac
+  done < <(grep -E '^[A-Za-z0-9_]+=' "$HERE/provision/pins.sh")
+  # The helpers, functionally and without network: a local bare repo with two
+  # commits for clone_pinned, a file:// URL for fetch_pinned. Both the happy
+  # path and the refusal are asserted — a verifier that cannot fail is décor.
+  local jt jsha1 jsha2 jout
+  jt="$(mktemp -d)"
+  git -C "$jt" init -q -b master src && ( cd "$jt/src" && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m one && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m two )
+  git -C "$jt/src" config uploadpack.allowReachableSHA1InWant true   # GitHub allows this; a local repo must opt in
+  jsha1="$(git -C "$jt/src" rev-parse HEAD~1)"; jsha2="$(git -C "$jt/src" rev-parse HEAD)"
+  if bash "$HERE/provision/pins.sh" clone_pinned "$jt/src" "$jsha1" "$jt/dst" >/dev/null 2>&1 \
+     && [ "$(git -C "$jt/dst" rev-parse HEAD)" = "$jsha1" ] && [ "$(git -C "$jt/dst" rev-list --count HEAD)" = 1 ]; then
+    ok "clone_pinned — checks out exactly the pinned commit, shallow, detached (not $jsha2)"
+  else bad "clone_pinned — did not land on the pinned commit"; fi
+  if bash "$HERE/provision/pins.sh" clone_pinned "$jt/src" "0000000000000000000000000000000000000000" "$jt/dst2" >/dev/null 2>&1; then
+    bad "clone_pinned — accepted an unreachable commit"
+  else ok "clone_pinned — refuses an unreachable commit"; fi
+  if bash "$HERE/provision/pins.sh" clone_pinned "$jt/src" "not-a-sha" "$jt/dst3" >/dev/null 2>&1; then
+    bad "clone_pinned — accepted a malformed pin"
+  else ok "clone_pinned — refuses a malformed pin"; fi
+  printf 'echo hi\n' > "$jt/script.sh"
+  local jgood; jgood="$(sha256sum "$jt/script.sh" | cut -d' ' -f1)"
+  if PINS_TEST_ALLOW_FILE=1 bash "$HERE/provision/pins.sh" fetch_pinned "file://$jt/script.sh" "$jgood" "$jt/out1" >/dev/null 2>&1 \
+     && cmp -s "$jt/script.sh" "$jt/out1"; then ok "fetch_pinned — delivers a file whose sha256 matches the pin"
+  else bad "fetch_pinned — failed on a correct pin"; fi
+  jout="$(PINS_TEST_ALLOW_FILE=1 bash "$HERE/provision/pins.sh" fetch_pinned "file://$jt/script.sh" "$(printf '0%.0s' {1..64})" "$jt/out2" 2>&1)"; local jrc=$?
+  if [ "$jrc" != 0 ] && [ ! -e "$jt/out2" ] && grep -q 'REFUSING' <<<"$jout" && grep -q 're-pin' <<<"$jout"; then
+    ok "fetch_pinned — refuses a hash mismatch, removes the file, says how to re-pin"
+  else bad "fetch_pinned — mismatch handling wrong (rc=$jrc): $jout"; fi
+  if bash "$HERE/provision/pins.sh" fetch_pinned "file://$jt/script.sh" "$jgood" "$jt/out3" >/dev/null 2>&1; then
+    bad "fetch_pinned — accepted a non-https URL outside the test hook"
+  else ok "fetch_pinned — https only (file:// refused without the test hook)"; fi
+  rm -rf "$jt"
+
   # ── kitty on an arch upstream does not build for ───────────────────────────
   # Must WARN and exit 0, never soft_fail: under STRICT a soft_fail would abort
   # a whole golden build over something the operator cannot fix. Untestable
@@ -478,6 +542,19 @@ v_core() {
     bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
   check "oh-my-zsh present"        test -d "$HOME/.oh-my-zsh"
   check "p10k theme present"       test -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
+  # The pinned checkouts are AT their pins (pins.sh). A box whose omz/p10k/theme
+  # moved — `omz update`, a stray `git pull` — is red here: that is what a pin
+  # means. versions.lock records the actual SHA; a bump shows as drift once.
+  local pd pv
+  while IFS=$'\t' read -r pd pv; do
+    [ -d "$HOME/$pd/.git" ] || { skip "pinned checkout $pd (not present)"; continue; }
+    if [ "$(git -C "$HOME/$pd" rev-parse HEAD 2>/dev/null)" = "$pv" ]; then ok "pinned checkout at its pin: $pd @ ${pv:0:12}"
+    else bad "pinned checkout DRIFTED from pins.sh: $pd is at $(git -C "$HOME/$pd" rev-parse --short=12 HEAD 2>/dev/null), pin ${pv:0:12}"; fi
+  done <<EOF
+.oh-my-zsh	$OMZ_SHA
+.oh-my-zsh/custom/themes/powerlevel10k	$P10K_SHA
+.config/alacritty/themes	$ALACRITTY_THEME_SHA
+EOF
   check "zsh starts clean"         zsh -ic true
   # Every entry in dotfiles.list — step 60 installs the whole set on every
   # profile, and the list is the single owner of what that set is.

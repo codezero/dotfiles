@@ -87,12 +87,14 @@ fi
 # Color themes — alacritty.toml imports one from here. Clone the upstream repo
 # rather than vendoring ~190 theme files. Skip if already a checkout; clone if
 # empty/missing; but DON'T wipe a non-empty non-git dir (could be custom themes).
-as_user 'set -e; d="$HOME/.config/alacritty/themes"; \
-  if [ -d "$d/.git" ]; then exit 0; fi; \
-  if [ -e "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ]; then \
-    echo "[warn] $d is not a git checkout — leaving it (theme import may be missing)" >&2; exit 0; fi; \
-  rm -rf "$d"; git clone --depth=1 https://github.com/alacritty/alacritty-theme "$d"' \
-  || soft_fail "alacritty theme clone failed"
+# Pinned clone (pins.sh ALACRITTY_THEME_SHA) — it was `git clone --depth=1` at
+# whatever HEAD was that day (TODO J).
+as_user "set -e; d=\"\$HOME/.config/alacritty/themes\"; \
+  if [ -d \"\$d/.git\" ]; then exit 0; fi; \
+  if [ -e \"\$d\" ] && [ -n \"\$(ls -A \"\$d\" 2>/dev/null)\" ]; then \
+    echo \"[warn] \$d is not a git checkout — leaving it (theme import may be missing)\" >&2; exit 0; fi; \
+  bash '$PINS' clone_pinned '$ALACRITTY_THEME_URL' '$ALACRITTY_THEME_SHA' \"\$d\"" \
+  || soft_fail "alacritty theme clone failed (see pins.sh)"
 # Confirm the theme that alacritty.toml imports actually resolved.
 as_user 'test -f "$HOME/.config/alacritty/themes/themes/catppuccin_mocha.toml"' \
   || soft_fail "alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"

@@ -9,6 +9,9 @@
 PROVISION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "$PROVISION_DIR/.." && pwd)"
 PKG_DIR="$PROVISION_DIR/packages"
+PINS="$PROVISION_DIR/pins.sh"     # the commits/hashes of code executed at install time (TODO J)
+# shellcheck source=pins.sh
+source "$PINS"
 STEPS_DIR="$PROVISION_DIR/steps"
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

@@ -225,6 +225,73 @@ mode was considered and rejected — it would be ~70 % real with an invisible
 30 % hole (brew), and a flag that *reads* as reproducible while the largest
 group floats underneath is worse than no flag.
 
+## Supply chain — what is pinned, what is verified, what floats
+
+Two different things get installed here, and they are treated differently on
+purpose:
+
+- **Tools** — brew formulae, the rustup *toolchain*, mise runtimes, Claude,
+  kitty, flatpaks — **float** (bring-to-latest is the design) and are
+  **recorded** by `versions.lock`. Each is verified at install by its own
+  channel: apt repos and kitty by pinned signing keys, cargo by crates.io
+  checksums, rustup's toolchain by its channel manifest, Claude's binary by its
+  version manifest, brew bottles by the sha256 in homebrew-core.
+- **Code executed at install time** — installer scripts and the git clones whose
+  code runs in every shell — is **pinned** in `provision/pins.sh`, one owner
+  shared by `provision/` and `install.sh`. Nothing there moves except by editing
+  that file, i.e. a reviewed commit:
+
+| What | Was | Now |
+|---|---|---|
+| Homebrew installer | `curl …/HEAD/install.sh \| bash` | raw URL at a pinned **commit**, file verified against a pinned sha256, then run |
+| `rustup-init` | `curl https://sh.rustup.rs \| sh` — no checksum anywhere | the **versioned** binary from `static.rust-lang.org/rustup/archive/<ver>`, verified against a hash recorded **in the repo**; saved under its own name (rustup dispatches on argv[0]) |
+| Claude bootstrap | `curl https://claude.ai/install.sh \| bash` | the 302 target `bootstrap.sh` verified against a pinned sha256, then `bash … stable` |
+| oh-my-zsh | its installer script from `master`, cloning `master` | `clone_pinned` at `OMZ_SHA` — shallow, detached; the installer's five `git config` lines reproduced so `omz` works |
+| powerlevel10k, alacritty-theme | `git clone --depth=1` at HEAD | `clone_pinned` at their SHAs |
+
+Both helpers **refuse, never fall back**: a hash mismatch names the URL and both
+hashes and says to read the upstream change and re-pin; an unreachable commit
+fails the clone. Under `STRICT`/`GOLDEN_IMAGE` that aborts the build — correct,
+an unreviewed installer must not be baked into every clone. The dry tier
+asserts that no `curl … | sh` pipeline and no raw `git clone` remain in any
+install path, that every pin has the right shape, and exercises both helpers
+with a local repo and a `file://` URL (happy path and refusal). `verify` asserts
+the three checkouts sit at their pins. oh-my-zsh's updater is set to *remind*,
+not act (`.zshrc`): `omz update` would move the checkout off its pin, which the
+lock and `verify` then report — bump the pin instead.
+
+**Honest limits.** A pinned installer still installs a moving payload: the
+Homebrew installer clones `Homebrew/brew` at its current release, the Claude
+bootstrap fetches the current manifest (and verifies its binary itself),
+`rustup-init` installs the current stable toolchain (verified by rustup). This
+closes the *scripts*, not the ecosystem. And a compromised homebrew-core formula
+or a genuinely malicious upstream release is caught by nobody at install time —
+the defense there is lag: re-provision on your cadence, never daily.
+
+**Bottle provenance.** Homebrew can verify that a bottle was built by Homebrew's
+CI from its formula (sigstore attestations), but that check **needs a GitHub
+token** — without one `brew install` fails outright — and a golden build box
+holds no credentials by rule. So goldens' bottles are checksum-verified, not
+provenance-verified. On an adopted box with `gh` logged in, verify them after the
+fact: `HOMEBREW_DEVELOPER=1 brew verify $(brew list --formula)` re-fetches every
+bottle and checks its attestation.
+
+### Bring-to-latest cadence — monthly, observed, never a cron
+
+1. `bash provision/versions-lock.sh check ~/versions.lock` — read what moved
+   since the last baseline.
+2. Bump pins in `provision/pins.sh` by **reading** each upstream change first:
+   `git log OLD..NEW` for a clone, a diff of the script for a hash (the
+   `rustup-init` hashes come from upstream's `.sha256` files, recorded here so
+   they are no longer same-host). One reviewed commit.
+3. Re-run the box's recipe with `APT_UPGRADE=1` (copy-mode boxes keep
+   `DOTFILES_COPY=1`). Step 85 prints the drift.
+4. `HOMEBREW_DEVELOPER=1 brew verify …` if `gh` is logged in.
+5. `bash provision/versions-lock.sh emit -o ~/versions.lock` to re-baseline.
+
+Goldens: rebuild from the reviewed SHA, commit the clone's lock as
+`provision/versions.lock`, tag `golden/gen-N`.
+
 ## Key design points
 
 - **Root vs user.** cloud-init runs as root, but **Homebrew/oh-my-zsh/rustup/

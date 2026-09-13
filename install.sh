@@ -18,6 +18,10 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The commits/hashes of every script and clone this bootstrap executes, plus
+# clone_pinned/fetch_pinned — one owner, shared with provision/ (TODO J).
+# shellcheck source=provision/pins.sh
+source "$DOTFILES_DIR/provision/pins.sh"
 
 # Link vs. override: symlink the dotfiles by default (repo stays the source of
 # truth), or copy them in with DOTFILES_COPY=1 / --copy (self-contained — the
@@ -81,25 +85,28 @@ fi
 
 echo "==> [2/7] Homebrew (linuxbrew)"
 if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ] && ! command -v brew >/dev/null 2>&1; then
-  NONINTERACTIVE=1 /bin/bash -c \
-    "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # Installer fetched at a pinned commit and verified before it runs (pins.sh).
+  hb_installer="$(mktemp)"
+  fetch_pinned "$HOMEBREW_INSTALL_URL" "$HOMEBREW_INSTALL_SHA256" "$hb_installer" \
+    || { echo "    Homebrew installer could not be verified — aborting (see provision/pins.sh)" >&2; exit 1; }
+  NONINTERACTIVE=1 /bin/bash "$hb_installer"; rm -f "$hb_installer"
 fi
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 echo "==> [3/7] oh-my-zsh"
 export ZSH="${ZSH:-$HOME/.oh-my-zsh}"
-if [ ! -d "$ZSH" ]; then
-  # --unattended = don't run zsh or chsh here; KEEP_ZSHRC so our .zshrc wins.
-  RUNZSH=no KEEP_ZSHRC=yes sh -c \
-    "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" \
-    "" --unattended
+if [ ! -f "$ZSH/oh-my-zsh.sh" ]; then
+  # A pinned clone (pins.sh OMZ_SHA) replaces the installer script from master;
+  # our .zshrc is never touched and chsh is step [7/7]'s.
+  clone_pinned "$OMZ_URL" "$OMZ_SHA" "$ZSH" \
+    || { echo "    oh-my-zsh clone failed (see provision/pins.sh)" >&2; exit 1; }
 fi
 
 echo "==> [4/7] Powerlevel10k theme"
 ZSH_CUSTOM="${ZSH_CUSTOM:-$ZSH/custom}"
-if [ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k \
-    "$ZSH_CUSTOM/themes/powerlevel10k"
+if [ ! -f "$ZSH_CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme" ]; then
+  clone_pinned "$P10K_URL" "$P10K_SHA" "$ZSH_CUSTOM/themes/powerlevel10k" \
+    || { echo "    powerlevel10k clone failed (see provision/pins.sh)" >&2; exit 1; }
 fi
 
 echo "==> [5/7] CLI tools via brew (mise, eza, bat, zoxide, jq)"
@@ -149,10 +156,9 @@ if [ -d "$themes_dir/.git" ]; then
 elif [ -e "$themes_dir" ] && [ -n "$(ls -A "$themes_dir" 2>/dev/null)" ]; then
   echo "    alacritty themes dir exists and isn't a git checkout — leaving it"
 else
-  rm -rf "$themes_dir"
-  git clone --depth=1 https://github.com/alacritty/alacritty-theme "$themes_dir" 2>/dev/null \
-    && echo "    cloned alacritty themes" \
-    || echo "    (alacritty theme clone failed)"
+  clone_pinned "$ALACRITTY_THEME_URL" "$ALACRITTY_THEME_SHA" "$themes_dir" 2>/dev/null \
+    && echo "    cloned alacritty themes (pinned)" \
+    || echo "    (alacritty theme clone failed — see provision/pins.sh)"
 fi
 [ -f "$themes_dir/themes/catppuccin_mocha.toml" ] || \
   echo "    note: alacritty theme catppuccin_mocha.toml missing — alacritty.toml import will fail"

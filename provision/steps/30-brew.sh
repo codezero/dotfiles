@@ -18,7 +18,7 @@ if dry; then
   n="$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$BREWFILE" 2>/dev/null || true)"
   n="${n:-0}"
   would "pre-create /home/linuxbrew owned by $TARGET_USER (so the non-root brew installer needs no sudo)"
-  would "install Homebrew (if missing) as $TARGET_USER"
+  would "install Homebrew (if missing) as $TARGET_USER — installer pinned to Homebrew/install@${HOMEBREW_INSTALL_COMMIT:0:12}, sha256 ${HOMEBREW_INSTALL_SHA256:0:16}… (pins.sh)"
   would "brew bundle: $n formulae/casks from $(basename "$BREWFILE") (flatpak/npm/mas/vscode lines ignored)"
 else
   # Homebrew won't run as root, but its FIRST install needs root to create
@@ -34,10 +34,15 @@ else
     # manages brew, but all users can read/exec the installed binaries. Match it.
     $SUDO chown -R "$TARGET_USER:$(id -gn "$TARGET_USER")" /home/linuxbrew
   fi
-  # Install Homebrew non-interactively if missing.
-  as_user 'test -x /home/linuxbrew/.linuxbrew/bin/brew || \
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' \
-    || soft_fail "Homebrew install step failed"
+  # Install Homebrew non-interactively if missing. The installer is fetched at
+  # a PINNED commit and verified against pins.sh before it runs (TODO J) — it
+  # used to be `curl …/HEAD/install.sh | bash`, unverified. Honest limit: the
+  # script then clones Homebrew/brew at its current release; that is Homebrew's
+  # own update channel and floats like every formula.
+  as_user "test -x /home/linuxbrew/.linuxbrew/bin/brew || {
+    t=\$(mktemp) && bash '$PINS' fetch_pinned '$HOMEBREW_INSTALL_URL' '$HOMEBREW_INSTALL_SHA256' \"\$t\" \
+      && NONINTERACTIVE=1 /bin/bash \"\$t\"; rc=\$?; rm -f \"\$t\"; exit \$rc; }" \
+    || soft_fail "Homebrew install step failed (installer fetch/verify/run — see pins.sh)"
 
   # `brew bundle dump` also records flatpak/npm/mas/vscode entries. Keep only the
   # Homebrew-native ones (tap/brew/cask) so bundling can't (a) install flatpaks
