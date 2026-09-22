@@ -1,0 +1,71 @@
+# ──────────────────────────────────────────────────────────────
+# Secrets / credentials — NEVER commit these
+# ──────────────────────────────────────────────────────────────
+*.key
+*.pem
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+id_*
+.netrc
+.npmrc
+.env
+.env.*
+**/*secret*
+**/*credential*
+**/*token*
+
+# SSH / GPG private material
+.ssh/
+.gnupg/
+
+# Claude Code — ignore all state/creds, but DO track the two configs we port
+.claude/*
+!.claude/settings.json
+!.claude/statusline-command.sh
+.claude.json
+# Personal working memory (closed-TODO log). Claude Code auto-loads it next to
+# CLAUDE.md; hand-carry it to a new box together with ~/.claude/projects/…/memory/
+CLAUDE.local.md
+
+# Cloud / tool credentials
+.config/gh/hosts.yml
+.aws/
+.config/gcloud/
+.kube/
+
+# AI / API tool auth + state (live OAuth tokens, account info, history)
+**/auth.json
+**/.credentials.json
+.codex/
+.config/remmina/
+.config/goa-1.0/
+.config/go/telemetry/
+
+# Local state databases / machine identifiers
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+**/installation_id
+**/machineid
+
+# Neovim (LazyVim): track the config tree, but not the plugin lockfile (we track
+# latest, per the bring-to-latest policy) — LazyVim rewrites it through the symlink.
+.config/nvim/lazy-lock.json
+
+# ──────────────────────────────────────────────────────────────
+# Generated / cache / noise
+# ──────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
+*.swo
+*~
+.zcompdump*
+*.zwc
+.zsh_history
+.bash_history
+.lesshst
+
+# Local install backups created by install.sh
+*.backup.*

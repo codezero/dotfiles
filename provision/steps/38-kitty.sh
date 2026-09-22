@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Step 38 — kitty, from upstream's SIGNED binary bundle.
+#
+# Why this path and not the others (all checked 2026-09-06, arm64 26.04):
+#   cargo   — N/A. kitty is C + Python (Go for `kitten`), not Rust, so the
+#             step-35 toolchain that builds Alacritty buys nothing here.
+#   brew    — no Linux formula at all (formula/kitty.json -> 404); macOS cask
+#             only. The same dead end as Alacritty's deprecated formula.
+#   apt     — 0.45.0 against upstream 0.48.2, and frozen for the release. apt
+#             was already rejected for Alacritty for exactly this reason;
+#             taking it here would leave the two terminals inconsistent.
+#   flatpak — kitty is not on Flathub (both plausible app-IDs 404), and a
+#             sandboxed terminal would run the user's shell inside the sandbox.
+#   snap    — this machine has no snapd by design (see step 36).
+#
+# The interesting difference from Alacritty: upstream ships NO Linux binary for
+# Alacritty (v0.17.0's assets are Windows/macOS plus man pages and completions),
+# which is why step 36 must build from crates.io. kitty publishes a per-arch
+# .txz AND a detached OpenPGP signature — so this step VERIFIES it against a
+# PINNED fingerprint, the same fail-closed pattern verify_keyring() applies to
+# the Docker/Cursor/VSCodium apt keys. That makes kitty the only artifact here
+# verified by SIGNATURE rather than by checksum-over-TLS. The others are NOT
+# unverified: cargo checks the crates.io index cksum (step 36 also passes
+# --locked), rustup checks the channel manifest's per-artifact hash, and the
+# Claude installer fails closed on a sha256sum mismatch. The difference is that
+# in all three the hash is served by the SAME host as the artifact, so it does
+# not survive that host being compromised — whereas the fingerprint pinned
+# below lives in this repo, so a swapped key fails closed.
+set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
+
+# No GUI wanted — same gate as step 36 (lib.sh gui_wanted).
+gui_wanted || { log "kitty: skipped ($(no_gui_reason))"; exit 0; }
+
+# kitty names its assets x86_64/arm64; dpkg says amd64/arm64.
+#
+# An arch upstream publishes no binary for (ppc64el, s390x, riscv64) WARNS and
+# skips rather than soft_fail-ing. soft_fail would abort a GOLDEN build, and
+# that is disproportionate for a condition the operator cannot act on: nothing
+# they change makes an upstream binary exist. This mirrors vendor_apt_update in
+# step 20, which warns instead of soft_failing even under STRICT for the same
+# reason — soft_fail is for failures worth stopping an image build over.
+# Structural non-applicability belongs with the no-GUI skip above.
+_karch_raw="$(dpkg --print-architecture 2>/dev/null)"
+case "$_karch_raw" in
+  arm64) karch=arm64 ;;
+  amd64) karch=x86_64 ;;
+  *)     warn "kitty: skipped — upstream ships no binary for architecture '${_karch_raw:-unknown}'"; exit 0 ;;
+esac
+
+# Ensure this step's own tools rather than assuming an earlier step left them —
+# the same rule step 36 states for its build deps, and it is load-bearing here:
+# `gnupg` is Priority: optional and is NOT in apt.list (the list carries `gpg`),
+# and `xz-utils` (for `tar -J`) is not there either. Today they happen to exist
+# because step 20 installs gnupg first; that is exactly the cross-step coupling
+# the convention forbids, and it would break this step run standalone.
+apt_install curl gnupg xz-utils
+
+# Kovid Goyal's release-signing key. Pinned: a mismatch must SKIP the install,
+# never fall back to installing unverified. Served from his own domain, so this
+# is trust-on-first-use rather than a web of trust — still strictly better than
+# an unsigned tarball, and the pin makes a silent key REPLACEMENT fail closed.
+#
+# A replacement is not the only tampering worth stopping, though. verify_keyring
+# compares only the FIRST key in the file, so a kovid.gpg carrying the real key
+# first plus an APPENDED second key still passes the pin — and a bare
+# `gpg --verify` is then happy with a signature from either. That is why the
+# verify below passes --assert-signer "$KITTY_FP": it binds the signature check
+# to this exact fingerprint instead of to "anything in the keyring", which is
+# the whole point of pinning. gpg checks the fingerprint against the signing key
+# AND its primary key, so a signature made by a signing subkey still validates.
+KITTY_FP="3CE1780F78DD88DF45194FD706BC317B515ACE7C"
+KITTY_KEY_URL="https://calibre-ebook.com/signatures/kovid.gpg"
+KITTY_VER_URL="https://sw.kovidgoyal.net/kitty/current-version.txt"
+KITTY_REL="https://github.com/kovidgoyal/kitty/releases/download"
+
+APP="$TARGET_HOME/.local/kitty.app"
+BINDIR="$TARGET_HOME/.local/bin"
+APPSDIR="$TARGET_HOME/.local/share/applications"
+
+
+if dry; then
+  would "resolve the current kitty version from $KITTY_VER_URL"
+  would "download kitty-<ver>-$karch.txz + .sig from $KITTY_REL"
+  would "verify the OpenPGP signature against pinned fingerprint $KITTY_FP (mismatch => skip, never install unverified)"
+  would "extract to $APP and link kitty+kitten into $BINDIR"
+  would "install kitty.desktop + kitty-open.desktop into $APPSDIR (Exec/Icon rewritten to $TARGET_HOME)"
+  exit 0
+fi
+
+ver="$(curl -fsSL --max-time 30 "$KITTY_VER_URL" 2>/dev/null | tr -d '[:space:]')"
+case "$ver" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) soft_fail "kitty: could not resolve the current version (got '${ver:-<empty>}')"; exit 0 ;;
+esac
+
+# Idempotent: a re-run on an up-to-date box does nothing. Bring-to-latest still
+# applies — a newer upstream release reinstalls (see CLAUDE.md's philosophy).
+# Read the installed version AS THE USER — never execute a user-owned binary
+# as root (a replaced ~/.local/kitty.app/bin/kitty would run with root's uid).
+cur="$(as_user '"$HOME/.local/kitty.app/bin/kitty" --version 2>/dev/null | awk "{print \$2}"' 2>/dev/null)"
+if [ "$cur" = "$ver" ]; then
+  log "kitty $ver is already installed — skipping"
+  exit 0
+fi
+log "kitty: installing $ver ($karch)${cur:+ — upgrading from $cur}"
+
+tmp="$(mktemp -d)" || { soft_fail "kitty: mktemp failed"; exit 0; }
+trap 'rm -rf "$tmp"' EXIT
+tarball="kitty-$ver-$karch.txz"
+
+curl -fsSL --max-time 300 -o "$tmp/$tarball"     "$KITTY_REL/v$ver/$tarball" \
+  && curl -fsSL --max-time 60 -o "$tmp/$tarball.sig" "$KITTY_REL/v$ver/$tarball.sig" \
+  && curl -fsSL --max-time 60 -o "$tmp/kovid.gpg"    "$KITTY_KEY_URL" \
+  || { soft_fail "kitty: download failed (tarball, signature, or signing key)"; exit 0; }
+
+# Pin check BEFORE the key is ever used to verify anything.
+verify_keyring "$tmp/kovid.gpg" "$KITTY_FP" \
+  || { soft_fail "kitty: signing key fingerprint mismatch — refusing to install"; exit 0; }
+
+# --assert-signer needs gnupg >= 2.4.1 (2.2.42 on the LTS branch). Ubuntu 26.04
+# ships 2.4.x so this never fires there; it exists so an unexpectedly old host
+# says WHY it stopped instead of reporting a misleading signature failure — and
+# it refuses rather than silently falling back to an unbound `gpg --verify`.
+if ! gpg --dump-options 2>/dev/null | grep -q -- '--assert-signer'; then
+  soft_fail "kitty: gpg lacks --assert-signer (needs >= 2.4.1) — refusing to verify unbound"
+  exit 0
+fi
+
+# Throwaway keyring inside $tmp so we never touch root's real GnuPG home.
+export GNUPGHOME="$tmp/gnupg"
+mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
+if ! gpg --batch --quiet --import "$tmp/kovid.gpg" 2>/dev/null \
+   || ! gpg --batch --verify --assert-signer "$KITTY_FP" \
+             "$tmp/$tarball.sig" "$tmp/$tarball" 2>/dev/null; then
+  soft_fail "kitty: OpenPGP signature verification FAILED for $tarball — not installing"
+  exit 0
+fi
+log "kitty: signature verified against pinned key $KITTY_FP"
+
+# Install AS THE USER (2026-09-22, external assessment #1): until then root
+# ran rm -rf/mkdir/tar/cp/chown -R straight into ~/.local — the same
+# symlinked-parent escalation step 60 had. Nothing here needs root: the
+# verified tarball is handed to the user (root's mktemp dir is 0700, so open
+# it up — it holds only the public release files), and the user extracts into
+# their own home. Also fixes "extract before removing": the new tree lands in
+# kitty.app.new, is validated, THEN swapped in — a failed extraction leaves the
+# working kitty in place instead of no kitty at all.
+chmod 755 "$tmp" && chmod 644 "$tmp/$tarball" || { soft_fail "kitty: could not hand the tarball to $TARGET_USER"; exit 0; }
+as_user "set -e
+  app=\"\$HOME/.local/kitty.app\"; bindir=\"\$HOME/.local/bin\"; appsdir=\"\$HOME/.local/share/applications\"
+  for d in \"\$HOME/.local\" \"\$HOME/.local/share\"; do [ ! -L \"\$d\" ] || { echo \"kitty: \$d is a symlink — refusing\" >&2; exit 1; }; done
+  rm -rf \"\$app.new\" && mkdir -p \"\$app.new\" \"\$bindir\" \"\$appsdir\"
+  tar -xJf '$tmp/$tarball' -C \"\$app.new\"
+  [ -x \"\$app.new/bin/kitty\" ] && \"\$app.new/bin/kitty\" --version >/dev/null
+  rm -rf \"\$app.old\"; [ -e \"\$app\" ] && mv \"\$app\" \"\$app.old\"; mv \"\$app.new\" \"\$app\"; rm -rf \"\$app.old\"
+  # kitty and kitten on PATH. Absolute symlinks, like the rest of the tree.
+  ln -sf \"\$app/bin/kitty\" \"\$app/bin/kitten\" \"\$bindir/\"
+  # Desktop integration. Same BASENAMES as apt's kitty package on purpose: a
+  # user-level .desktop overrides the system one by XDG precedence, so a box
+  # that happens to have apt's kitty shows ONE menu entry pointing at this
+  # build rather than two competing ones.
+  for d in kitty.desktop kitty-open.desktop; do
+    [ -f \"\$app/share/applications/\$d\" ] || continue
+    sed -e \"s|Icon=kitty|Icon=\$app/share/icons/hicolor/256x256/apps/kitty.png|g\" \
+        -e \"s|Exec=kitty|Exec=\$app/bin/kitty|g\" \"\$app/share/applications/\$d\" > \"\$appsdir/\$d\"
+  done" \
+  || { soft_fail "kitty: install as $TARGET_USER failed (extraction, validation or swap — the previous kitty, if any, is untouched)"; exit 0; }
+
+# Deliberately NOT written: ~/.config/xdg-terminals.list. That would make kitty
+# the default terminal for the whole desktop, which is a user preference, not a
+# provisioning decision — Alacritty is installed alongside and neither wins.
+log "kitty $ver installed to $APP (kitty + kitten on PATH via $BINDIR)"

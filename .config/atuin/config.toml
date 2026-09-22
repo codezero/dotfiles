@@ -1,0 +1,15 @@
+# ~/.config/atuin/config.toml — only keys that differ from atuin's defaults
+# (shipped by dotfiles.list; inert on a box without atuin). The 400-line
+# template atuin writes on first run is documentation: `atuin default-config`
+# prints it. .zshrc inits atuin with --disable-up-arrow, so the *_up_key filter
+# settings never fire and are omitted on purpose. (2026-09-13 on-box audit: the
+# box carried the whole template with one change, enter_accept.)
+enter_accept = true          # Enter runs the selected line; Tab edits it first
+style = "compact"            # inline list under the prompt, no full-screen takeover
+inline_height = 20
+search_mode = "fuzzy"
+filter_mode = "global"
+workspaces = true            # inside a git repo the `w` filter scopes to that repo
+auto_sync = false            # no sync account on these boxes; finalize scrubs the DB anyway
+update_check = false         # no phone-home from a golden image / agent box
+secrets_filter = true        # default, kept explicit: never record token-looking lines

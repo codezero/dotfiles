@@ -1,0 +1,16 @@
+# ~/.config/lazygit/config.yml — lazygit, delta and nvim ship together (full
+# Brewfile), so none of these need a guard. Without nerdFontsVersion lazygit
+# draws no icons even with MesloLGS NF installed (found on-box 2026-09-13).
+# `--features lazygit` selects the [delta "lazygit"] block in ~/.gitconfig
+# (side-by-side off — the diff pane is narrow). Schema is lazygit 0.65's
+# (`git.diffRenderers`, not the older `git.paging`): lazygit MIGRATES an old
+# schema by rewriting this file in place on start — in copy mode that shows
+# up as `verify` content drift, so keep this file on the current schema.
+gui:
+  nerdFontsVersion: "3"
+git:
+  diffRenderers:
+    - colorArg: always
+      command: delta --dark --paging=never --features lazygit
+os:
+  editPreset: nvim

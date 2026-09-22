@@ -1,0 +1,71 @@
+[user]
+	name = codezero
+	email = codezero@local.none
+
+# delta (https://github.com/dandavison/delta) — syntax-highlighted diffs.
+# Homebrew formula is `git-delta`; the BINARY is `delta` (same trap as
+# bat/batcat). It ships in the FULL Brewfile only — Brewfile.minimal drops the
+# niceties and install.sh installs a smaller set still — but this file goes to
+# EVERY box via dotfiles.list. So both hooks are guarded with `command -v`,
+# exactly like .zshrc's bat/eza/zoxide aliases: without the guard, `git diff`
+# would break outright on a lean box. git runs these through a shell, so the
+# `if` works; the fallbacks are git's own defaults (less, and no filter).
+#
+# The QUOTES are load-bearing: in git-config syntax an unquoted `;` starts a
+# comment, so without them the value is silently truncated at the first `;`
+# and every paged git command dies with "Syntax error: end of file unexpected".
+[core]
+	pager = "if command -v delta >/dev/null 2>&1; then delta; else less; fi"
+	# Global safety-net ignore (.config/git/ignore, shipped by dotfiles.list).
+	# This IS git's XDG default path; set explicitly so it doesn't depend on
+	# XDG_CONFIG_HOME being unset on the box.
+	excludesFile = ~/.config/git/ignore
+
+# Modern defaults (2026-09-13 on-box audit). Every key is understood by apt's
+# git >= 2.43 and brew's; an older git ignores unknown keys, so nothing here
+# breaks a lean box. pull.rebase is the one BEHAVIOUR change: `git pull` rebases
+# local commits instead of creating merge commits.
+[init]
+	defaultBranch = main
+[pull]
+	rebase = true
+[push]
+	# first `git push` on a new branch needs no -u (git >= 2.37)
+	autoSetupRemote = true
+[rebase]
+	autoStash = true
+[merge]
+	# shows the common ancestor in conflict hunks (git >= 2.35)
+	conflictstyle = zdiff3
+[diff]
+	# delta renders moved blocks distinctly
+	colorMoved = default
+[rerere]
+	# remember conflict resolutions across rebases
+	enabled = true
+[fetch]
+	prune = true
+
+[interactive]
+	diffFilter = "if command -v delta >/dev/null 2>&1; then delta --color-only; else cat; fi"
+
+[delta]
+	navigate = true
+	line-numbers = true
+	# side-by-side needs width — it is cramped under ~120 cols. Flip it per
+	# command without editing this file:  git -c delta.side-by-side=false diff
+	side-by-side = true
+
+# lazygit's diff pane is narrow: .config/lazygit/config.yml runs delta with
+# `--features lazygit`, which selects this block and turns side-by-side off.
+[delta "lazygit"]
+	side-by-side = false
+
+# Credentials: hand https://github.com off to gh when it is installed (and
+# logged in — the carried ~/.config/gh); silent no-op otherwise, so a box
+# without gh gets git's normal prompt instead of a "helper not found" error.
+# Same guard pattern as the delta pager above. Found on the Gen-3 clone
+# (2026-09-13): gh was logged in, yet `git push` had no helper to ask.
+[credential "https://github.com"]
+	helper = "!f() { command -v gh >/dev/null 2>&1 && exec gh auth git-credential \"$@\"; }; f"
+

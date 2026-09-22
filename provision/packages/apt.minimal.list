@@ -1,0 +1,15 @@
+# Minimal agent profile (PROFILE=minimal): lean headless box for AI agents.
+# Shell + core dev toolchain only — no GUI, no desktop/locale/IME, no GUI
+# editors (VSCodium/Cursor are skipped in step 20 too; Docker is kept there).
+# Hand-curated (unlike apt.list, which is the full showmanual export); step 10
+# still applies its boot/kernel/third-party filters on top, harmlessly.
+build-essential
+ca-certificates
+curl
+git
+gpg
+tmux
+wget
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting

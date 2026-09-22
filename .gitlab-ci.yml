@@ -1,0 +1,78 @@
+# GitLab CI — the same gates as .github/workflows/{smoke,gitleaks}.yml, so the
+# repo is checked identically on either host (each host ignores the other's
+# config). Written for a SELF-MANAGED instance with the docker executor:
+#   - runner tags are unknown here, so the smoke job is arch-agnostic at run
+#     time (uname -m picks the shellcheck tarball) and runs untagged on the
+#     default runner; an arm64 leg is added by setting ARM64_RUNNER_TAG.
+#   - images are pinned by DIGEST (GitLab's equivalent of pinning actions to a
+#     commit SHA); if Docker Hub is unreachable from the runners, mirror the two
+#     images and change only the two `image:` lines.
+stages: [smoke, secrets]
+
+variables:
+  # The version the tree is kept clean against — same pin, same two TOFU
+  # hashes as smoke.yml (upstream publishes no checksum file). Re-pin both
+  # files together when bumping.
+  SHELLCHECK_VERSION: v0.11.0
+  SHELLCHECK_SHA256_AARCH64: 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588
+  SHELLCHECK_SHA256_X86_64: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+  # Set (project/instance CI variable, or here) to the tag of an arm64 runner
+  # to get the arm leg — the repo's target arch. Empty = job not created.
+  ARM64_RUNNER_TAG: ""
+
+# One template, two jobs. The container runs as ROOT and the dry tier refuses
+# a uid-0 target (lib.sh dies on a root TARGET_USER) — GitHub's runners are
+# non-root, this executor is not — so the tiers run as a created user, the
+# same recipe as the local ubuntu:24.04 rehearsal that preceded both CI files.
+.smoke:
+  stage: smoke
+  image: ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254
+  variables:
+    DEBIAN_FRONTEND: noninteractive
+  before_script:
+    - apt-get -qq update && apt-get -qq install -y git curl xz-utils ca-certificates >/dev/null
+    - useradd -m runner && chown -R runner:runner "$CI_PROJECT_DIR"
+    # Pinned shellcheck, arch chosen at run time; the runner's own shellcheck
+    # (if any) is shadowed by prepending to PATH.
+    - |
+      set -euo pipefail
+      case "$(uname -m)" in
+        aarch64) arch=aarch64; sha="$SHELLCHECK_SHA256_AARCH64" ;;
+        x86_64)  arch=x86_64;  sha="$SHELLCHECK_SHA256_X86_64" ;;
+        *) echo "no pinned shellcheck for $(uname -m)"; exit 1 ;;
+      esac
+      f="shellcheck-${SHELLCHECK_VERSION}.linux.${arch}.tar.xz"
+      curl -fsSL --max-time 120 -o "/tmp/$f" \
+        "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/$f"
+      echo "$sha  /tmp/$f" | sha256sum -c -
+      tar -xJf "/tmp/$f" -C /opt
+      ln -s "/opt/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+      shellcheck --version | grep -Fx "version: ${SHELLCHECK_VERSION#v}"
+  script:
+    - su runner -s /bin/bash -c "cd '$CI_PROJECT_DIR' && bash smoke-test.sh lint"
+    - su runner -s /bin/bash -c "cd '$CI_PROJECT_DIR' && bash smoke-test.sh dry"
+
+smoke:
+  extends: .smoke
+
+smoke:arm64:
+  extends: .smoke
+  tags: [$ARM64_RUNNER_TAG]
+  rules:
+    - if: $ARM64_RUNNER_TAG
+
+# Full-history secret scan with the repo's own .gitleaks.toml — the same
+# allowlist the pre-commit hook and the GitHub job use. GitLab's bundled
+# Secret-Detection template was considered and rejected: it scans commit
+# ranges by default and reads its own ruleset file, so the allowlist would
+# have to be kept in two places. GIT_DEPTH: 0 because the default clone is
+# shallow and a history scan of 20 commits is not a history scan.
+gitleaks:
+  stage: secrets
+  image:
+    name: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - gitleaks git --no-banner --redact --config .gitleaks.toml --verbose .
