@@ -232,6 +232,29 @@ when editing code:
   finishes every step but exits non-zero if any soft failure occurred. Under `STRICT`/
   `GOLDEN_IMAGE` a soft failure **dies** immediately. `lib.sh` refuses a uid-0 target user.
 
+## Commits
+
+- **The author and committer are always the repository owner** (`codezero`) — an agent never
+  commits under its own name. An agent's share of the work is recorded in **trailers**, so
+  `git log --format='%an'` answers "whose machine spec is this" and `%(trailers)` answers "who
+  wrote this commit":
+
+  ```
+  Co-Authored-By: Claude <model> <noreply@anthropic.com>
+  Claude-Session: <session URL>
+  ```
+
+  Add both when an agent did the work; omit them when it did not. The same applies to a PR
+  description. Never set `user.name`/`user.email` to anything else for a commit.
+- **Style is owned by [`CONTRIBUTING.md`](CONTRIBUTING.md#commit-messages)** — `type(scope):
+  imperative outcome — the reason`, a body that gives the *why* and the evidence (which tiers
+  ran and their counts, what was mutation-checked, which live scenario was used), and an
+  explicit note of what was **not** verified. Don't restate that style here.
+- **Don't commit on a red tree.** `lint` and `dry` pass before a commit that touches a script;
+  if something is knowingly left failing, the commit message says so in as many words.
+- **One commit per reviewable idea.** A refactor and the behaviour change it enables are two
+  commits, so a bisect can tell them apart.
+
 ## Conventions / gotchas
 
 - `provision.sh` is cloud-init-ready: root, idempotent, failure-tolerant. `apt_preflight`

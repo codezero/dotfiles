@@ -68,13 +68,40 @@ when the guard is removed. Mutation-check it; an assertion that cannot fail is d
 
 ## Commit messages
 
-Imperative subject, and a body that says **why** — this repo's history is unusually
-explanatory on purpose, because six months later the reason is the part nobody can reconstruct.
-"fix(finalize): apt through the wrapper — a bare autoremove hung the build" is the house style.
+This repo's history is unusually explanatory on purpose: six months later, the reason is the
+part nobody can reconstruct, and the diff is the part anyone can read. The house style:
+
+```
+type(scope): imperative outcome — the short reason it was needed
+
+Why, not what: the failure it fixes or the property it adds, and the evidence
+that it works — which tiers ran and their counts, what was mutation-checked,
+which live scenario it was tested with, what is still unproven.
+```
+
+- **Subject** says the *outcome*, not the diff (`fix(finalize): apt through the wrapper — a
+  bare autoremove hung the build`, not `change apt call`). Types in use: `feat`, `fix`, `docs`,
+  `test`, `ci`, `security`, `pins`, `lock`; the scope is a step or file when one dominates.
+- **Body** carries the reasoning and the proof. "Dry tier 213 → 215, mutation-checked" is worth
+  more than three sentences of intent.
+- **Say what you did *not* verify.** A commit that admits "the live path is unexercised" is
+  worth more than one that implies otherwise.
 
 ## Licensing
 
 Inbound = outbound: contributions are accepted under **AGPL-3.0-only**, the licence in
-[`LICENSE`](LICENSE). There is no CLA, so contributed parts stay under that licence — including
-for the owner. Vendored third-party components keep their own licences and notices; don't
-relicense them or strip their `LICENSE`/`NOTICE` files.
+[`LICENSE`](LICENSE). Vendored third-party components keep their own licences and notices;
+don't relicense them or strip their `LICENSE`/`NOTICE` files.
+
+There is **no CLA to sign**, but one grant is asked for in exchange, and it is stated here
+rather than buried: **by submitting a contribution you grant the maintainer a perpetual,
+worldwide, irrevocable, royalty-free right to license your contribution under other terms**,
+alongside the AGPL — you keep your copyright, and you keep every right you already had to your
+own work.
+
+Why ask at all: without it, changing this project's licence later would need the agreement of
+every contributor whose code is still in the tree, so a single unreachable person freezes the
+licence permanently. The grant keeps that door open without a signing ceremony on a repo whose
+realistic volume is a handful of patches. It applies to contributions made after this text
+existed; if you'd rather not give it, say so in the PR and we'll find another way — a narrower
+fix, or leaving it out.
