@@ -254,6 +254,14 @@ cmd_dry() {
     [ -n "$mdbad" ] && { bad "docs — $mdf cites commit SHAs that do not resolve here: $(tr '\n' ' ' <<<"$mdbad")"; mdhit=1; }
   done < <(cd "$HERE" && git ls-files '*.md' 2>/dev/null)
   [ "$mdhit" = 0 ] && ok "docs — no tracked *.md cites a commit SHA (history lives in docs/DESIGN-NOTES.md)"
+  # The two community files, and the one thing SECURITY.md must not lose: a
+  # private report channel. An issue is the wrong place for a vulnerability in
+  # a repo that installs software as root.
+  if [ -s "$HERE/SECURITY.md" ] && [ -s "$HERE/CONTRIBUTING.md" ] \
+     && grep -qi 'private vulnerability reporting' "$HERE/SECURITY.md" \
+     && grep -q 'security/advisories/new' "$HERE/SECURITY.md"; then
+    ok "docs — SECURITY.md (private reporting channel) and CONTRIBUTING.md are present"
+  else bad "docs — SECURITY.md/CONTRIBUTING.md missing, or SECURITY.md lost its private channel"; fi
   # The design note is the one place the pre-export history survives.
   if [ -s "$HERE/docs/DESIGN-NOTES.md" ] && grep -q 'DESIGN-NOTES' "$HERE/CLAUDE.md" && grep -q 'DESIGN-NOTES' "$HERE/README.md"; then
     ok "docs — DESIGN-NOTES.md exists and both CLAUDE.md and README.md point at it"

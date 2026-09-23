@@ -71,6 +71,7 @@ running, refusing on mismatch. See
 | `provision/` | Full-machine replication (Docker, editors, Rust+Alacritty, Flatpak, Brewfile); cloud-init ready |
 | `tests/` | The smoke tiers `smoke-test.sh` runs (lint, dry-run matrix, on-box audit, runbook) |
 | `docs/DESIGN-NOTES.md` | **Why it is the way it is** — the golden-image generations, the live-test record, what was declined, and the gotchas that outlive the code |
+| `CONTRIBUTING.md`, `SECURITY.md` | How to send a change, and how to report a vulnerability privately |
 
 > **Never committed:** SSH/GPG keys, `~/.claude/` state (only its two tracked
 > configs are in the repo), cloud creds, shell history (see `.gitignore`).
@@ -194,6 +195,9 @@ In plain English:
   triggers on distribution, not on use.
 - **Different terms:** if AGPL does not fit your organization, open an issue to
   discuss a separate license.
+
+Sending a change: [`CONTRIBUTING.md`](CONTRIBUTING.md). Found a vulnerability:
+[`SECURITY.md`](SECURITY.md) — report it privately, not in an issue.
 
 Third-party components keep their own licenses and are usable under them
 independently of this repo:
