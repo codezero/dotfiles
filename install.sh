@@ -52,7 +52,16 @@ done
 # sudo only when one of those two actually has work to do. (Found live, S10
 # re-run 2026-09-12: a re-run that stalls on a prompt has demonstrated nothing
 # about idempotency, whatever the backup count says afterwards.)
-APT_PKGS=(zsh git curl wget build-essential tmux zsh-autosuggestions zsh-syntax-highlighting)
+APT_PKGS=(zsh git curl wget build-essential tmux kitty-terminfo \
+          zsh-autosuggestions zsh-syntax-highlighting)
+# ^ kitty-terminfo: this entry point exists to set up an EXISTING box, which is
+#   usually a box you ssh INTO. kitty sets TERM=xterm-kitty and ssh forwards the
+#   name but not the terminfo (kitty's own lives inside its .txz bundle, behind
+#   a $TERMINFO it exports into its own child), so without the system entry
+#   every ncurses tool here answers "unknown terminal type xterm-kitty" — less,
+#   vim, clear, and p10k's own probing, i.e. exactly what this script installs.
+#   114 kB, terminfo only, pulls in no GUI. Same reasoning as the provision apt
+#   lists; found live on an AWS box 2026-09-24.
 # ^ tmux: we install .tmux.conf from dotfiles.list AND .zshrc loads omz's `tmux`
 #   plugin, which prints "tmux not found. Please install tmux before using this
 #   plugin." on every shell start when it's missing. Shipping the config without

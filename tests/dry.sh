@@ -560,15 +560,20 @@ cmd_dry() {
   # the TODO K cloud-init box (minimal, so no step 38 at all) and then
   # reproduced on the desktop, which HAS step 38 and is broken for an inbound
   # session just the same. 114 kB, no GUI dependency.
-  # Both lists are hand-maintained, and this entry buys nothing visible on the
-  # box that installs it — so it is exactly the kind of line a future tidy-up
-  # deletes as noise. This assertion is what would notice.
+  # All THREE install surfaces need it, install.sh most of all: it exists to set
+  # up an EXISTING box, which is usually one you ssh into. The lists are
+  # hand-maintained and the entry buys nothing visible on the box that installs
+  # it, so it is exactly the kind of line a future tidy-up deletes as noise.
+  # This assertion is what would notice — and it covers install.sh because that
+  # is the surface the first fix forgot.
   local tmiss=0 al
-  for al in apt.list apt.minimal.list; do
-    grep -qx 'kitty-terminfo' "$HERE/provision/packages/$al" \
+  for al in provision/packages/apt.list provision/packages/apt.minimal.list; do
+    grep -qx 'kitty-terminfo' "$HERE/$al" \
       || { bad "$al — kitty-terminfo missing (inbound ssh from kitty breaks there)"; tmiss=1; }
   done
-  [ "$tmiss" = 0 ] && ok "apt lists — kitty-terminfo present in both profiles"
+  grep -qE '^APT_PKGS=\(.*kitty-terminfo|^ *kitty-terminfo' "$HERE/install.sh" \
+    || { bad "install.sh — kitty-terminfo missing from APT_PKGS"; tmiss=1; }
+  [ "$tmiss" = 0 ] && ok "kitty-terminfo — present in both apt lists and install.sh"
 
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
   # Every dotfiles.list entry must EXIST in the repo. Step 60 and install.sh
