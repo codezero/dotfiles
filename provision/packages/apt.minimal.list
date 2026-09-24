@@ -8,6 +8,13 @@ ca-certificates
 curl
 git
 gpg
+# NOT kitty itself (this box has no GUI) — just its terminfo entry, 114 kB.
+# A headless box exists to be SSH'd INTO, and kitty sets TERM=xterm-kitty; a
+# remote without the entry answers every ncurses tool with "unknown terminal
+# type xterm-kitty" (less, vim, clear, and p10k's own probing). Found live on
+# the TODO K cloud-init box, 2026-09-24: local VMs never showed it because
+# they install kitty, whose bundle carries the terminfo with it.
+kitty-terminfo
 tmux
 wget
 zsh
