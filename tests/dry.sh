@@ -278,6 +278,23 @@ cmd_dry() {
      && grep -q '^system	kernel	' "$vlt/a.lock" && grep -q '^# generated: ' "$vlt/a.lock"; then
     ok "versions.lock — emit writes a parseable lock with the system kind"
   else bad "versions.lock — emit failed or produced no system kind"; fi
+  # The header's provenance field: always present, honest when unresolvable.
+  # The emitter runs as the TARGET USER, and git refuses a repo owned by
+  # someone else — under cloud-init that is root-owned /opt/dotfiles, so the
+  # field silently vanished from every cloud-provisioned box's lock (found live
+  # on AWS, TODO K 2026-09-24). Step 85 now resolves it as root and hands it
+  # down; "unknown" is recorded when nothing can.
+  local vhdr
+  vhdr="$(PROVISION_REPO_SHA=abc1234 bash "$vl" emit | sed -n 2p)"
+  if grep -q 'repo: abc1234' <<<"$vhdr"; then ok "versions.lock — the header takes PROVISION_REPO_SHA (handed down by step 85 as root)"
+  else bad "versions.lock — PROVISION_REPO_SHA ignored: $vhdr"; fi
+  mkdir -p "$vlt/nogit" && cp "$vl" "$HERE/provision/boot-pkgs.sh" "$vlt/nogit/"
+  vhdr="$(bash "$vlt/nogit/versions-lock.sh" emit 2>/dev/null | sed -n 2p)"
+  if grep -q 'repo: unknown' <<<"$vhdr"; then ok "versions.lock — records 'repo: unknown' rather than dropping the field"
+  else bad "versions.lock — no repo field when git cannot resolve one: $vhdr"; fi
+  if grep -q 'PROVISION_REPO_SHA=' "$HERE/provision/steps/85-versions-lock.sh"; then
+    ok "versions.lock — step 85 hands the repo SHA down to the user-context emit"
+  else bad "versions.lock — step 85 no longer passes PROVISION_REPO_SHA; cloud-init locks lose provenance"; fi
   vout="$(bash "$vl" check "$vlt/a.lock" 2>&1)"; vrc=$?
   if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — check against its own emit: no drift, exit 0"
   else bad "versions.lock — self-check gave exit $vrc: $vout"; fi

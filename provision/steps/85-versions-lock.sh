@@ -43,5 +43,16 @@ fi
 # rm FIRST (rm doesn't follow symlinks): same multi-user hardening as step 80 —
 # a pre-placed symlink at this path must not redirect the write.
 $SUDO rm -f "$LOCK_FILE"
-as_user "PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
+# Resolve the repo SHA HERE, as root, and hand it down: the emitter runs as the
+# target user, and git refuses to parse a repo owned by another user
+# (safe.directory). Under cloud-init the repo is root-owned in /opt, so the
+# user's own probe finds nothing and the lock loses the one field that says
+# which commit produced it (found live, TODO K). Root owns it there; on a
+# normal box git's SUDO_UID special case covers the user-owned repo. If neither
+# resolves, the emitter records `repo: unknown` rather than dropping the field.
+REPO_SHA="$(git -C "$DOTFILES_ROOT" rev-parse --short=7 HEAD 2>/dev/null || true)"
+if [ -n "$REPO_SHA" ] && ! git -C "$DOTFILES_ROOT" diff --quiet HEAD -- 2>/dev/null; then
+  REPO_SHA="$REPO_SHA (dirty)"
+fi
+as_user "PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
   || soft_fail "could not write $LOCK_FILE"
