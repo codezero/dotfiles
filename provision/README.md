@@ -452,6 +452,25 @@ handshake to hosts that already work).
 #cloud-config
 package_update: true
 packages: [git]          # ensure git exists before the clone (don't assume it)
+
+# This repo NEVER creates users — cloud-init's `users:` owns that, and lib.sh
+# dies if PROVISION_USER names an account that doesn't exist.
+users:
+  - default              # the image's own user
+  - name: agent
+    uid: 1100            # PIN IT. Listing `- default` first does NOT win uid 1000
+                         # (proven live): cloud-init assigns uids in its own order,
+                         # so without an explicit uid the target can collide with
+                         # the image user — and then lib.sh's explicit branch and
+                         # its uid-1000 fallback pick the same account, which makes
+                         # a broken fallback undetectable.
+    primary_group: staff # a group != the username is the only thing that exercises
+                         # TARGET_GROUP; that code shipped unrun for months.
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+
 runcmd:
   # Pin to a TAG for image builds (--branch takes a branch/tag NAME, not a raw
   # commit SHA). For a specific commit: clone, then `git -C /opt/dotfiles fetch

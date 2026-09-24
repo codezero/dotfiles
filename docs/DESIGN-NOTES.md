@@ -73,6 +73,13 @@ drifted furthest behind the code (cloud-init and `install.sh`, 2026-09-24). The 
 keeping: each live run since has found exactly one defect, and never the one that was expected —
 which is the argument for running them at all rather than reasoning about them.
 
+A second pattern produced most of the guards in `tests/`: **writing a rule down precisely is
+what exposes that nothing enforces it.** It happened at least six times — two flags documented
+in the table but missing from the typo guard, composition rules stated in the runbook but not
+refused by `verify`, a "boot package" definition that lived in two places, the no-non-root-user
+edge that turned out to need code rather than a sentence. The habit that follows: when a fact
+gets written down, check the same commit that something goes red when it stops being true.
+
 ---
 
 ## Decisions, and what would reopen them
@@ -174,6 +181,13 @@ which is the argument for running them at all rather than reasoning about them.
   `sudo -i`, had nothing, and the invoking user's own copy made every check look green. Audits
   of system-wide state have to probe with `env -i`, or they pass off the one home that happens
   to be populated. `~/.terminfo` is the user's space and the repo no longer writes it.
+- **A regex built in `awk -v` is not portable across mawk versions.** A test guard that
+  extracted a shell function with `awk -v f="^name\(\) \{"` matched on Ubuntu 26.04's mawk
+  and matched *nothing* on 24.04's, so the guard reported every function as missing its call —
+  green locally, red on both CI runners, and not reproducible on the machine that wrote it. In
+  a POSIX sed BRE `(`, `)` and `{` are literal and need no escaping, so `sed -n "/^name() {/,
+  /^}/p"` has nothing left to differ. The wider rule this repo already states and that pass
+  ignored: rehearse anything CI-visible in a stock `ubuntu:24.04` container first.
 - **`setsid` does not simulate cloud-init** — `logname` resolves from the audit loginuid, which
   survives it. Only a systemd unit (or real cloud-init) has none.
 

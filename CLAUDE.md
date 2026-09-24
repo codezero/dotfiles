@@ -309,13 +309,13 @@ Closed work is summarized in [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md); the
 keeps a verbatim log in `CLAUDE.local.md` (gitignored — hand-carried between machines with
 `~/.claude/projects/…/memory/`).
 
-**No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware; the
-last two (cloud-init × `PROFILE=minimal`, and `install.sh` bare metal) closed 2026-09-24.
+**No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware.
 
-One harness nit is parked rather than filed: `verify`'s `cursor debconf preseed (needs sudo)`
-check skips on an adopted clone even right after `sudo -v`. It is desktop-only — the minimal
-box never installs Cursor — so the live runs could not chase it. Find out rather than accept
-the skip, next time a desktop clone is in front of you.
+What remains is **verification debt, not unfinished work** — changes that are correct by
+construction and by the tiers, but have not yet run on a real box. A commit says so in its own
+body when it applies; the standing one is that **finalize's fail-closed rewrite has only ever
+been rehearsed in a container**, so the next golden build is its first live exercise. Treat a
+"not verified live" line in a commit message as a claim someone still has to collect.
 
 ## Project direction & philosophy
 
