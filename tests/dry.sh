@@ -581,9 +581,14 @@ cmd_dry() {
   # most likely to be reached ONLY over ssh. That is not hypothetical: S10
   # scored 28/28 on a box that answered "unknown terminal type xterm-kitty" at
   # every prompt for the operator who ssh'd in (2026-09-24).
+  # sed, not awk: the first version of this guard passed on Ubuntu 26.04's mawk
+  # (1.3.4 20260129) and failed on BOTH CI runners (24.04, older mawk), because
+  # `\(` / `\{` escaping in a dynamic -v regex is not stable across mawk
+  # versions. In a POSIX sed BRE `(`, `)` and `{` are literal and need no
+  # escaping at all, so there is nothing left to differ.
   local vf
   for vf in v_core v_installsh; do
-    awk -v f="^$vf\\(\\) \\{" '$0 ~ f {inf=1} inf && /^\}/ {exit} inf' "$HERE/tests/verify.sh" \
+    sed -n "/^$vf() {/,/^}/p" "$HERE/tests/verify.sh" \
       | grep -q '^[[:space:]]*v_terminfo' \
       || { bad "verify.sh — $vf does not call v_terminfo (that audit cannot see a missing entry)"; tmiss=1; }
   done
