@@ -61,11 +61,17 @@ runbook and the audit each one maps to. The point of the table is what each *fou
 | S6 | copy mode | "the run logged the word copy" is not evidence; only a byte-for-byte comparison is |
 | S7/S8 | golden, golden-desktop | see the generations above |
 | S9 | iterate on a golden | the keep-the-flag trap (Gen-2) |
-| S10 | `install.sh` | a redirected run parked on an **invisible** sudo prompt (sudo reads the tty, prints to stderr) — hence the explicit `[0/7]` priming; and the tmux plugin nagged on every shell start because the bootstrap shipped `.tmux.conf` without tmux |
+| S10 | `install.sh` | a redirected run parked on an **invisible** sudo prompt (sudo reads the tty, prints to stderr) — hence the explicit `[0/7]` priming; and the tmux plugin nagged on every shell start because the bootstrap shipped `.tmux.conf` without tmux. Re-proven bare-metal later: **it needs its own box** — Homebrew is one owner per prefix, so a second user on someone else's provisioned box cannot get past `[5/7]` |
 | S11/S14 | `PROFILE=minimal`, ± rootless | the lean box keeps Docker on purpose; `command -v` guards in `.zshrc` are what make it start silently |
 | S12 | `APT_UPGRADE=1` | "N packages can be upgraded" never reaches zero, by design — see Gotchas |
 | S13 | real cloud-init | cloud-init does **not** assign uid 1000 in `users:` list order; `chsh` works with no controlling terminal; a primary group ≠ username exercises code that had never run |
+| S13×S11 | cloud-init **and** `PROFILE=minimal`, one box | the versions lock had **no `repo:` field**: it is emitted as the target user, and git refuses to parse a repo owned by someone else — under cloud-init the repo is root-owned in `/opt`, so the one field saying *which commit produced this* silently vanished. Only this path could show it; four months of desktop runs never did |
 | S15 | `HEADLESS=1` | the full CLI set with every GUI install skipped — one `gui_wanted` gate, not a third profile |
+
+**Every scenario in that table has now run on real hardware**, most recently the two that had
+drifted furthest behind the code (cloud-init and `install.sh`, 2026-09-24). The pattern worth
+keeping: each live run since has found exactly one defect, and never the one that was expected —
+which is the argument for running them at all rather than reasoning about them.
 
 ---
 

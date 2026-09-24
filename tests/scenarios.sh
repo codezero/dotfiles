@@ -97,7 +97,25 @@ node 24 LTS + go 1.27), S10 RE-RUN (2026-09-12, install.sh with mise: 22/22;
 first run's chsh failed on a mistyped password because sudo's cached timestamp
 made it the only prompt -> dc1ff2d announces it; the converged re-run at
 dc1ff2d completed with NO prompt — [0/7]/[1/7]/[7/7] all skipped — and 1
-backup total, i.e. the idempotency half of S10 finally demonstrated).
+backup total, i.e. the idempotency half of S10 finally demonstrated),
+S13 x S11 (2026-09-24, AWS t4g.large arm64: REAL cloud-init running
+PROFILE=minimal for a uid-1100 target whose primary group is `staff` —
+cloud-init done/errors:[], exit 0, no warnings, `verify S11` 53/53. First live
+proof that pins.sh and the dotfile installer run AS THE TARGET USER under
+cloud-init. It found the one bug of the day: the lock had no `repo:` field,
+because the emitter runs as that user and git refuses a root-owned repo —
+step 85 now resolves the SHA as root and hands it down),
+S10 BARE METAL (2026-09-24, its own fresh box: 28/28. [0/7]-[7/7] all doing
+real work, Homebrew from the same-day installer pin bump, 13 dotfiles through
+dotfiles-install.sh, ZERO backups on both runs — the old one-backup note is
+obsolete since the pinned clone replaced omz's installer and its .zshrc
+template. chsh failed once on a mistyped password, exactly as the step warns,
+and the getent gate correctly re-attempted on the next run).
+
+NOT a valid shortcut, tried and recorded 2026-09-24: running S10 as a SECOND
+user on a box already provisioned for someone else. Homebrew is one owner per
+prefix, so [5/7] cannot write and install.sh aborts (correctly). S10 needs its
+own box.
 Pending live (TODO K): S13×S11 — one cloud-init launch with PROFILE=minimal —
 and an S10 re-run, both AFTER the J pins + step 85 landed (2026-09-13); the
 desktop golden (Gen-4, b5a1856) proved the shared code, these prove the paths

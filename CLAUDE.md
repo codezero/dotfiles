@@ -310,18 +310,13 @@ Closed work is summarized in [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md); the
 keeps a verbatim log in `CLAUDE.local.md` (gitignored — hand-carried between machines with
 `~/.claude/projects/…/memory/`).
 
-- [ ] **K — re-prove the non-desktop paths end-to-end.** The desktop golden exercises every
-  shared change, but three scenarios last ran on hardware before the current pins, lock step
-  and finalize existed, and each has a path the desktop build does not touch: **cloud-init**
-  (root, no tty, no `SUDO_USER`, repo at `/opt/dotfiles`), **`PROFILE=minimal`** (different
-  manifests; only four install sites run there), and **`install.sh`**'s own `[1/7]…[7/7]` flow.
-  - **Plan:** one cloud-init launch with `PROFILE=minimal` covers the first two in a single box
-    (~15 min) — user-data at a pinned SHA, **explicit `uid:`** (a `- default` first does not win
-    uid 1000), then `verify minimal plain` as the target user. Plus `install.sh` on a throwaway:
-    run, `verify S10`, then a promptless re-run. Record both in the runbook's "Covered live"
-    line; anything found goes into the step, not the note.
-  - Harness nit to chase on the way: the `cursor debconf preseed (needs sudo)` check skips on an
-    adopted clone even right after `sudo -v`.
+**No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware; the
+last two (cloud-init × `PROFILE=minimal`, and `install.sh` bare metal) closed 2026-09-24.
+
+One harness nit is parked rather than filed: `verify`'s `cursor debconf preseed (needs sudo)`
+check skips on an adopted clone even right after `sudo -v`. It is desktop-only — the minimal
+box never installs Cursor — so the live runs could not chase it. Find out rather than accept
+the skip, next time a desktop clone is in front of you.
 
 ## Project direction & philosophy
 
