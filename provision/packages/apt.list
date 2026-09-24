@@ -6,6 +6,8 @@
 #   • desktop/locale/IME            -> only with INSTALL_DESKTOP=1
 # Essential/base packages (dash, grep, coreutils, …) are intentionally NOT listed
 # here — they're always present, so reinstalling them is pure noise.
+# kitty-terminfo + ncurses-term are for INBOUND ssh, not for a terminal on
+# this box — see the note in apt.minimal.list, which owns the reasoning.
 binfmt-support
 build-essential
 ca-certificates
@@ -55,6 +57,7 @@ linux-generic-hwe-24.04
 m17n-db
 mythes-en-au
 mythes-en-us
+ncurses-term
 net-tools
 shim-signed
 thunderbird-locale-en

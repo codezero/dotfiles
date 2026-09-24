@@ -550,30 +550,32 @@ cmd_dry() {
     ok "kitty — --assert-signer asserts the pinned \$KITTY_FP"
   else bad "kitty — --assert-signer does not reference \$KITTY_FP"; fi
 
-  # ── xterm-kitty terminfo ships on EVERY box, in BOTH profiles ─────────────
-  # kitty's own terminfo lives inside the .txz bundle step 38 installs, and is
-  # reachable only through the $TERMINFO kitty exports into its own child — so
-  # it covers the machine kitty RUNS on and nothing else. Every box this repo
-  # provisions is a box someone ssh's INTO from kitty, and ssh forwards
-  # TERM=xterm-kitty and nothing else; with no system entry, every ncurses tool
-  # on the far side answers "unknown terminal type xterm-kitty". Found live on
-  # the TODO K cloud-init box (minimal, so no step 38 at all) and then
-  # reproduced on the desktop, which HAS step 38 and is broken for an inbound
-  # session just the same. 114 kB, no GUI dependency.
-  # All THREE install surfaces need it, install.sh most of all: it exists to set
-  # up an EXISTING box, which is usually one you ssh into. The lists are
-  # hand-maintained and the entry buys nothing visible on the box that installs
-  # it, so it is exactly the kind of line a future tidy-up deletes as noise.
-  # This assertion is what would notice — and it covers install.sh because that
-  # is the surface the first fix forgot.
-  local tmiss=0 al
-  for al in provision/packages/apt.list provision/packages/apt.minimal.list; do
-    grep -qx 'kitty-terminfo' "$HERE/$al" \
-      || { bad "$al — kitty-terminfo missing (inbound ssh from kitty breaks there)"; tmiss=1; }
+  # ── terminfo for INBOUND ssh — every surface, every profile ───────────────
+  # ssh forwards TERM and not the terminfo, so what a box needs is decided by
+  # the CLIENT, never by which terminal (if any) is installed here. That makes
+  # it profile-independent and GUI-independent, which is why it lives in the
+  # apt lists rather than in step 36/38. ncurses-base (Essential) already has
+  # xterm-256color/screen-*/tmux-256color; ncurses-term adds alacritty, wezterm,
+  # foot and ~2,900 more; kitty-terminfo adds xterm-kitty, which ncurses-term
+  # does NOT carry. Neither buys anything visible on the box that installs it,
+  # so both are exactly the kind of line a tidy-up deletes as noise — and
+  # install.sh is the surface a fix forgets, which is how it went the first time.
+  local tmiss=0 al pkg
+  for pkg in kitty-terminfo ncurses-term; do
+    for al in provision/packages/apt.list provision/packages/apt.minimal.list; do
+      grep -qx "$pkg" "$HERE/$al" \
+        || { bad "$al — $pkg missing (inbound ssh from that terminal breaks here)"; tmiss=1; }
+    done
+    grep -qE "^APT_PKGS=\(.*$pkg" "$HERE/install.sh" \
+      || { bad "install.sh — $pkg missing from APT_PKGS"; tmiss=1; }
   done
-  grep -qE '^APT_PKGS=\(.*kitty-terminfo|^ *kitty-terminfo' "$HERE/install.sh" \
-    || { bad "install.sh — kitty-terminfo missing from APT_PKGS"; tmiss=1; }
-  [ "$tmiss" = 0 ] && ok "kitty-terminfo — present in both apt lists and install.sh"
+  # ...and step 36 must NOT have grown its per-user tic back: $HOME/.terminfo
+  # covers one account, shadows the system entry for that account only, and is
+  # the user's own space.
+  if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/36-alacritty.sh" | grep -q 'HOME/.terminfo'; then
+    bad "36-alacritty.sh — writes \$HOME/.terminfo again (one account only; ncurses-term owns this)"; tmiss=1
+  fi
+  [ "$tmiss" = 0 ] && ok "terminfo — kitty-terminfo + ncurses-term on all 3 surfaces, no per-user tic"
 
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────
   # Every dotfiles.list entry must EXIST in the repo. Step 60 and install.sh

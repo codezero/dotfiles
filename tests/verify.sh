@@ -12,6 +12,17 @@ v_core() {
   # from the start — v_core didn't, which was simply an asymmetry.
   check "default shell = zsh (chsh took)" \
     bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
+  # Terminfo for INBOUND ssh. Deliberately probed with `env -i`: that is what a
+  # SECOND account, or root via `sudo -i`, actually sees. Checking it as the
+  # invoking user would pass off a stale ~/.terminfo — which is precisely how
+  # the old step-36 per-user tic hid the fact that nobody else on the box had
+  # the entry. ncurses-base covers tmux-256color, so its failure means the probe
+  # itself is broken rather than a package being absent.
+  local ti
+  for ti in tmux-256color alacritty xterm-kitty; do
+    check "terminfo $ti resolves for ANY account" \
+      env -i /usr/bin/infocmp -1 "$ti"
+  done
   check "oh-my-zsh present"        test -d "$HOME/.oh-my-zsh"
   check "p10k theme present"       test -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
   # The pinned checkouts are AT their pins (pins.sh). A box whose omz/p10k/theme

@@ -2,7 +2,7 @@
 # Step 36 — Alacritty, built from crates.io via cargo (latest stable release).
 # Replaces the old snap so the machine needs no snapd. The binary lands in
 # ~/.cargo/bin/alacritty (on PATH via .zshrc's ~/.cargo/env). `cargo install`
-# does NOT add desktop integration, so terminfo/.desktop/icon/completions are
+# does NOT add desktop integration, so the .desktop/icon/completions are
 # taken from the crate's extra/ dir afterwards — the .crate re-fetched from
 # crates.io and verified against the index's sha256 (all best-effort).
 #
@@ -31,8 +31,15 @@ apt_install build-essential curl git cmake pkg-config libfreetype6-dev \
 as_user 'set -e; . "$HOME/.cargo/env"; cargo install alacritty --locked' \
   || soft_fail "cargo install alacritty failed"
 
-# Ancillary files — terminfo, .desktop, icon, and the zsh/bash/fish
-# completions. `cargo install` places only the binary; these live in the
+# Ancillary files — .desktop, icon, and the zsh/bash/fish completions.
+# NOT terminfo: until 2026-09-24 this step also tic'd the crate's alacritty.info
+# into $HOME/.terminfo, which was wrong twice over — it covered exactly ONE
+# account (not a second user, not root), and terminfo for inbound ssh is not
+# this step's business at all. `ncurses-term` in the apt lists carries the
+# alacritty entries for every account on every profile, including boxes where
+# Alacritty is never installed. ~/.terminfo is the USER's now; the repo does not
+# write it, so anything they put there wins (ncurses searches it first).
+# `cargo install` places only the binary; the rest live in the
 # crate's extra/ dir. Until 2026-09-22 they were fetched from
 # raw.githubusercontent.com at the matching tag with NO hash — and the zsh
 # completion is code sourced by every shell of every user, installed
@@ -60,7 +67,7 @@ fetch_alacritty_extra() {  # <version> <outdir> — leaves <outdir>/extra/
 if dry; then
   would "fetch alacritty-<ver>.crate from static.crates.io, verify against the index.crates.io sha256, unpack extra/"
   would "install completions system-wide from it: _alacritty, alacritty.bash, alacritty.fish"
-  would "(as $TARGET_USER) terminfo -> ~/.terminfo, Alacritty.desktop + icon -> ~/.local/share (Exec rewritten to ~/.cargo/bin)"
+  would "(as $TARGET_USER) Alacritty.desktop + icon -> ~/.local/share (Exec rewritten to ~/.cargo/bin)"
 else
   ver="$(as_user '. "$HOME/.cargo/env" 2>/dev/null; alacritty --version 2>/dev/null | cut -d" " -f2')"
   if [ -z "$ver" ]; then
@@ -88,7 +95,6 @@ else
       as_user "set -e; x='$xt/extra'; \
         appdir=\"\$HOME/.local/share/applications\"; icondir=\"\$HOME/.local/share/icons/hicolor/scalable/apps\"; \
         mkdir -p \"\$appdir\" \"\$icondir\"; \
-        infocmp alacritty >/dev/null 2>&1 || tic -xe alacritty,alacritty-direct -o \"\$HOME/.terminfo\" \"\$x/alacritty.info\"; \
         cp -f \"\$x/logo/alacritty-term.svg\" \"\$icondir/Alacritty.svg\"; \
         cp -f \"\$x/linux/Alacritty.desktop\" \"\$appdir/Alacritty.desktop\"; \
         sed -i \"s|^Exec=alacritty|Exec=\$HOME/.cargo/bin/alacritty|; s|^TryExec=alacritty|TryExec=\$HOME/.cargo/bin/alacritty|\" \"\$appdir/Alacritty.desktop\"" \

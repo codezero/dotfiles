@@ -416,6 +416,34 @@ the first mismatch. That bug is what finished the exporter off.
 **Snaps are neither exported nor installed**: Alacritty — the only user snap —
 is built from crates.io via cargo in step 36, so the machine needs no snapd.
 
+## Terminfo — ssh in from whatever terminal you use
+
+Every box gets `kitty-terminfo` + `ncurses-term` from the apt lists, on **every
+profile**, whether or not a terminal is installed locally. The reason is that
+ssh forwards `TERM` but not the terminfo behind it, so what a box needs is
+decided by the **client**, not by the box: connect from kitty and the far side
+needs `xterm-kitty` even though it will never run kitty.
+
+`ncurses-base` (Essential, always present) already covers `xterm-256color`,
+`screen-*` and `tmux-256color`. `ncurses-term` adds alacritty, wezterm, foot,
+vte and ~2,900 more; `kitty-terminfo` adds `xterm-kitty`, which `ncurses-term`
+does not carry. Together ~4.5 MB.
+
+`~/.terminfo` belongs to the user — nothing here writes it, and ncurses searches
+it *before* `/etc` and `/usr/share`, so anything you put there wins.
+
+**Ghostty has no entry anywhere in Ubuntu**, and neither will the next new
+terminal. That one is the client's job, once per host:
+
+```bash
+infocmp -x xterm-ghostty | ssh user@host 'tic -x -'   # or: ghostty +ssh-cache
+```
+
+kitty has its own version of this — `kitten ssh user@host` copies the terminfo
+over on connect. Worth knowing for boxes this repo did *not* provision; aliasing
+`ssh` to it globally is not recommended (it breaks outside kitty and adds a
+handshake to hosts that already work).
+
 ## cloud-init wiring
 
 `provision.sh` is the single entrypoint. Minimal `user-data`:

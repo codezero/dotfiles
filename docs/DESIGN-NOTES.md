@@ -153,6 +153,21 @@ which is the argument for running them at all rather than reasoning about them.
   setting, so it has to pin the family itself.
 - **lazygit rewrites its own config** in place when the schema changes, which shows up as
   drift on a copy-mode box. Keep the shipped file on the current schema.
+- **ssh forwards `TERM`, not the terminfo behind it.** A modern terminal sets `TERM` to its own
+  name, so connecting from kitty to a box with no `xterm-kitty` entry makes every ncurses tool
+  there fail with "unknown terminal type" — `less`, `vim`, `clear`, and the prompt's own
+  probing. What a box needs is therefore decided by the *client*, and is independent of which
+  terminal (if any) the box has: it belongs in the apt lists, not in a terminal's install step.
+  The first fix missed this twice — it reached for `kitty-terminfo` while the signature-verified
+  kitty tarball already carried a newer copy, and it left `install.sh`, the entry point most
+  likely to be run on a box you only ever ssh into. `ncurses-term` turned out to cover
+  alacritty, wezterm and foot already; Ubuntu has no ghostty entry at all, and never will for
+  whatever ships next — that case is the client's (`infocmp -x … | ssh host 'tic -x -'`).
+- **A per-user `~/.terminfo` hides a missing system entry.** Step 36 used to `tic` Alacritty's
+  entry into `$TARGET_HOME`, which covered exactly one account: a second user, or root via
+  `sudo -i`, had nothing, and the invoking user's own copy made every check look green. Audits
+  of system-wide state have to probe with `env -i`, or they pass off the one home that happens
+  to be populated. `~/.terminfo` is the user's space and the repo no longer writes it.
 - **`setsid` does not simulate cloud-init** — `logname` resolves from the audit loginuid, which
   survives it. Only a systemd unit (or real cloud-init) has none.
 
