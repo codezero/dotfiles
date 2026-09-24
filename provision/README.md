@@ -13,7 +13,6 @@ arm64) machine. **No credentials or PII** are stored — only package names.
 ```
 provision/
 ├── provision.sh          # master entrypoint (run as root; cloud-init target)
-├── inventory-export.sh   # run on the SOURCE machine to refresh the lists exactly
 ├── lib.sh                # shared helpers (logging, target-user, apt, as_user)
 ├── packages/
 │   ├── apt.list          # apt packages (base/desktop/boot excluded)
@@ -356,8 +355,8 @@ Goldens: rebuild from the reviewed SHA, commit the clone's lock as
   (the `env` wrapper is required so the settings survive `sudo`, which resets the
   environment), with `--force-confdef/--force-confold` to auto-resolve dpkg config
   prompts and the msttcorefonts EULA pre-accepted via debconf.
-- **apt.list is filtered at install time** (step 10). The exported list is the full
-  `apt-mark showmanual` set, so the script always skips **boot/firmware** (`grub*`,
+- **apt.list is filtered at install time** (step 10). The list has the shape of an
+  `apt-mark showmanual` dump, so the script always skips **boot/firmware** (`grub*`,
   `shim-signed`, `efibootmgr`) and **kernel** metapackages (they'd reconfigure the
   bootloader / rebuild initramfs), and the **third-party** packages that step 20
   owns (`docker-*`, `containerd.io`, `codium`, `cursor`, `uidmap`) — those
@@ -392,22 +391,30 @@ Goldens: rebuild from the reviewed SHA, commit the clone's lock as
 - **Arch-aware.** Docker codename auto-falls back to `noble` if the repo lacks
   your release. Cursor's signed apt repo serves both arches (`stable` suite).
 
-## Refreshing the lists (do this on the source machine)
+## The package lists (curated by hand)
 
-The committed lists were seeded by inspecting on-disk state and **may not be
-exhaustive** (Homebrew especially). Regenerate them exactly:
+Everything in `packages/` is **maintained by hand** — adding a tool means adding
+a line. There is no exporter: one existed, and it was removed once re-running it
+had come to make the lists worse rather than better (`docs/DESIGN-NOTES.md` has
+the measurements). `apt.list` still has the shape of an `apt-mark showmanual`
+dump and step 10 filters it (see above), so a line a step already owns is
+harmless noise rather than a bug.
+
+**Forking, and want to start from your own box?** Three one-liners, no script:
 
 ```bash
-bash inventory-export.sh      # writes packages/{apt.list,flatpak.list,Brewfile}
+LC_ALL=C apt-mark showmanual | sort -u                     # -> apt.list (prune it)
+flatpak list --app --columns=application                   # -> flatpak.list
+brew bundle dump --file=- | grep -E '^(tap|brew|cask) '    # -> Brewfile
 ```
-The exporter now self-cleans the **Brewfile** (moves `flatpak` entries into
-`flatpak.list`, strips `npm`/`mas`/`vscode`, warns about Linux-unsupported casks),
-so the duplication doesn't recur on re-export.
 
-`apt.list` keeps the full `showmanual` set on purpose — step 10 filters it (see
-above), so you don't have to. **Snaps are not exported or installed**: Alacritty
-— the only user snap — is built from crates.io via cargo in step 36, so the
-machine needs no snapd.
+`LC_ALL=C` is load-bearing, not decoration: under a UTF-8 locale `sort` ignores
+the hyphen, so `ibus-table-cangjie-big` lands *after* `…cangjie5`, while `comm`
+compares bytes — subtract one list from another and it silently stops working at
+the first mismatch. That bug is what finished the exporter off.
+
+**Snaps are neither exported nor installed**: Alacritty — the only user snap —
+is built from crates.io via cargo in step 36, so the machine needs no snapd.
 
 ## cloud-init wiring
 

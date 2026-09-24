@@ -17,7 +17,7 @@ cmd_lint() {
     check "steps/$(basename "$s")" \
       shellcheck -x --severity=warning --source-path="$HERE/provision" "$s"
   done
-  for s in provision/provision.sh provision/lib.sh provision/inventory-export.sh \
+  for s in provision/provision.sh provision/lib.sh \
            provision/versions-lock.sh provision/pins.sh provision/boot-pkgs.sh \
            dotfiles-install.sh install.sh smoke-test.sh \
            tests/lib.sh tests/vocab.sh tests/lint.sh tests/dry.sh tests/verify.sh tests/scenarios.sh; do

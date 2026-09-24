@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
 # boot-pkgs.sh — the ONE definition of "a boot/firmware/kernel package": the
-# apt packages this repo NAMES (apt.list is a full `apt-mark showmanual`
-# export) but NEVER installs or upgrades by name, because Ubuntu's own updater
+# apt packages this repo NAMES (apt.list keeps the shape of an `apt-mark
+# showmanual` dump) but NEVER installs or upgrades by name, because Ubuntu's own updater
 # owns them — installing one unattended reconfigures the bootloader / rebuilds
 # the initramfs, and unattended-upgrades pulls new kernel ABIs on its own
 # schedule (typically minutes after a fresh image's first boot).

@@ -19,10 +19,11 @@
 # ~/versions.lock on every run (and prints what moved since the last one);
 # provision/versions.lock in the repo is the latest golden's copy.
 #
-# Sibling: inventory-export.sh writes the repo's INPUTS (package names -> the
-# manifests, run on a source machine). This records a box's OUTPUTS and runs on
-# any provisioned box or clone. Same rule as that script: names and versions
-# only — no hostnames, usernames, paths, or tokens.
+# Distinct from packages/: those manifests are the repo's INPUTS (which package
+# names to install, curated by hand). This records a box's OUTPUTS -- what those
+# inputs actually produced -- and runs on any provisioned box or clone. Same
+# rule either way: names and versions only, no hostnames, usernames, paths or
+# tokens.
 #
 # Format: sorted TSV, one line per item — `kind<TAB>name<TAB>version` — under
 # a `#` header. Line-oriented so `diff`/`comm` work and no parser is needed.

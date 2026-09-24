@@ -21,8 +21,6 @@ that outlive any one line of code. This file holds the rules; that one holds the
   bare `sudo VAR=…` is subject to the sudoers policy). **`provision/README.md#flags` is the
   canonical flag reference** and `provision.sh --help` prints the recipes — keep those two the
   owners; don't restate flag syntax elsewhere.
-- `bash provision/inventory-export.sh` — run on the **source** machine to regenerate
-  `packages/{apt.list,flatpak.list,Brewfile}` from live state. Names only, never versions.
 - `bash provision/versions-lock.sh emit|check` — **record what landed / report drift; never
   installs.** Step 85 writes `~/versions.lock` on every run as the target user, logging the
   drift since the previous lock first. Sorted TSV (`kind name version`), every kind optional so
@@ -262,8 +260,9 @@ when editing code:
   **waits a bounded time** for any in-flight run; a normal run restarts them at the end
   (`apt_preflight_restore`) — a golden build is captured instead, and the enabled timers return
   at the clone's first boot.
-- Step 10 filters boot/kernel/third-party/desktop out of `apt.list` at install time (the list is
-  the full `apt-mark showmanual` export on purpose). `provision/boot-pkgs.sh` is the **one
+- Step 10 filters boot/kernel/third-party/desktop out of `apt.list` at install time — the list
+  has the shape of an `apt-mark showmanual` dump, so it names things a step owns and things
+  nothing should install by name. `provision/boot-pkgs.sh` is the **one
   owner** of "boot package", shared with `versions-lock.sh --ignore-boot`.
 - Step 20 owns Docker/VSCodium/Cursor in **key → verify → repo → install** order. Every repo
   add is gated on a pinned, verified signing key; a mismatch `soft_fail`s and skips that vendor

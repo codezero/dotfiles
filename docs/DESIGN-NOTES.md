@@ -96,6 +96,22 @@ which is the argument for running them at all rather than reasoning about them.
 - **Homebrew attestations: documented, not enabled.** Verification needs a GitHub token;
   a credential-free build box has none, so enabling it would break every golden. `brew verify`
   post hoc is documented instead.
+- **No inventory exporter.** `inventory-export.sh` regenerated `apt.list`, `flatpak.list` and
+  the `Brewfile` from `apt-mark showmanual` and `brew bundle dump`. It was deleted once
+  re-running it had come to make the lists strictly worse. Measured on the daily box, it took
+  `apt.list` from 65 entries to 95, and all thirty additions were noise: the Essential/required
+  set its own header promised to exclude, that box's kernel ABI, the build dependencies step 36
+  installs itself, and step 20's rootless prerequisites — while silently dropping a real entry
+  that no live state could justify. It also flattened the Brewfile's per-tool rationale
+  comments into Homebrew's generic blurbs. Underneath sat a genuine bug: `sort` under a UTF-8
+  locale ignores the hyphen, so `ibus-table-cangjie-big` sorts after `…cangjie5` while `comm`
+  compares bytes, and both subtractions stopped working from the first mismatch onward. The
+  lists had quietly stopped being an export and become curated inputs. What is lost is real and
+  small: nothing now notices a package installed by hand months ago and never written down —
+  but at thirty noise lines to zero real ones, the script was not delivering that signal
+  either. *Reopen if*: the lists must track a machine automatically rather than be chosen — in
+  which case it needs `LC_ALL=C` on every sort and a pruning pass, not a revert.
+
 - **The git identity stays in the tracked `.gitconfig`.** It is the owner's, and a placeholder
   that refuses to commit would only add ceremony.
 - **No tmux session persistence, no btop config.** Persistence would add two more pinned clones

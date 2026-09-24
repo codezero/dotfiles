@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Step 10 — base apt packages. apt.list is the full `apt-mark showmanual` export,
-# so we filter out classes we must NOT auto-(re)install unattended:
+# Step 10 — base apt packages. apt.list has the shape of an `apt-mark showmanual`
+# dump, so we filter out classes we must NOT auto-(re)install unattended:
 #   - boot/firmware + kernel : would reconfigure the bootloader / rebuild initramfs
 #   - third-party pkgs       : step 20 installs them after adding their repos
 #                              (here they'd be unlocatable and abort the whole batch)
@@ -19,7 +19,7 @@ is_denied() {
   case "$1" in
     docker-ce|docker-ce-cli|docker-ce-rootless-extras|docker-buildx-plugin|docker-compose-plugin|containerd.io|uidmap) return 0 ;;
     codium|cursor) return 0 ;;
-    bruno) return 0 ;;   # removed from the project; still skip if a re-export re-adds it
+    bruno) return 0 ;;   # removed from the project; still skip if a line ever comes back
     flatpak|gnome-software-plugin-flatpak) return 0 ;;   # owned by step 50 (CLI flatpak)
   esac
   return 1
