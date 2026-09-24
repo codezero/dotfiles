@@ -44,8 +44,8 @@ ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
 # ── installer scripts / binaries executed once ───────────────────────────────
 # Homebrew/install: the raw URL is pinned to a COMMIT (not HEAD) and the file
 # is verified against the hash recorded here before it runs.
-HOMEBREW_INSTALL_COMMIT=b41c8e7b3588e2899974119faf3b2a897428648d     # 2026-09-21 (was fde1410a, 2026-09-11: upstream added a --path/-p custom-prefix option and refactored prefix validation; default prefix + our no-arg call unchanged; diff read, nothing network/exec-shaped)
-HOMEBREW_INSTALL_SHA256=71d25d14c32edd7adeaf4413ba671b28474ea08e4f6662cb1a73e85ff0eba368
+HOMEBREW_INSTALL_COMMIT=e53db71afc381d41c46c8baaeba10c091acf4b44     # 2026-09-24 (bumped from b41c8e7b; diff reviewed via `pins.sh bump`)
+HOMEBREW_INSTALL_SHA256=f31a38f097f3b5bbfdc110658e4a9876d0c023ccc9ef2e70527f5b8a762e505e     # sha256 of install.sh at that commit
 HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBREW_INSTALL_COMMIT/install.sh"
 
 # rustup: NOT sh.rustup.rs (a script that downloads whatever rustup-init is
