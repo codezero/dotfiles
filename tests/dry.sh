@@ -575,6 +575,18 @@ cmd_dry() {
   if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/36-alacritty.sh" | grep -q 'HOME/.terminfo'; then
     bad "36-alacritty.sh — writes \$HOME/.terminfo again (one account only; ncurses-term owns this)"; tmiss=1
   fi
+  # BOTH whole-box audits must run the terminfo probe. `verify installsh`
+  # deliberately replaces v_core rather than extending it, so a check added to
+  # v_core silently does not apply to an install.sh box — which is the shape
+  # most likely to be reached ONLY over ssh. That is not hypothetical: S10
+  # scored 28/28 on a box that answered "unknown terminal type xterm-kitty" at
+  # every prompt for the operator who ssh'd in (2026-09-24).
+  local vf
+  for vf in v_core v_installsh; do
+    awk -v f="^$vf\\(\\) \\{" '$0 ~ f {inf=1} inf && /^\}/ {exit} inf' "$HERE/tests/verify.sh" \
+      | grep -q '^[[:space:]]*v_terminfo' \
+      || { bad "verify.sh — $vf does not call v_terminfo (that audit cannot see a missing entry)"; tmiss=1; }
+  done
   [ "$tmiss" = 0 ] && ok "terminfo — kitty-terminfo + ncurses-term on all 3 surfaces, no per-user tic"
 
   # ── .gitconfig's delta hooks degrade on a box without delta ────────────────

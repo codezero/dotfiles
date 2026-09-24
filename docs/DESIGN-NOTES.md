@@ -163,6 +163,12 @@ which is the argument for running them at all rather than reasoning about them.
   likely to be run on a box you only ever ssh into. `ncurses-term` turned out to cover
   alacritty, wezterm and foot already; Ubuntu has no ghostty entry at all, and never will for
   whatever ships next — that case is the client's (`infocmp -x … | ssh host 'tic -x -'`).
+- **An audit that *replaces* another inherits none of its later checks.** `verify installsh`
+  deliberately does not run `v_core` — install.sh installs about nine fewer things — so a check
+  added to `v_core` silently does not apply to an install.sh box, which is the shape most likely
+  to be reached only over ssh. That is how S10 scored 28/28 on a box that answered "unknown
+  terminal type" at every prompt for the person who connected to it. Shared checks now live in
+  their own function that both audits call, with a dry-tier assertion that they still do.
 - **A per-user `~/.terminfo` hides a missing system entry.** Step 36 used to `tic` Alacritty's
   entry into `$TARGET_HOME`, which covered exactly one account: a second user, or root via
   `sudo -i`, had nothing, and the invoking user's own copy made every check look green. Audits

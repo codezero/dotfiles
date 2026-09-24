@@ -5,6 +5,24 @@
 # external assessment's last open item. Shared helpers: tests/lib.sh.
 
 # ── verify (on-box end-state audit) ─────────────────────────────────────────
+# Terminfo for INBOUND ssh — shared by v_core and v_installsh, because BOTH
+# entry points install kitty-terminfo + ncurses-term and both produce boxes
+# whose whole purpose is to be ssh'd into. It lives here rather than being
+# copied into each, so the two cannot drift.
+#
+# Probed with `env -i` deliberately: that is what a SECOND account, or root via
+# `sudo -i`, actually sees. As the invoking user it would pass off a stale
+# ~/.terminfo — precisely how the old step-36 per-user tic hid the fact that
+# nobody else on the box had the entry. ncurses-base ships tmux-256color, so if
+# THAT one fails the probe itself is broken rather than a package being absent.
+v_terminfo() {
+  local ti
+  for ti in tmux-256color alacritty xterm-kitty; do
+    check "terminfo $ti resolves for ANY account" \
+      env -i /usr/bin/infocmp -1 "$ti"
+  done
+}
+
 v_core() {
   hdr "verify: core (every provisioned box)"
   check "zsh installed"            command -v zsh
@@ -12,17 +30,7 @@ v_core() {
   # from the start — v_core didn't, which was simply an asymmetry.
   check "default shell = zsh (chsh took)" \
     bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
-  # Terminfo for INBOUND ssh. Deliberately probed with `env -i`: that is what a
-  # SECOND account, or root via `sudo -i`, actually sees. Checking it as the
-  # invoking user would pass off a stale ~/.terminfo — which is precisely how
-  # the old step-36 per-user tic hid the fact that nobody else on the box had
-  # the entry. ncurses-base covers tmux-256color, so its failure means the probe
-  # itself is broken rather than a package being absent.
-  local ti
-  for ti in tmux-256color alacritty xterm-kitty; do
-    check "terminfo $ti resolves for ANY account" \
-      env -i /usr/bin/infocmp -1 "$ti"
-  done
+  v_terminfo
   check "oh-my-zsh present"        test -d "$HOME/.oh-my-zsh"
   check "p10k theme present"       test -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
   # The pinned checkouts are AT their pins (pins.sh). A box whose omz/p10k/theme
@@ -168,6 +176,11 @@ v_installsh() {
   # tmux: install.sh ships .tmux.conf and .zshrc loads omz's tmux plugin, which
   # nags on every shell start when the binary is missing (found live, S10).
   check "tmux installed"         command -v tmux
+  # Found the hard way 2026-09-24: this audit skips v_core, so the terminfo
+  # checks did not run on the ONE box shape most likely to be reached only over
+  # ssh — and S10 passed 28/28 while the operator's session was answering
+  # "unknown terminal type xterm-kitty" at every prompt.
+  v_terminfo
   check "oh-my-zsh present"      test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"
   check "p10k theme present"     test -f "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme"
   check "zsh starts clean"       zsh -ic true
