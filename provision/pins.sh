@@ -143,7 +143,12 @@ fetch_pinned() {
 # act. --check only reports (exit 1 = something is behind). Why it exists: on a daily box `omz update` would
 # make the tool a second owner of code the pin owns; the pin wins, so bumping
 # has to be as easy as the tool's own updater (.zshrc routes `omz update` here).
-_pins_file() { echo "${BASH_SOURCE[0]}"; }
+# ABSOLUTE, always: callers do `git -C "$(dirname …)" add "$(…)"`, and with a
+# relative BASH_SOURCE (`bash provision/pins.sh bump …` from the repo root)
+# that resolves to provision/provision/pins.sh and fails. It failed silently
+# for two days because the `git add` was 2>/dev/null'd while bump still
+# printed "rewritten and staged" (2026-09-24).
+_pins_file() { printf '%s/%s\n' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$(basename "${BASH_SOURCE[0]}")"; }
 _pin_get() { grep -E "^$1=" "$(_pins_file)" | head -1 | cut -d= -f2 | cut -d' ' -f1 | tr -d '"'; }
 # _pin_set VAR VALUE COMMENT — replace the whole VAR= line; the rest of the
 # file stays byte-identical (the dry tier asserts that).
@@ -240,8 +245,14 @@ bump() {
     case "$r" in 3) changed=1 ;; 0) ;; 1) changed=1; rc=1 ;; *) rc=1 ;; esac
   done
   if [ "$changed" = 1 ] && [ "$CHECK" = 0 ]; then
-    git -C "$(dirname "$(_pins_file)")" add "$(_pins_file)" 2>/dev/null
-    echo "── pins.sh rewritten and staged. Review the log/diff above, then commit: git commit -m 'pins: bump …'"
+    local pf; pf="$(_pins_file)"
+    # Not silenced: a message that says "staged" when nothing was staged is
+    # worse than no message.
+    if git -C "$(dirname "$pf")" add "$pf"; then
+      echo "── pins.sh rewritten and staged. Review the log/diff above, then commit: git commit -m 'pins: bump …'"
+    else
+      echo "── pins.sh rewritten but NOT staged (not a git checkout?) — stage $pf yourself, then commit." >&2
+    fi
   fi
   # --check: exit 1 when something is behind (cadence step 1), like versions-lock.sh check.
   [ "$CHECK" = 1 ] && [ "$changed" = 1 ] && [ "$rc" = 0 ] && return 1

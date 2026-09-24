@@ -421,6 +421,16 @@ cmd_dry() {
   # argument validation, and the line rewrite must touch ONLY the named pin
   # (the rest of the file byte-identical, shapes intact). The upstream fetches
   # need the network and are exercised by hand on each cadence run.
+  # _pins_file must be ABSOLUTE even when pins.sh is invoked by a relative
+  # path: `bump` stages with `git -C "$(dirname …)" add "$(…)"`, which with a
+  # relative path becomes provision/provision/pins.sh and fails. It did, for
+  # two days, silently (2026-09-24).
+  local pabs; pabs="$(cd "$HERE" && bash -c 'source provision/pins.sh; _pins_file' 2>/dev/null)"
+  case "$pabs" in
+    /*) [ -f "$pabs" ] && ok "pins.sh — _pins_file is absolute even when invoked by a relative path" \
+          || bad "pins.sh — _pins_file returned '$pabs', which is not a readable file" ;;
+    *)  bad "pins.sh — _pins_file returned a RELATIVE path ('$pabs'); bump's git add will fail" ;;
+  esac
   bash "$HERE/provision/pins.sh" bump >/dev/null 2>&1; local brc=$?
   bash "$HERE/provision/pins.sh" bump nosuchpin >/dev/null 2>&1; local brc2=$?
   if [ "$brc" = 2 ] && [ "$brc2" = 2 ]; then ok "pins.sh bump — no name / unknown name is exit 2"
