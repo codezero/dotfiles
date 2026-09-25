@@ -158,8 +158,8 @@ fi
 if ! dry; then
   legacy="$(as_user 'u="$HOME/.terminfo/a/alacritty"
     [ -e "$u" ] || exit 0
-    mine="$(infocmp -1 alacritty 2>/dev/null)"
-    sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null)"
+    mine="$(infocmp -1 alacritty 2>/dev/null | grep -v "^#")"    # drop the "from file: <path>" comment,
+    sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null | grep -v "^#")"   # or identical entries never match
     [ -n "$sys" ] || exit 0
     [ "$mine" = "$sys" ] || printf %s "$u"' 2>/dev/null || true)"
   if [ -n "$legacy" ]; then

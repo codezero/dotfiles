@@ -133,8 +133,10 @@ v_gui() {  # GUI installs — present only when gui_wanted (full, not headless)
   # the message names the remedy rather than assuming which it is.
   check "terminfo alacritty not shadowed by a stale ~/.terminfo entry" \
     bash -c 'u="$HOME/.terminfo/a/alacritty"; [ -e "$u" ] || exit 0
-             sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null)"; [ -n "$sys" ] || exit 0
-             [ "$(infocmp -1 alacritty 2>/dev/null)" = "$sys" ] && exit 0
+             # grep -v "^#": infocmp names its source file in a comment line, so
+             # identical entries in two places would otherwise always "differ".
+             sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null | grep -v "^#")"; [ -n "$sys" ] || exit 0
+             [ "$(infocmp -1 alacritty 2>/dev/null | grep -v "^#")" = "$sys" ] && exit 0
              echo "$u shadows the system entry and differs from it (ncurses-term owns these now)." >&2
              echo "Remove it:  rm -f ~/.terminfo/a/alacritty ~/.terminfo/a/alacritty-direct" >&2; exit 1'
   check "alacritty built"          test -x "$HOME/.cargo/bin/alacritty"
