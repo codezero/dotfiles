@@ -141,3 +141,28 @@ if [ -d "$fontsrc" ]; then
 else
   soft_fail "vendored fonts dir missing: $fontsrc — MesloLGS NF not installed (prompt/TUI glyphs will be tofu)"
 fi
+
+# ── legacy per-user terminfo left by earlier revisions of THIS step ──────────
+# Until 2026-09-24 this step ran `tic … -o "$HOME/.terminfo"`. That write is gone
+# (ncurses-term now carries the alacritty entries system-wide, for every account
+# rather than one), but stopping a write does not undo it: ncurses searches
+# ~/.terminfo FIRST, so on a box provisioned earlier the target user's real
+# sessions keep resolving the old repo-written entry while the audit — which
+# probes with `env -i` to prove the SYSTEM entry exists — passes. That gap was
+# found by an external review, 2026-09-25.
+#
+# Reported, never deleted. ~/.terminfo is the user's space and the repo does not
+# write it any more, so it must not quietly remove things from it either: what
+# looks like our leftover may be a deliberate override. A `warn` lands in the
+# end-of-run summary, which is exactly where a one-time manual follow-up belongs.
+if ! dry; then
+  legacy="$(as_user 'u="$HOME/.terminfo/a/alacritty"
+    [ -e "$u" ] || exit 0
+    mine="$(infocmp -1 alacritty 2>/dev/null)"
+    sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null)"
+    [ -n "$sys" ] || exit 0
+    [ "$mine" = "$sys" ] || printf %s "$u"' 2>/dev/null || true)"
+  if [ -n "$legacy" ]; then
+    warn "stale per-user terminfo shadows the system entry: $legacy differs from /usr/share/terminfo's. Earlier revisions of step 36 wrote it; ncurses-term owns these now. Remove it as $TARGET_USER when convenient:  rm -f ~/.terminfo/a/alacritty ~/.terminfo/a/alacritty-direct"
+  fi
+fi

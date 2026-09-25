@@ -115,6 +115,19 @@ v_gui() {  # GUI installs — present only when gui_wanted (full, not headless)
     check "cursor debconf opt-out preseeded" \
       bash -c 'sudo -n debconf-show cursor 2>/dev/null | grep -q "add-cursor-repo: false"'
   else skip "cursor debconf preseed (needs sudo)"; fi
+  # v_terminfo proves the SYSTEM entry exists for every account. It cannot see
+  # the other half: earlier revisions of step 36 wrote ~/.terminfo/a/alacritty,
+  # ncurses searches that FIRST, and `env -i` deliberately hides it — so the
+  # invoking user can be on a stale entry while the audit is green (external
+  # review, 2026-09-25). Check what this user actually resolves. A deliberate
+  # override trips this too, and that is correct for an audit of "as provisioned":
+  # the message names the remedy rather than assuming which it is.
+  check "terminfo alacritty not shadowed by a stale ~/.terminfo entry" \
+    bash -c 'u="$HOME/.terminfo/a/alacritty"; [ -e "$u" ] || exit 0
+             sys="$(env -i /usr/bin/infocmp -1 alacritty 2>/dev/null)"; [ -n "$sys" ] || exit 0
+             [ "$(infocmp -1 alacritty 2>/dev/null)" = "$sys" ] && exit 0
+             echo "$u shadows the system entry and differs from it (ncurses-term owns these now)." >&2
+             echo "Remove it:  rm -f ~/.terminfo/a/alacritty ~/.terminfo/a/alacritty-direct" >&2; exit 1'
   check "alacritty built"          test -x "$HOME/.cargo/bin/alacritty"
   # Design invariant (CLAUDE.md): Alacritty was the only user snap, and it is
   # built via cargo so the machine needs no snapd. NB this asserts WE installed
