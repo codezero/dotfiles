@@ -4,11 +4,12 @@
 # drift against a previous record. Never installs, never downgrades.
 #
 #   bash versions-lock.sh emit [-o FILE]      write the lock (stdout by default)
-#   bash versions-lock.sh check LOCK [--brief] [--ignore-boot]
+#   bash versions-lock.sh check LOCK [--brief] [--ignore-boot] [--ignore-dep]
 #                                     compare this box to LOCK: exit 0 = no
 #                                     drift, 1 = drift, 2 = error. --ignore-boot
 #                                     leaves out the running kernel and the
-#                                     kernel/bootloader packages (boot-pkgs.sh)
+#                                     kernel/bootloader packages (boot-pkgs.sh);
+#                                     --ignore-dep leaves out the `dep` rows
 #
 # Why a record and not a pin: every install source here floats by design
 # (brew, rustup, mise, Claude, kitty, flatpak, three git clones at HEAD), and
@@ -18,6 +19,27 @@
 # manifest of outputs. This file is that manifest. Step 85 writes it to
 # ~/versions.lock on every run (and prints what moved since the last one);
 # provision/versions.lock in the repo is the latest golden's copy.
+#
+# THE `dep` KIND IS RECORDED, NEVER ASSERTED, AND NEVER AN INPUT.
+# apt resolves dependencies itself and marks them `auto`; this repo names ~78
+# packages and a real box ends up with ~1,900. The other ~1,800 used to be
+# invisible here, so a generation diff could not see a library move at all --
+# and for Docker/VSCodium/Cursor, whose packages come from vendor CDNs rather
+# than the Ubuntu archive, "the release pins it" was never true in the first
+# place. `dep` closes that: every installed package not already recorded as
+# `apt` or `deb`, so drift in a dependency is visible.
+# Three hard rules, because a list of package names is a tempting thing to
+# reuse and every one of those reuses would be wrong:
+#   1. NOTHING installs from it. packages/*.list are the only install inputs;
+#      naming a dependency there would mark it `manual` and permanently defeat
+#      finalize's `apt-get autoremove`.
+#   2. `dep` drift NEVER sets the failure exit code. It is reported under its
+#      own heading and `check` still exits 0 when only dep rows moved -- because
+#      unattended-upgrades bumps libraries on its own schedule and a check that
+#      cries wolf after every u-u run is a check nobody reads.
+#   3. It is not a dependency CLOSURE and does not claim to be. It is "what is
+#      installed", which also means a package put on by hand shows up -- the
+#      signal that deleting inventory-export.sh gave away.
 #
 # Distinct from packages/: those manifests are the repo's INPUTS (which package
 # names to install, curated by hand). This records a box's OUTPUTS -- what those
@@ -71,15 +93,39 @@ docker-compose-plugin docker-ce-rootless-extras codium cursor"
 
 # Only what the repo NAMES (decided): the union of the apt manifests. Base-image
 # packages are the Ubuntu release's business and would drown the tool drift.
+# The apt names this repo actually NAMES: both manifests, minus the vendor debs
+# (those are src_deb's). LC_ALL=C on the sort deliberately — a UTF-8 collation
+# ignores the hyphen, and anything downstream doing a byte-wise comparison then
+# silently stops matching part-way through (that bug is what killed the old
+# inventory exporter).
+_apt_named() {
+  cat "$PKG_DIR/apt.list" "$PKG_DIR/apt.minimal.list" 2>/dev/null \
+    | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | LC_ALL=C sort -u \
+    | grep -vxF -f <(tr ' ' '\n' <<<"$DEB_PKGS")
+}
+
 src_apt() {
   command -v dpkg-query >/dev/null 2>&1 || return 0
-  local names
-  names="$(cat "$PKG_DIR/apt.list" "$PKG_DIR/apt.minimal.list" 2>/dev/null \
-           | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | sort -u \
-           | grep -vxF -f <(tr ' ' '\n' <<<"$DEB_PKGS"))"
+  local names; names="$(_apt_named)"
   [ -n "$names" ] || return 0
   # shellcheck disable=SC2086
   _dpkg_versions $names | sed 's/^/apt\t/'
+}
+
+# Every installed package this repo does NOT name — see the `dep` rules in the
+# header. dpkg-query, not `apt-cache depends --recurse`: no apt cache needed,
+# nothing to get wrong about resolver semantics, and "what is installed" is the
+# claim actually being made.
+src_dep() {
+  command -v dpkg-query >/dev/null 2>&1 || return 0
+  local cov; cov="$(mktemp)" || return 0
+  # shellcheck disable=SC2086
+  { _apt_named; printf '%s\n' $DEB_PKGS; } | sed '/^$/d' | LC_ALL=C sort -u > "$cov"
+  dpkg-query -W -f='${Status}\t${Package}\t${Version}\n' 2>/dev/null \
+    | awk -F'\t' -v cov="$cov" '
+        BEGIN { while ((getline l < cov) > 0) named[l] = 1 }
+        $1 == "install ok installed" && $3 != "" && !($2 in named) { print "dep\t" $2 "\t" $3 }'
+  rm -f "$cov"
 }
 
 src_deb() {
@@ -177,8 +223,8 @@ emit_header() {
 }
 
 emit_body() {
-  { src_system; src_apt; src_deb; src_brew; src_flatpak; src_rustup; src_cargo
-    src_claude; src_kitty; src_mise; src_git; } \
+  { src_system; src_apt; src_deb; src_dep; src_brew; src_flatpak; src_rustup
+    src_cargo; src_claude; src_kitty; src_mise; src_git; } \
     | awk -F'\t' 'NF==3 && $3!="" {print}' | LC_ALL=C sort -u
 }
 
@@ -201,7 +247,13 @@ cmd_emit() {
 # ── check ───────────────────────────────────────────────────────────────────
 # Row filters for --ignore-boot (TSV on stdin): a boot row is `system/kernel`
 # or an `apt` row whose name is_boot_pkg.
-_is_boot_row() { { [ "$1" = system ] && [ "$2" = kernel ]; } || { [ "$1" = apt ] && is_boot_pkg "$2"; }; }
+# NB `dep`: most kernel/bootloader packages are NOT named in apt.list, so they
+# arrive as dep rows. Without them here, --ignore-boot would stop covering the
+# very thing it exists for the moment the dep kind was added.
+_is_boot_row() {
+  { [ "$1" = system ] && [ "$2" = kernel ]; } \
+    || { { [ "$1" = apt ] || [ "$1" = dep ]; } && is_boot_pkg "$2"; }
+}
 _boot_rows()      { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row "$k" "$n" && printf '%s\t%s\t%s\n' "$k" "$n" "$v"; done; true; }
 _drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row "$k" "$n" || printf '%s\t%s\t%s\n' "$k" "$n" "$v"; done; true; }
 # --ignore-boot: `system/kernel` is `uname -r` at emit time — for a lock
@@ -211,7 +263,7 @@ _drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row 
 # unattended-upgrades bumps them minutes after a fresh boot. A first-boot audit
 # wants provisioning's drift, not Ubuntu's — everything else still counts.
 cmd_check() {
-  local lock="" brief=0 ignore_boot=0
+  local lock="" brief=0 ignore_boot=0 ignore_dep=0
   # Options and the lock path in any order — `check --brief LOCK` and
   # `check LOCK --brief` both work (the first draft took $1 as the path
   # unconditionally, so the former reported "no such lock: '--brief'").
@@ -219,6 +271,7 @@ cmd_check() {
     case "$1" in
       --brief) brief=1 ;;
       --ignore-boot) ignore_boot=1 ;;
+      --ignore-dep)  ignore_dep=1 ;;
       -*) usage ;;
       *) [ -z "$lock" ] || usage; lock="$1" ;;
     esac; shift
@@ -232,6 +285,11 @@ cmd_check() {
   emit_body > "$now"
   # Compare by (kind, name). Both files are sorted TSV without headers here.
   local old; old="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u)"
+  if [ "$ignore_dep" = 1 ]; then
+    local curd; curd="$(awk -F'\t' '$1!="dep"' "$now")"
+    printf '%s\n' "$curd" > "$now"
+    old="$(awk -F'\t' '$1!="dep"' <<<"$old")"
+  fi
   local nb=0
   if [ "$ignore_boot" = 1 ]; then
     local cur
@@ -247,12 +305,41 @@ cmd_check() {
   changed="$(join -t $'\t' -j1 <(printf '%s\n' "$old" | awk -F'\t' '{print $1"/"$2"\t"$3}' | LC_ALL=C sort) \
                             <(awk -F'\t' '{print $1"/"$2"\t"$3}' "$now" | LC_ALL=C sort) \
              | awk -F'\t' '$2!=$3')"
-  local na nr nc
-  na="$(printf '%s' "$added"   | grep -c .)"; nr="$(printf '%s' "$removed" | grep -c .)"
+  # Split ASSERTED rows from RECORDED-ONLY `dep` rows. Rule 2 in the header: a
+  # library that unattended-upgrades bumped is a fact worth printing and not a
+  # reason to fail, so dep rows are counted and listed under their own heading
+  # and never reach the exit code.
+  local d_added d_removed d_changed
+  d_added="$(printf   '%s\n' "$added"   | grep '^dep/' || true)"
+  d_removed="$(printf '%s\n' "$removed" | grep '^dep/' || true)"
+  d_changed="$(printf '%s\n' "$changed" | grep '^dep/' || true)"
+  added="$(printf     '%s\n' "$added"   | grep -v '^dep/' || true)"
+  removed="$(printf   '%s\n' "$removed" | grep -v '^dep/' || true)"
+  changed="$(printf   '%s\n' "$changed" | grep -v '^dep/' || true)"
+
+  local na nr nc nda ndr ndc
+  na="$(printf '%s' "$added"   | grep -c .)"; nr="$(printf  '%s' "$removed"   | grep -c .)"
   nc="$(printf '%s' "$changed" | grep -c .)"
+  nda="$(printf '%s' "$d_added" | grep -c .)"; ndr="$(printf '%s' "$d_removed" | grep -c .)"
+  ndc="$(printf '%s' "$d_changed" | grep -c .)"
+
+  # Printed AFTER the verdict either way, so the headline is never ambiguous.
+  _dep_report() {
+    [ "$ignore_dep" = 1 ] && return 0
+    [ "$nda" = 0 ] && [ "$ndr" = 0 ] && [ "$ndc" = 0 ] && return 0
+    echo "  dep rows (recorded, not asserted): $ndc changed, $nda added, $ndr removed"
+    [ "$brief" = 1 ] && return 0
+    [ -n "$d_changed" ] && printf '%s\n' "$d_changed" | awk -F'\t' '{printf "    changed  %-30s %s -> %s\n", $1, $2, $3}'
+    [ -n "$d_added"   ] && printf '%s\n' "$d_added"   | awk -F'\t' '{printf "    added    %-30s %s\n", $1, $2}'
+    [ -n "$d_removed" ] && printf '%s\n' "$d_removed" | awk -F'\t' '{printf "    removed  %-30s (was %s)\n", $1, $2}'
+    return 0
+  }
+
   local ign=""; [ "$ignore_boot" = 1 ] && ign=" ($nb boot rows ignored)"
+  [ "$ignore_dep" = 1 ] && ign="$ign (dep rows ignored)"
   if [ "$na" = 0 ] && [ "$nr" = 0 ] && [ "$nc" = 0 ]; then
-    echo "no drift vs $lock ($(grep -vc '^#' "$lock") entries)$ign"; return 0
+    echo "no drift vs $lock ($(grep -vc '^#' "$lock") entries)$ign"
+    _dep_report; return 0
   fi
   echo "drift vs $lock: $nc changed, $na added, $nr removed$ign"
   if [ "$brief" = 0 ]; then
@@ -260,6 +347,7 @@ cmd_check() {
     [ -n "$added"   ] && printf '%s\n' "$added"   | awk -F'\t' '{printf "  added    %-32s %s\n", $1, $2}'
     [ -n "$removed" ] && printf '%s\n' "$removed" | awk -F'\t' '{printf "  removed  %-32s (was %s)\n", $1, $2}'
   fi
+  _dep_report
   return 1
 }
 

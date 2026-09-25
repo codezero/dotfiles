@@ -119,6 +119,18 @@ gets written down, check the same commit that something goes red when it stops b
   either. *Reopen if*: the lists must track a machine automatically rather than be chosen — in
   which case it needs `LC_ALL=C` on every sort and a pruning pass, not a revert.
 
+- **Dependencies are recorded, not named.** `apt.list` holds what to *ask for*; apt resolves the
+  rest. Naming the closure there would be actively wrong — anything named gets installed and
+  therefore marked `manual`, which permanently defeats the `apt-get autoremove` finalize runs —
+  and it would duplicate a resolver that already does the job. But the lock's claim is "what
+  landed", and until 2026-09 it covered 64 of a real box's 1,882 packages: `cursor` has 29 direct
+  dependencies and exactly one was recorded, so a generation diff could not see a library move.
+  The defence that `apt.list` is "pinned by the Ubuntu release" holds for the archive at a point
+  in time and not at all for Docker, VSCodium and Cursor, which come from vendor CDNs. Hence a
+  `dep` kind: every installed package not already recorded, **reported and never asserted**, on
+  the `--ignore-boot` precedent that some rows are somebody else's to bump. *Reopen if*: the dep
+  section starts being read as an install list, or someone wants a true closure rather than
+  "what is installed" — the latter is a different claim and should get a different kind.
 - **The git identity stays in the tracked `.gitconfig`.** It is the owner's, and a placeholder
   that refuses to commit would only add ceremony.
 - **No tmux session persistence, no btop config.** Persistence would add two more pinned clones

@@ -24,7 +24,10 @@ that outlive any one line of code. This file holds the rules; that one holds the
 - `bash provision/versions-lock.sh emit|check` — **record what landed / report drift; never
   installs.** Step 85 writes `~/versions.lock` on every run as the target user, logging the
   drift since the previous lock first. Sorted TSV (`kind name version`), every kind optional so
-  it is valid on a bare CI runner, and no usernames/hostnames/paths.
+  it is valid on a bare CI runner, and no usernames/hostnames/paths. The `dep` kind records
+  every *other* installed package: **recorded, never asserted** (its drift prints under its own
+  heading and never sets the exit code) and **never an install input** — naming a dependency in
+  `packages/*.list` would mark it manual and defeat finalize's autoremove.
   `provision/README.md#versions--recorded-not-pinned` owns the fact.
 - `bash smoke-test.sh lint && bash smoke-test.sh dry` — **run after ANY script change.**
   `smoke-test.sh` is the CLI; the tiers live in `tests/` (`lib.sh` helpers, `vocab.sh` the

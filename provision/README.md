@@ -221,6 +221,25 @@ record that makes the claim checkable is `versions.lock`:
   cargo-built Alacritty, Claude, kitty, mise's global tools, and the commit of
   each git clone. No hostnames, usernames, paths or tokens. Its header records
   when, from which repo SHA, and with which flags.
+- **Plus a `dep` row for every other installed package.** apt resolves
+  dependencies itself and marks them `auto`: this repo names ~78 packages and a
+  real box ends up with ~1,900, so ~1,800 of them used to be invisible here and
+  a generation diff could not see a library move at all. For Docker, VSCodium
+  and Cursor — whose packages come from vendor CDNs rather than the Ubuntu
+  archive — "the release pins it" was never true either; `cursor` alone has 29
+  direct dependencies and exactly one of them was recorded. Three rules, all
+  three guarded in the dry tier:
+  1. **Nothing installs from it.** `packages/*.list` are the only install
+     inputs. Naming a dependency there would mark it `manual` and permanently
+     defeat finalize's `apt-get autoremove`.
+  2. **`dep` drift never fails.** It prints under its own heading — `dep rows
+     (recorded, not asserted)` — and `check` still exits 0 when only dep rows
+     moved, because unattended-upgrades bumps libraries on its own schedule and
+     a check that cries wolf after every u-u run is a check nobody reads. Use
+     `--ignore-dep` to drop the section entirely.
+  3. **It is not a dependency closure** and doesn't claim to be. It is "what is
+     installed" — which also means a package added by hand shows up, the one
+     signal that removing the old inventory exporter gave away.
 - **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
   clone boots with "what this image contains" on the box, and `verify` on a
   clone asserts **zero drift** against it — with `--ignore-boot`. Two rows are
@@ -249,7 +268,11 @@ bash provision/versions-lock.sh emit -o ~/versions.lock     # record this box
 bash provision/versions-lock.sh check ~/versions.lock        # drift since then: exit 0 none, 1 drift, 2 error
 bash provision/versions-lock.sh check provision/versions.lock # this box vs the latest golden
 bash provision/versions-lock.sh check ~/versions.lock --ignore-boot  # what verify runs on a clone
+bash provision/versions-lock.sh check ~/versions.lock --ignore-dep   # decisions only, no dependency noise
 ```
+
+The first lock emitted after the `dep` kind was added shows every dependency as
+**added** — roughly 1,800 rows, once. That is the format change, not drift.
 
 What it never does: install, upgrade, or downgrade anything. A `PIN_VERSIONS`
 mode was considered and rejected — it would be ~70 % real with an invisible
