@@ -582,6 +582,14 @@ cmd_dry() {
   if [ "$brc" = 0 ] && ! grep -q 'rewritten' <<<"$bout"; then
     ok "pins.sh bump — nothing to do claims no rewrite and exits 0"
   else bad "pins.sh bump — no-op gave exit $brc and said: $(printf %.120s "$bout")"; fi
+  # (5) a bad name is refused before the snapshot and before any worker runs:
+  #     `brew-installer bogus` must not rewrite the first pin, and nothing is
+  #     left in the temp dir.
+  cp "$HERE/provision/pins.sh" "$bt/pins.sh"; mkdir -p "$bt/tmp"
+  bout="$( cd "$bt" && TMPDIR="$bt/tmp" bash -c 'source ./pins.sh; _bump_brew() { _pin_set HOMEBREW_INSTALL_COMMIT deadbeefdeadbeefdeadbeefdeadbeefdeadbeef stub; return 3; }; bump brew-installer bogus' 2>&1 )"; brc=$?
+  if [ "$brc" = 2 ] && cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" && [ -z "$(ls -A "$bt/tmp")" ]; then
+    ok "pins.sh bump — a bad name changes nothing and leaves no temp file (exit 2)"
+  else bad "pins.sh bump — 'brew-installer bogus' gave exit $brc$(cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" || echo ', rewrote a pin')$([ -z "$(ls -A "$bt/tmp")" ] || echo ', left a temp file')"; fi
   # (4) the safety copy cannot be made (mktemp fails): stop before any worker
   #     runs — exit 1 and pins.sh untouched (round-2 review).
   cp "$HERE/provision/pins.sh" "$bt/pins.sh"; mkdir -p "$bt/shim"

@@ -235,6 +235,17 @@ bump() {
   local pf snap=""; pf="$(_pins_file)"
   [ -n "$what" ] || { echo "usage: pins.sh bump [--check] omz|p10k|alacritty-theme|brew-installer|claude-bootstrap|rustup|all" >&2; return 2; }
   [ "$what" = all ] && set -- omz p10k alacritty-theme brew-installer claude-bootstrap rustup
+  # Every name is checked BEFORE the snapshot and before any worker runs, so a
+  # bad argument changes nothing and leaves nothing behind (round-3 review:
+  # `bump bogus` leaked the snapshot, `bump brew-installer bogus` rewrote a pin
+  # and then returned 2 without comparing, staging or cleaning up).
+  local w
+  for w in "$@"; do
+    case "$w" in
+      omz|p10k|alacritty-theme|brew-installer|claude-bootstrap|rustup) ;;
+      *) echo "bump: unknown pin '$w'" >&2; return 2 ;;
+    esac
+  done
   # The snapshot is how the outcome is judged, so no snapshot means no bump:
   # stop BEFORE any worker can change the file (round-2 review — it used to
   # carry on with snap="", skip the check, and return 0 after a rewrite).
@@ -250,7 +261,7 @@ bump() {
       brew-installer)   _bump_brew ;;
       claude-bootstrap) _bump_claude ;;
       rustup)           _bump_rustup ;;
-      *) echo "bump: unknown pin '$what'" >&2; return 2 ;;
+      *) rc=2 ;;   # unreachable — names were validated above; no early return past the snapshot
     esac; r=$?
     # 3 = news (rewritten, or found by --check). 0 = already at upstream.
     # Anything else is a failure, and says NOTHING about whether the file
