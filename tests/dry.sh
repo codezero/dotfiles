@@ -384,6 +384,15 @@ cmd_dry() {
   if [ "$grc" != 0 ] && grep -q 'uncommitted changes' <<<"$gout"; then
     ok "golden provenance — a dirty checkout is REFUSED before any step runs"
   else bad "golden provenance — dirty tree gave exit $grc: $(printf %.200s "$gout")"; fi
+  # An UNTRACKED file must count too: step 36 copies every fonts/MesloLGS-NF/*.ttf,
+  # so an extra untracked font changes the image while HEAD looks clean.
+  # `git diff --quiet HEAD` missed that (round-2 review).
+  git -C "$gt" checkout -q -- provision/lib.sh
+  : > "$gt/fonts/MesloLGS-NF/untracked-extra.ttf"
+  gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh 2>&1)"; grc=$?
+  if [ "$grc" != 0 ] && grep -q 'uncommitted changes' <<<"$gout"; then
+    ok "golden provenance — an UNTRACKED file is refused too (not only tracked edits)"
+  else bad "golden provenance — untracked file gave exit $grc: $(printf %.200s "$gout")"; fi
   gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh --dry-run 2>&1)"; grc=$?
   if [ "$grc" = 0 ] && grep -q 'a real run would refuse' <<<"$gout"; then
     ok "golden provenance — --dry-run only WARNS (previewing from a dirty tree is normal)"
