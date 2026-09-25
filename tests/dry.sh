@@ -784,14 +784,18 @@ cmd_dry() {
   # braced `${TARGET_HOME}` form (round-2 review). This is a TEXT SCAN, not a
   # proof: it catches the common shapes — a mutating command, bare or after
   # $SUDO, then/do/else, ; & | ( — aimed at $VAR or ${VAR} of a home path, plus
-  # redirects into one. Lines through as_user/as_owner are skipped: they run as
-  # the owner. Root may still READ a home (finalize's verify pass does).
+  # redirects into one. as_user/as_owner calls are skipped: they run as the
+  # owner. Root may still READ a home (finalize's verify pass does).
   # Home aliases are derived per file from assignments off TARGET_HOME.
   # Capture, never `{ … } | grep -q .` — under pipefail that could not fail.
   local rh rhit=0 rcode ralias rpat ra rwrites
   local rmut='rm|rmdir|mv|cp|install|tee|mkdir|chown|chgrp|chmod|ln|tar|truncate|dd|touch|sed|shred|rsync'
   for rh in "$HERE"/provision/steps/*.sh; do
-    rcode="$(grep -vE '^[[:space:]]*#' "$rh" | grep -vE 'as_user|as_owner' || true)"
+    # Split at ; && || first and skip only the PIECES that are as_user/as_owner
+    # calls — dropping whole lines let `as_user true; rm -rf "$TARGET_HOME/x"`
+    # through (round-3 review). A command split across lines is still a limit.
+    rcode="$(grep -vE '^[[:space:]]*#' "$rh" | sed -E 's/(;|&&|\|\|)/\n/g' \
+             | grep -vE '^[[:space:]]*((if|then|do|else)[[:space:]]+)?!?[[:space:]]*(as_user|as_owner)([[:space:]]|$)' || true)"
     ralias="$(grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=["]?\$\{?TARGET_HOME' <<<"$rcode" \
               | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/' | LC_ALL=C sort -u)"
     rpat='\$\{?TARGET_HOME|"\$\{?home|"\$\{?dst'
