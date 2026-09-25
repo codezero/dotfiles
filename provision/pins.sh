@@ -235,7 +235,13 @@ bump() {
   local pf snap=""; pf="$(_pins_file)"
   [ -n "$what" ] || { echo "usage: pins.sh bump [--check] omz|p10k|alacritty-theme|brew-installer|claude-bootstrap|rustup|all" >&2; return 2; }
   [ "$what" = all ] && set -- omz p10k alacritty-theme brew-installer claude-bootstrap rustup
-  if [ "$CHECK" = 0 ]; then snap="$(mktemp)" && cp -- "$pf" "$snap" || snap=""; fi
+  # The snapshot is how the outcome is judged, so no snapshot means no bump:
+  # stop BEFORE any worker can change the file (round-2 review — it used to
+  # carry on with snap="", skip the check, and return 0 after a rewrite).
+  if [ "$CHECK" = 0 ]; then
+    snap="$(mktemp)" && cp -- "$pf" "$snap" \
+      || { echo "bump: cannot make a safety copy of $pf — nothing changed" >&2; [ -n "$snap" ] && rm -f -- "$snap"; return 1; }
+  fi
   for what in "$@"; do
     case "$what" in
       omz)              _bump_clone omz OMZ_SHA "$OMZ_URL" "$HOME/.oh-my-zsh" ;;
