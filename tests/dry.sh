@@ -397,6 +397,33 @@ cmd_dry() {
   if [ "$grc" = 0 ] && grep -q 'a real run would refuse' <<<"$gout"; then
     ok "golden provenance — --dry-run only WARNS (previewing from a dirty tree is normal)"
   else bad "golden provenance — dry run gave exit $grc / no warning"; fi
+  rm -f "$gt/fonts/MesloLGS-NF/untracked-extra.ttf"
+  # Three more ways a tree only LOOKED clean (round-3 review), each refused:
+  _golden_refuses() {   # <label> — run the real (non-dry) gate in $gt, expect a refusal
+    gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh 2>&1)"; grc=$?
+    if [ "$grc" != 0 ] && grep -q 'uncommitted changes' <<<"$gout"; then ok "golden provenance — $1 is refused"
+    else bad "golden provenance — $1 gave exit $grc: $(printf %.160s "$gout")"; fi
+  }
+  #  - an IGNORED file that the image would still copy (whole-dir .config/nvim)
+  : > "$gt/.config/nvim/lazy-lock.json"
+  _golden_refuses "an ignored-but-copied file (.config/nvim/lazy-lock.json)"
+  rm -f "$gt/.config/nvim/lazy-lock.json"
+  #  - status.showUntrackedFiles=no hiding an untracked font
+  git -C "$gt" config status.showUntrackedFiles no
+  : > "$gt/fonts/MesloLGS-NF/untracked-extra.ttf"
+  _golden_refuses "an untracked file hidden by status.showUntrackedFiles=no"
+  rm -f "$gt/fonts/MesloLGS-NF/untracked-extra.ttf"; git -C "$gt" config --unset status.showUntrackedFiles
+  #  - git status itself failing (corrupt index) — it prints nothing, so it
+  #    used to read as clean
+  # Control: a truly clean tree must get PAST the gate (it then stops at the
+  # root check, since this tier is not root). Without this, a gate that refused
+  # everything would pass every assertion above.
+  gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh 2>&1)"
+  if ! grep -q 'uncommitted changes' <<<"$gout" && grep -q 'Run with sudo/root' <<<"$gout"; then
+    ok "golden provenance — a clean checkout passes the gate (control)"
+  else bad "golden provenance — the gate refused a CLEAN tree: $(printf %.160s "$gout")"; fi
+  printf 'garbage' > "$gt/.git/index"
+  _golden_refuses "a failing git status (corrupt index)"
   rm -rf "$gt"
   # (b) step 85 is the backstop for the non-golden and got-dirty-mid-run cases.
   if grep -q 'soft_fail "cannot resolve the repo commit' "$HERE/provision/steps/85-versions-lock.sh" \

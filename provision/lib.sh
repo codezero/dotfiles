@@ -96,6 +96,24 @@ stale_warn() {
   if [ "${GOLDEN_IMAGE:-0}" = 1 ]; then soft_fail "$*"; else warn "$*"; fi
 }
 
+# repo_is_clean DIR — true only when `git status` SUCCEEDED and listed nothing.
+#   - a failing status (corrupt index, not a repo) is NOT clean — it used to
+#     print nothing and so read as clean;
+#   - untracked files always count; --untracked-files=all overrides a
+#     `status.showUntrackedFiles=no` setting that would hide them;
+#   - ignored files count too for a golden: they can still be copied into the
+#     image (e.g. .config/nvim/lazy-lock.json sits under a whole-directory
+#     dotfile entry). A golden is cloned fresh, so it has none. A daily box keeps
+#     an ignored CLAUDE.local.md, which is why normal runs leave them out.
+# Shared by provision.sh's golden gate and step 85's backstop (round-3 review).
+repo_is_clean() {
+  local out ign=""
+  [ "${GOLDEN_IMAGE:-0}" = 1 ] && ign="--ignored"
+  # shellcheck disable=SC2086
+  out="$(git -C "$1" status --porcelain --untracked-files=all $ign 2>/dev/null)" || return 1
+  [ -z "$out" ]
+}
+
 # --- target user resolution -------------------------------------------------
 # Per-user installs (Homebrew, oh-my-zsh, rustup, Claude Code, dotfiles) can't
 # run as root, and cloud-init runs as root — so those steps drop to this user.

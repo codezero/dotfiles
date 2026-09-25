@@ -62,7 +62,7 @@ fi
 REPO_SHA="$(git -C "$DOTFILES_ROOT" rev-parse HEAD 2>/dev/null || true)"
 if [ -z "$REPO_SHA" ]; then
   soft_fail "cannot resolve the repo commit at $DOTFILES_ROOT — the lock would record 'repo: unknown', so this image could not be traced to a commit"
-elif [ -n "$(git -C "$DOTFILES_ROOT" status --porcelain 2>/dev/null)" ]; then   # tracked edits AND untracked files
+elif ! repo_is_clean "$DOTFILES_ROOT"; then   # edits, untracked (golden: also ignored) files, or a failing git status
   REPO_SHA="$REPO_SHA (dirty)"
   soft_fail "the repo at $DOTFILES_ROOT has uncommitted changes — '$(printf %.7s "$REPO_SHA") (dirty)' names a tree nobody else can reproduce"
 fi

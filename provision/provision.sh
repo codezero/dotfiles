@@ -100,8 +100,8 @@ if [ "$GOLDEN_IMAGE" = "1" ]; then
   _gsha="$(git -C "$HERE/.." rev-parse HEAD 2>/dev/null || true)"
   if [ -z "$_gsha" ]; then
     _gmsg="not a readable git checkout, so versions.lock could only record 'repo: unknown' and the image could never be traced to a commit"
-  elif [ -n "$(git -C "$HERE/.." status --porcelain 2>/dev/null)" ]; then   # tracked edits AND untracked files
-    _gmsg="has uncommitted changes — '$(printf %.7s "$_gsha") (dirty)' names a tree nobody else can reproduce"
+  elif ! repo_is_clean "$HERE/.."; then   # edits, untracked or ignored files, or a failing git status
+    _gmsg="has uncommitted changes (or untracked/ignored files, or git status failed) — '$(printf %.7s "$_gsha") (dirty)' names a tree nobody else can reproduce"
   else
     _gmsg=""
   fi
