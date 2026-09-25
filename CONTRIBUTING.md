@@ -64,7 +64,8 @@ when the guard is removed. Mutation-check it; an assertion that cannot fail is d
 - **snap.** The one thing that wanted it is built from source instead, so the machine needs no
   snapd.
 - **Anything that puts credentials or personal data in the repo** — including a hostname or a
-  username in a package list. The inventory export is names-only for that reason.
+  username in a package list. The package lists and the versions lock hold names and versions
+  only, for that reason.
 
 ## Commit messages
 

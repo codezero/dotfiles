@@ -139,6 +139,25 @@ builder. It changes three things versus a normal run:
   nobody can SSH in until a key is added at the console — a cloud clone gets
   its keys back from cloud-init.
 
+**Which user, and which box.** Four rules, so the golden recipe and the
+cloud-init example don't get mixed up:
+
+- **Always set `PROVISION_USER` explicitly** for a golden (the recipe below uses
+  `ubuntu`, the account a stock Ubuntu image has). Never rely on the uid-1000
+  fallback.
+- **The `agent` / uid-1100 account in the cloud-init example is a test fixture**,
+  not part of the golden recipe. It exists to prove that an explicit target user
+  and a primary group other than the username both work. Build an agent-user
+  golden only on purpose — and then make sure the clone's cloud-init gives that
+  account its SSH key.
+- **Build from a fresh, throwaway VM — never from a machine that has been used.**
+  Finalize scrubs known credentials from every account, but it does not delete
+  extra accounts, arbitrary files, or unrelated system state; and a Homebrew
+  prefix already owned by another user makes a strict build abort (correctly).
+- **Ubuntu 26.04 is the golden builder.** `install.sh` also works on 24.04, but
+  the provision manifests target 26.04 and a 24.04 golden has not been
+  qualified.
+
 ### Take-path: fresh Ubuntu 26.04 → image
 
 ```bash

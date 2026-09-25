@@ -331,5 +331,5 @@ been rehearsed in a container**, so the next golden build is its first live exer
 - **The dual role is permanent:** (1) fresh Ubuntu → clean, credential-free state — no golden
   is built from the owner's daily box, because it holds credentials; (2) a re-runnable
   bring-to-latest layer over an existing image.
-- **No creds/PII ever** — enforced by `.gitignore`, the names-only inventory export, and
+- **No creds/PII ever** — enforced by `.gitignore`, the names-only package lists and versions lock, and
   finalize's fail-closed audit.
