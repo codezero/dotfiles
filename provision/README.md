@@ -142,9 +142,9 @@ builder. It changes three things versus a normal run:
 **Which user, and which box.** Four rules, so the golden recipe and the
 cloud-init example don't get mixed up:
 
-- **Always set `PROVISION_USER` explicitly** for a golden (the recipe below uses
-  `ubuntu`, the account a stock Ubuntu image has). Never rely on the uid-1000
-  fallback.
+- **Always set `PROVISION_USER` explicitly** for a golden, to the image's actual
+  login account. The recipe below uses `ubuntu` — common, but not universal across
+  public images. Never rely on the uid-1000 fallback.
 - **The `agent` / uid-1100 account in the cloud-init example is a test fixture**,
   not part of the golden recipe. It exists to prove that an explicit target user
   and a primary group other than the username both work. Build an agent-user
@@ -241,7 +241,7 @@ record that makes the claim checkable is `versions.lock`:
   each git clone. No hostnames, usernames, paths or tokens. Its header records
   when, from which repo SHA, and with which flags.
 - **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
-  clone boots with "what this image contains" on the box, and `verify` on a
+  clone boots with its own record of the named packages and tools, and `verify` on a
   clone asserts **zero drift** against it — with `--ignore-boot`. Two rows are
   Ubuntu's, not provisioning's: `system kernel` is `uname -r` *at emit time*,
   which inside a golden build is the **build box's** running kernel (step 85

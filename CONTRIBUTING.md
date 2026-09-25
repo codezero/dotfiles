@@ -57,7 +57,7 @@ when the guard is removed. Mutation-check it; an assertion that cannot fail is d
   audit tokens are refused with exit 2, `PROFILE=minimal` with `INSTALL_DESKTOP=1` dies instead
   of guessing. Friendliness belongs in messages and docs, not in the rails.
 - **Default version pins for tools.** Bring-to-latest is deliberate, and the lock file records
-  what landed. Pinning *code that executes at install time* is the opposite case and already
+  the versions of what the repo names. Pinning *code that executes at install time* is the opposite case and already
   exists (`provision/pins.sh`) — extend that instead.
 - **Fetching executable code at run time** without a pin and a refusal path. No `curl | sh`,
   no `git clone` of a moving branch; the dry tier rejects both.

@@ -21,7 +21,7 @@ that outlive any one line of code. This file holds the rules; that one holds the
   bare `sudo VAR=…` is subject to the sudoers policy). **`provision/README.md#flags` is the
   canonical flag reference** and `provision.sh --help` prints the recipes — keep those two the
   owners; don't restate flag syntax elsewhere.
-- `bash provision/versions-lock.sh emit|check` — **record what landed / report drift; never
+- `bash provision/versions-lock.sh emit|check` — **record the versions of what the repo names / report drift; never
   installs.** Step 85 writes `~/versions.lock` on every run as the target user, logging the
   drift since the previous lock first. Sorted TSV (`kind name version`), every kind optional so
   it is valid on a bare CI runner, and no usernames/hostnames/paths.
