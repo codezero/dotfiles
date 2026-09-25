@@ -690,9 +690,12 @@ cmd_dry() {
   done
   # ...and step 36 must NOT have grown its per-user tic back: $HOME/.terminfo
   # covers one account, shadows the system entry for that account only, and is
-  # the user's own space.
-  if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/36-alacritty.sh" | grep -q 'HOME/.terminfo'; then
-    bad "36-alacritty.sh — writes \$HOME/.terminfo again (one account only; ncurses-term owns this)"; tmiss=1
+  # the user's own space. Match the WRITE (a tic aimed there), not any mention of
+  # the path — the step now has to name it in order to REPORT a stale entry left
+  # by an earlier revision, and the first version of this guard reddened on that.
+  if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/36-alacritty.sh" \
+     | grep -qE '(^|[^[:alnum:]_])tic[^#]*HOME/\.terminfo'; then
+    bad "36-alacritty.sh — a tic writes \$HOME/.terminfo again (one account only; ncurses-term owns this)"; tmiss=1
   fi
   # BOTH whole-box audits must run the terminfo probe. `verify installsh`
   # deliberately replaces v_core rather than extending it, so a check added to
