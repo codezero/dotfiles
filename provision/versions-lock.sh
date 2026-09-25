@@ -47,10 +47,23 @@ _dpkg_versions() {  # <pkg...> -> lines for the ones actually installed
   local p st
   for p in "$@"; do
     st="$(dpkg-query -W -f='${Status}\t${Version}' "$p" 2>/dev/null)" || continue
+    # "install ok installed" or "hold ok installed" — a held package is still
+    # installed and belongs in the record (round-2 review).
     case "$st" in
-      "install ok installed"*) printf '%s\t%s\n' "$p" "${st#*	}" ;;
+      *" ok installed"*) printf '%s\t%s\n' "$p" "${st#*	}" ;;
     esac
   done
+}
+
+# dpkg-query answers 1 both for "not installed" and for "I am broken", so a
+# broken dpkg used to look like "nothing installed" and emit wrote a valid-looking
+# lock with ZERO apt/deb rows, exit 0 (round-2 review). Ask once about a package
+# that is always there; if that fails, stop instead of recording nothing.
+_require_dpkg() {
+  command -v dpkg-query >/dev/null 2>&1 || return 0   # no dpkg at all: apt/deb kinds are simply absent
+  dpkg-query -W dpkg >/dev/null 2>&1 && return 0
+  echo "dpkg-query is present but not working — refusing to record a lock with no packages in it" >&2
+  exit 2
 }
 
 src_system() {
@@ -190,6 +203,7 @@ cmd_emit() {
       *) usage ;;
     esac
   done
+  _require_dpkg    # before anything is written, so a broken dpkg leaves no file behind
   if [ -n "$out" ]; then
     { emit_header; emit_body; } > "$out" || { echo "could not write $out" >&2; exit 2; }
     echo "wrote $out ($(grep -vc '^#' "$out") entries)"
@@ -211,6 +225,7 @@ _drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row 
 # unattended-upgrades bumps them minutes after a fresh boot. A first-boot audit
 # wants provisioning's drift, not Ubuntu's — everything else still counts.
 cmd_check() {
+  _require_dpkg    # a broken dpkg would otherwise read as "every apt row removed"
   local lock="" brief=0 ignore_boot=0
   # Options and the lock path in any order — `check --brief LOCK` and
   # `check LOCK --brief` both work (the first draft took $1 as the path

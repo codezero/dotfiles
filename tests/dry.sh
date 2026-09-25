@@ -349,6 +349,17 @@ cmd_dry() {
        && ! is_boot_pkg curl && ! is_boot_pkg util-linux && ! is_boot_pkg flatpak ); then
     ok "boot-pkgs.sh — is_boot_pkg: kernel/grub/shim/efibootmgr yes; curl/util-linux/flatpak no"
   else bad "boot-pkgs.sh — is_boot_pkg misclassifies"; fi
+  # A BROKEN dpkg must stop emit, not produce an empty lock. dpkg-query answers
+  # 1 both for "not installed" and for "broken", so it used to write a
+  # valid-looking lock with zero apt/deb rows and exit 0 (round-2 review).
+  local dshim; dshim="$(mktemp -d)"
+  printf '#!/bin/sh\nexit 9\n' > "$dshim/dpkg-query"; chmod +x "$dshim/dpkg-query"
+  PATH="$dshim:$PATH" bash "$vl" emit -o "$vlt/broken.lock" >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ] && [ ! -e "$vlt/broken.lock" ]; then
+    ok "versions.lock — a broken dpkg-query stops emit (exit 2, no lock written)"
+  else bad "versions.lock — broken dpkg-query gave exit $vrc$([ -e "$vlt/broken.lock" ] && echo ', and a lock was written')"; fi
+  rm -rf "$dshim"
+
   # ── provenance is fail-closed for a golden (external review, 2026-09-25) ───
   # `repo: unknown` and `repo: <sha> (dirty)` used to be annotations nobody
   # consumed: check strips the header, v_core only tests the lock is non-empty.
