@@ -500,7 +500,10 @@ runcmd:
   # --depth=1 origin <sha> && git -C /opt/dotfiles checkout <sha>`.
   - [ bash, -lc, "git clone --branch <tag> --depth=1 https://github.com/<you>/dotfiles /opt/dotfiles && chmod -R a+rX /opt/dotfiles" ]
   # `set -o pipefail` so a provision failure isn't masked by tee's exit 0.
-  - [ bash, -lc, "set -o pipefail; PROVISION_USER=ubuntu bash /opt/dotfiles/provision/provision.sh 2>&1 | tee /var/log/provision.log" ]
+  # PROVISION_USER must name the account `users:` created above. Pointing it at
+  # the image default instead provisions the wrong box silently, and dies
+  # outright on an image that has no such account.
+  - [ bash, -lc, "set -o pipefail; PROVISION_USER=agent bash /opt/dotfiles/provision/provision.sh 2>&1 | tee /var/log/provision.log" ]
 ```
 
 For reproducible images, build from a ref you reviewed rather than from the

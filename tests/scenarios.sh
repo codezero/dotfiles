@@ -116,10 +116,9 @@ NOT a valid shortcut, tried and recorded 2026-09-24: running S10 as a SECOND
 user on a box already provisioned for someone else. Homebrew is one owner per
 prefix, so [5/7] cannot write and install.sh aborts (correctly). S10 needs its
 own box.
-Pending live (TODO K): S13×S11 — one cloud-init launch with PROFILE=minimal —
-and an S10 re-run, both AFTER the J pins + step 85 landed (2026-09-13); the
-desktop golden (Gen-4, b5a1856) proved the shared code, these prove the paths
-it does not take. HEADLESS (S15) is pre-J too but differs only in skips.
+Nothing is pending live: every scenario above has run on real hardware, the
+last two on 2026-09-24 (see the record above). HEADLESS (S15) last ran before
+the pins landed, but it differs from a full run only in which steps skip.
 Deliberately NOT a scenario: GOLDEN_IMAGE+DOCKER_ROOTLESS (bakes the userns
 relaxation into the image — per-clone opt-in is the design).
 EOF
