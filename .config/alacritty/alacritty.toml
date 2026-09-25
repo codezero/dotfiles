@@ -31,6 +31,7 @@ vi_mode_style = "None"
 
 [scrolling]
 history = 30000
+multiplier = 6
 
 [selection]
 save_to_clipboard = true
