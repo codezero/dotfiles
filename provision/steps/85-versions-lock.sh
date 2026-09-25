@@ -50,9 +50,24 @@ $SUDO rm -f "$LOCK_FILE"
 # which commit produced it (found live, TODO K). Root owns it there; on a
 # normal box git's SUDO_UID special case covers the user-owned repo. If neither
 # resolves, the emitter records `repo: unknown` rather than dropping the field.
-REPO_SHA="$(git -C "$DOTFILES_ROOT" rev-parse --short=7 HEAD 2>/dev/null || true)"
-if [ -n "$REPO_SHA" ] && ! git -C "$DOTFILES_ROOT" diff --quiet HEAD -- 2>/dev/null; then
+#
+# FAIL-CLOSED (external review, 2026-09-25): `unknown` and `(dirty)` were only
+# ever annotations. check strips the header and verify asserts the lock is
+# non-empty, so NO consumer looked at either — a golden could reach capture with
+# no machine-checked provenance at all while the repo claims "this commit
+# produced this image". Both now soft_fail, which a tolerant run records and
+# STRICT/GOLDEN turns into an abort.
+#
+# Full 40 hex, not --short=7: a shallow cloud-init clone cannot know whether an
+# abbreviation is unique in the full history, and this field's whole job is to
+# identify a commit unambiguously. It is a header, never a compared row, so
+# widening it causes no drift.
+REPO_SHA="$(git -C "$DOTFILES_ROOT" rev-parse HEAD 2>/dev/null || true)"
+if [ -z "$REPO_SHA" ]; then
+  soft_fail "cannot resolve the repo commit at $DOTFILES_ROOT — the lock would record 'repo: unknown', so this image could not be traced to a commit"
+elif ! git -C "$DOTFILES_ROOT" diff --quiet HEAD -- 2>/dev/null; then
   REPO_SHA="$REPO_SHA (dirty)"
+  soft_fail "the repo at $DOTFILES_ROOT has uncommitted changes — '$(printf %.7s "$REPO_SHA") (dirty)' names a tree nobody else can reproduce"
 fi
 as_user "PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
   || soft_fail "could not write $LOCK_FILE"

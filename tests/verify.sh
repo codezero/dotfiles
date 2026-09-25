@@ -349,7 +349,23 @@ v_golden_clone() {
   # bootloader apt rows go with it: step 10 never installs them and
   # unattended-upgrades bumps them minutes after first boot. Everything
   # provisioning owns still counts.
+  # Provenance, asserted rather than merely present. `repo: unknown` and
+  # `repo: <sha> (dirty)` used to pass everything: check strips the header and
+  # v_core only tests that the lock is non-empty, so an image could be captured
+  # with nothing traceable (external review, 2026-09-25). A golden is supposed
+  # to BE a reviewed commit, so here it has to look like one.
   if [ -s "$HOME/versions.lock" ]; then
+    check "the image records a traceable commit (repo: a full SHA, not unknown/dirty)" \
+      bash -c 'r=$(sed -n "s/.*repo: \([^ ]*\)\( (dirty)\)\?.*/\1\2/p" "$HOME/versions.lock" | head -1)
+               case "$r" in
+                 "" ) echo "no repo: field in the lock" >&2; exit 1 ;;
+                 unknown* ) echo "repo: unknown — this image cannot be traced to a commit" >&2; exit 1 ;;
+                 *"(dirty)" ) echo "repo: $r — built from uncommitted changes" >&2; exit 1 ;;
+                 *[!0-9a-f]* ) echo "repo: $r is not a hex object id" >&2; exit 1 ;;
+               esac
+               # Length, not a row of 40 question marks — miscounting those is
+               # how the first draft rejected a perfectly good SHA.
+               [ ${#r} = 40 ] || { echo "repo: $r is abbreviated; a shallow clone cannot prove an abbreviation is unique" >&2; exit 1; }'
     check "no drift vs the image's own versions.lock (first-boot property; boot rows ignored)" \
       bash "$HERE/provision/versions-lock.sh" check "$HOME/versions.lock" --brief --ignore-boot
     local lk; lk="$(awk -F'\t' '$1=="system" && $2=="kernel"{print $3}' "$HOME/versions.lock")"

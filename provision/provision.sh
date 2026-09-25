@@ -89,6 +89,29 @@ if [ "$HEADLESS" = "1" ] && [ "$INSTALL_DESKTOP" = "1" ]; then
   die "HEADLESS=1 and INSTALL_DESKTOP=1 conflict — HEADLESS skips every GUI install; drop one of the flags"
 fi
 
+# GOLDEN_IMAGE: the image's provenance must be a commit someone can go and read.
+# Step 85 soft_fails on an unresolvable or dirty checkout, but step 85 is second
+# to LAST — aborting there costs a whole build. Check it here instead, before any
+# work happens. A dry run only warns: previewing from a dirty tree is normal and
+# is in fact how you would check this before committing.
+# (External review, 2026-09-25: `unknown` and `(dirty)` were annotations that no
+# consumer looked at, so a golden could be captured with no traceable commit.)
+if [ "$GOLDEN_IMAGE" = "1" ]; then
+  _gsha="$(git -C "$HERE/.." rev-parse HEAD 2>/dev/null || true)"
+  if [ -z "$_gsha" ]; then
+    _gmsg="not a readable git checkout, so versions.lock could only record 'repo: unknown' and the image could never be traced to a commit"
+  elif ! git -C "$HERE/.." diff --quiet HEAD -- 2>/dev/null; then
+    _gmsg="has uncommitted changes — '$(printf %.7s "$_gsha") (dirty)' names a tree nobody else can reproduce"
+  else
+    _gmsg=""
+  fi
+  if [ -n "$_gmsg" ]; then
+    dry && warn "GOLDEN_IMAGE: the repo at $HERE/.. $_gmsg (a real run would refuse)" \
+        || die "GOLDEN_IMAGE: the repo at $HERE/.. $_gmsg. Commit or stash first — a golden is supposed to BE a reviewed commit."
+  fi
+  unset _gsha _gmsg
+fi
+
 if dry; then
   log "DRY RUN — no changes will be made; printing planned actions."
 else

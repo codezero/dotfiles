@@ -397,6 +397,51 @@ cmd_dry() {
   if [ -z "$lkbad" ]; then ok "versions.lock — nothing installs from it (record only)"
   else bad "versions.lock — installed FROM as if it were a manifest:$(printf '\n    %s' "$lkbad")"; fi
 
+  # ── provenance is fail-closed for a golden (external review, 2026-09-25) ───
+  # `repo: unknown` and `repo: <sha> (dirty)` used to be annotations nobody
+  # consumed: check strips the header, v_core only tests the lock is non-empty.
+  # So a golden could be captured with no traceable commit while the repo claims
+  # "this commit produced this image". Three gates now, all three guarded.
+  #
+  # (a) provision.sh refuses EARLY under GOLDEN_IMAGE. Early matters: step 85 is
+  # second to last, so failing there costs a whole build. Runnable without root
+  # because the gate sits ahead of the is_root check, and it changes nothing.
+  local gt gout grc
+  # Every tracked path, at its WORKING-TREE content. Two traps here, both hit
+  # while writing this: a partial copy makes step 36 soft_fail on the missing
+  # vendored font dir, which under STRICT aborts and looks exactly like the gate
+  # firing; and `git archive HEAD` copies the COMMITTED scripts, so the test
+  # silently exercises HEAD instead of the change under test — green as soon as
+  # you commit, having never tested anything.
+  gt="$(mktemp -d)"
+  ( cd "$HERE" && git ls-files -z | tar --null -T - -cf - ) 2>/dev/null | tar -x -C "$gt" 2>/dev/null
+  ( cd "$gt" && git init -q && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm x ) >/dev/null 2>&1
+  printf '\n# dirty\n' >> "$gt/provision/lib.sh"
+  gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh 2>&1)"; grc=$?
+  if [ "$grc" != 0 ] && grep -q 'uncommitted changes' <<<"$gout"; then
+    ok "golden provenance — a dirty checkout is REFUSED before any step runs"
+  else bad "golden provenance — dirty tree gave exit $grc: $(printf %.200s "$gout")"; fi
+  gout="$(cd "$gt" && GOLDEN_IMAGE=1 PROVISION_USER="$(id -un)" bash provision/provision.sh --dry-run 2>&1)"; grc=$?
+  if [ "$grc" = 0 ] && grep -q 'a real run would refuse' <<<"$gout"; then
+    ok "golden provenance — --dry-run only WARNS (previewing from a dirty tree is normal)"
+  else bad "golden provenance — dry run gave exit $grc / no warning"; fi
+  rm -rf "$gt"
+  # (b) step 85 is the backstop for the non-golden and got-dirty-mid-run cases.
+  if grep -q 'soft_fail "cannot resolve the repo commit' "$HERE/provision/steps/85-versions-lock.sh" \
+     && grep -q 'soft_fail "the repo at .* uncommitted changes' "$HERE/provision/steps/85-versions-lock.sh"; then
+    ok "golden provenance — step 85 soft_fails on an unresolvable OR dirty repo"
+  else bad "golden provenance — step 85 no longer soft_fails on bad provenance"; fi
+  # (c) the SHA is recorded in full. A shallow cloud-init clone cannot know an
+  # abbreviation is unique in a history it does not have.
+  if grep -q 'rev-parse HEAD' "$HERE/provision/steps/85-versions-lock.sh" \
+     && ! grep -q 'rev-parse --short' "$HERE/provision/steps/85-versions-lock.sh"; then
+    ok "golden provenance — step 85 records the full 40-hex commit, not an abbreviation"
+  else bad "golden provenance — step 85 records an abbreviated SHA"; fi
+  # (d) and the clone audit ASSERTS the shape rather than mere presence.
+  if sed -n "/^v_golden_clone() {/,/^}/p" "$HERE/tests/verify.sh" | grep -q 'traceable commit'; then
+    ok "golden provenance — v_golden_clone asserts the repo: field's shape"
+  else bad "golden provenance — v_golden_clone does not assert provenance"; fi
+
   # No PII: the lock must carry no username, hostname or home path.
   if grep -qE "$(id -un)|$(hostname)|$HOME" "$vlt/a.lock"; then bad "versions.lock — emit leaked a username/hostname/path"
   else ok "versions.lock — no username, hostname or home path in the lock"; fi
