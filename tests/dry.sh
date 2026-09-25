@@ -729,19 +729,45 @@ cmd_dry() {
   if grep -q 'id -u)" = 0' "$HERE/dotfiles-install.sh" && grep -q 'refusing to run as root' "$HERE/dotfiles-install.sh"; then
     ok "dotfiles-install — refuses uid 0 (provision runs it via as_user)"
   else bad "dotfiles-install — the uid-0 refusal is gone"; fi
-  # No step may operate on the target home AS ROOT any more: no \$SUDO and
-  # TARGET_HOME (or the derived $APP/$BINDIR/$APPSDIR/$NOTES_FILE/$dst) on one
-  # command line in 60/38/80, and finalize scrubs each home as its owner.
-  local rh rhit=0
-  for rh in 60-shell.sh 38-kitty.sh 80-next-steps.sh; do
-    if grep -vE '^[[:space:]]*#' "$HERE/provision/steps/$rh" \
-       | grep -E '\$SUDO[^#]*(\$TARGET_HOME|"\$APP|"\$BINDIR|"\$APPSDIR|"\$NOTES_FILE|"\$dst|"\$home)' | grep -q .; then
-      bad "root-in-home — $rh still runs something as root against the target home"; rhit=1; fi
+  # No step may operate on the target home AS ROOT. CLAUDE.md states that
+  # absolutely, so the guard has to check it absolutely: EVERY step, not a
+  # hard-coded three. The old version scanned 60/38/80 only and therefore could
+  # not see step 85 doing `$SUDO rm -f "$TARGET_HOME/versions.lock"` — a real
+  # exception to the rule, printed under a success message that claimed
+  # otherwise (external review, 2026-09-25, F4).
+  #
+  # Aliases are derived PER FILE from assignments off $TARGET_HOME, because a
+  # fixed list of variable names is the same trap one level down: a new step
+  # naming its own variable would slip straight through.
+  local rh rhit=0 rcode ralias rpat ra
+  for rh in "$HERE"/provision/steps/*.sh; do
+    rcode="$(grep -vE '^[[:space:]]*#' "$rh")"
+    ralias="$(grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[\"]?\$\{?TARGET_HOME' <<<"$rcode" \
+              | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/' | LC_ALL=C sort -u)"
+    # $home/$dst are home paths that do NOT come from a TARGET_HOME assignment
+    # (finalize reads passwd; the installer iterates) — named explicitly.
+    rpat='\$TARGET_HOME|"\$home|"\$dst'
+    for ra in $ralias; do rpat="$rpat|\\\$$ra|\\\$\{$ra"; done
+    # WRITES only. CLAUDE.md permits root to READ a home — finalize's verify
+    # pass does exactly that ($SUDO find "$home" …) — and forbids it to write
+    # one. A pattern that just looks for $SUDO plus a home path reddens those
+    # legitimate reads, which is how the first draft of this guard behaved.
+    local rmut='rm|rmdir|mv|cp|install|tee|mkdir|chown|chgrp|chmod|ln|tar|truncate|dd|touch|sed|shred'
+    # CAPTURE, never `{ … } | grep -q .`: the harness runs with `pipefail`, and a
+    # command group's status is its LAST command's, so the second grep finding
+    # nothing (the common case) made the whole pipeline non-zero and the `if`
+    # silently false. That guard could not fail — the exact defect this tier
+    # exists to catch, found only by planting a violation and watching it pass.
+    local rwrites
+    rwrites="$( { grep -E "\\\$SUDO[[:space:]]+(env[[:space:]]+[^[:space:]]+=[^[:space:]]*[[:space:]]+)*($rmut)\\b[^#]*($rpat)" <<<"$rcode"
+                 grep -E "\\\$SUDO[^#]*>[[:space:]]*\"?($rpat)" <<<"$rcode"; } || true )"
+    if [ -n "$rwrites" ]; then
+      bad "root-in-home — $(basename "$rh") WRITES the target home as root:$(printf '\n      %s' "$rwrites")"; rhit=1; fi
   done
   if grep -qE '^\s*\$SUDO rm -rf "\$home/' "$HERE/provision/steps/90-finalize.sh"; then
     bad "root-in-home — finalize scrubs a home as root instead of as its owner"; rhit=1; fi
   grep -q 'as_owner "\$owner"' "$HERE/provision/steps/90-finalize.sh" || { bad "root-in-home — finalize lost its as_owner scrub"; rhit=1; }
-  [ "$rhit" = 0 ] && ok "root-in-home — steps 60/38/80 write the target home as the user; finalize scrubs each home as its owner"
+  [ "$rhit" = 0 ] && ok "root-in-home — no step ($(ls "$HERE"/provision/steps/*.sh | wc -l) scanned) writes the target home as root; finalize scrubs each home as its owner"
   # finalize: keys always removed (no keep branch, no flag), every account
   if ! grep -q 'cloud_init_reinjects\|KEEP_AUTHORIZED' "$HERE/provision/steps/90-finalize.sh" \
      && grep -q 'authorized_keys' "$HERE/provision/steps/90-finalize.sh" \

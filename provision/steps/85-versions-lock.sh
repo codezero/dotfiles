@@ -40,9 +40,6 @@ if [ -s "$LOCK_FILE" ]; then
   as_user "bash '$TOOL' check '$LOCK_FILE'" || true
 fi
 
-# rm FIRST (rm doesn't follow symlinks): same multi-user hardening as step 80 —
-# a pre-placed symlink at this path must not redirect the write.
-$SUDO rm -f "$LOCK_FILE"
 # Resolve the repo SHA HERE, as root, and hand it down: the emitter runs as the
 # target user, and git refuses to parse a repo owned by another user
 # (safe.directory). Under cloud-init the repo is root-owned in /opt, so the
@@ -69,5 +66,11 @@ elif ! git -C "$DOTFILES_ROOT" diff --quiet HEAD -- 2>/dev/null; then
   REPO_SHA="$REPO_SHA (dirty)"
   soft_fail "the repo at $DOTFILES_ROOT has uncommitted changes — '$(printf %.7s "$REPO_SHA") (dirty)' names a tree nobody else can reproduce"
 fi
-as_user "PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
+# rm FIRST, and AS THE USER (external review, 2026-09-25, F4). rm does not
+# follow a leaf symlink, so the old root-side `$SUDO rm -f` was not an
+# escalation — but it was a root operation on a path inside $TARGET_HOME, which
+# CLAUDE.md forbids absolutely, and the dry tier's guard did not scan this step
+# and so could not see it. Removing and writing in ONE user-context call is
+# both narrower and simpler: the user cannot escalate against their own home.
+as_user "rm -f '$LOCK_FILE'; PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
   || soft_fail "could not write $LOCK_FILE"
