@@ -228,10 +228,14 @@ _bump_rustup() {
 }
 bump() {
   CHECK=0; [ "${1:-}" = "--check" ] && { CHECK=1; shift; }
-  local what="${1:-}" rc=0 changed=0 r
+  local what="${1:-}" rc=0 news=0 r
   local zc="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+  # Snapshot pins.sh so the outcome can be read off the FILE rather than guessed
+  # from a worker's exit code.
+  local pf snap=""; pf="$(_pins_file)"
   [ -n "$what" ] || { echo "usage: pins.sh bump [--check] omz|p10k|alacritty-theme|brew-installer|claude-bootstrap|rustup|all" >&2; return 2; }
   [ "$what" = all ] && set -- omz p10k alacritty-theme brew-installer claude-bootstrap rustup
+  if [ "$CHECK" = 0 ]; then snap="$(mktemp)" && cp -- "$pf" "$snap" || snap=""; fi
   for what in "$@"; do
     case "$what" in
       omz)              _bump_clone omz OMZ_SHA "$OMZ_URL" "$HOME/.oh-my-zsh" ;;
@@ -242,20 +246,31 @@ bump() {
       rustup)           _bump_rustup ;;
       *) echo "bump: unknown pin '$what'" >&2; return 2 ;;
     esac; r=$?
-    case "$r" in 3) changed=1 ;; 0) ;; 1) changed=1; rc=1 ;; *) rc=1 ;; esac
+    # 3 = news (rewritten, or found by --check). 0 = already at upstream.
+    # Anything else is a failure, and says NOTHING about whether the file
+    # changed: a worker returns 1 both for "cannot reach GitHub" (nothing
+    # written) and for "pin rewritten but the checkout would not converge"
+    # (written). The old code mapped 1 to changed=1 and so claimed a rewrite
+    # that had not happened (external review, 2026-09-25, F2).
+    case "$r" in 3) news=1 ;; 0) ;; *) rc=1 ;; esac
   done
-  if [ "$changed" = 1 ] && [ "$CHECK" = 0 ]; then
-    local pf; pf="$(_pins_file)"
+  # Claim a rewrite only if pins.sh ACTUALLY DIFFERS. Read off the file, never
+  # inferred from an exit status — that is the whole point of the fix.
+  if [ "$CHECK" = 0 ] && [ -n "$snap" ] && ! cmp -s -- "$pf" "$snap"; then
     # Not silenced: a message that says "staged" when nothing was staged is
     # worse than no message.
-    if git -C "$(dirname "$pf")" add "$pf"; then
+    if git -C "$(dirname "$pf")" add -- "$pf"; then
       echo "── pins.sh rewritten and staged. Review the log/diff above, then commit: git commit -m 'pins: bump …'"
     else
+      # The documented final step did not happen, so this is not a success —
+      # automation used to see 0 here and carry on (F2).
       echo "── pins.sh rewritten but NOT staged (not a git checkout?) — stage $pf yourself, then commit." >&2
+      rc=1
     fi
   fi
+  [ -n "$snap" ] && rm -f -- "$snap"
   # --check: exit 1 when something is behind (cadence step 1), like versions-lock.sh check.
-  [ "$CHECK" = 1 ] && [ "$changed" = 1 ] && [ "$rc" = 0 ] && return 1
+  [ "$CHECK" = 1 ] && [ "$news" = 1 ] && [ "$rc" = 0 ] && return 1
   return $rc
 }
 

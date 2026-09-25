@@ -545,6 +545,32 @@ cmd_dry() {
   bash "$HERE/provision/pins.sh" bump nosuchpin >/dev/null 2>&1; local brc2=$?
   if [ "$brc" = 2 ] && [ "$brc2" = 2 ]; then ok "pins.sh bump — no name / unknown name is exit 2"
   else bad "pins.sh bump — argument errors gave $brc / $brc2 (want 2 / 2)"; fi
+  # bump's OUTCOME must be read off the file, not inferred from a worker's exit
+  # code (external review, 2026-09-25, F2). A worker returns 1 both for "cannot
+  # reach GitHub" (nothing written) and for "pin rewritten, checkout would not
+  # converge" (written), so the old `1 -> changed=1` mapping printed "rewritten
+  # and staged" for a bump that never touched the file. And when the rewrite
+  # happened but `git add` failed, it warned honestly and still returned 0, so
+  # automation saw success. Both are exercised offline with a stub worker.
+  local bt bout
+  bt="$(mktemp -d)"; cp "$HERE/provision/pins.sh" "$bt/pins.sh"
+  # (1) worker fails BEFORE any rewrite: no rewrite claim, exit 1.
+  bout="$( cd "$bt" && bash -c 'source ./pins.sh; _bump_brew() { echo "stub: cannot reach GitHub" >&2; return 1; }; bump brew-installer' 2>&1 )"; brc=$?
+  if [ "$brc" = 1 ] && ! grep -q 'rewritten' <<<"$bout"; then
+    ok "pins.sh bump — a worker that fails before rewriting claims NO rewrite (exit 1)"
+  else bad "pins.sh bump — failed-before-rewrite gave exit $brc and said: $(printf %.120s "$bout")"; fi
+  # (2) rewrite really happens but staging cannot ($bt is not a git checkout):
+  #     the message is honest AND the exit code is a failure.
+  bout="$( cd "$bt" && bash -c 'source ./pins.sh; _bump_brew() { _pin_set HOMEBREW_INSTALL_COMMIT deadbeefdeadbeefdeadbeefdeadbeefdeadbeef "stub"; return 3; }; bump brew-installer' 2>&1 )"; brc=$?
+  if [ "$brc" = 1 ] && grep -q 'NOT staged' <<<"$bout"; then
+    ok "pins.sh bump — a rewrite that cannot be staged is exit 1, not 0"
+  else bad "pins.sh bump — unstageable rewrite gave exit $brc and said: $(printf %.120s "$bout")"; fi
+  # (3) and a worker reporting "already at upstream" must claim nothing at all.
+  bout="$( cd "$bt" && bash -c 'source ./pins.sh; _bump_brew() { echo "stub: at upstream HEAD"; return 0; }; bump brew-installer' 2>&1 )"; brc=$?
+  if [ "$brc" = 0 ] && ! grep -q 'rewritten' <<<"$bout"; then
+    ok "pins.sh bump — nothing to do claims no rewrite and exits 0"
+  else bad "pins.sh bump — no-op gave exit $brc and said: $(printf %.120s "$bout")"; fi
+  rm -rf "$bt"
   cp "$HERE/provision/pins.sh" "$jt/pins-copy.sh"
   if ( source "$jt/pins-copy.sh"; _pin_set OMZ_SHA "$(printf 'a%.0s' {1..40})" "test note" ) \
      && grep -q "^OMZ_SHA=$(printf 'a%.0s' {1..40})     # test note$" "$jt/pins-copy.sh" \
