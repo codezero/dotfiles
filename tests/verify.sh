@@ -111,10 +111,19 @@ v_gui() {  # GUI installs — present only when gui_wanted (full, not headless)
   check "cursor installed (dpkg)"  dpkg-query -W cursor
   check "cursor.sources arch-pinned (single arch)" \
     bash -c '[ "$(grep -c "," /etc/apt/sources.list.d/cursor.sources)" = 0 ] && grep -q "^Architectures: $(dpkg --print-architecture)$" /etc/apt/sources.list.d/cursor.sources'
-  if sudo -n true 2>/dev/null; then
-    check "cursor debconf opt-out preseeded" \
-      bash -c 'sudo -n debconf-show cursor 2>/dev/null | grep -q "add-cursor-repo: false"'
-  else skip "cursor debconf preseed (needs sudo)"; fi
+  # No sudo, and no skip. This was gated on `sudo -n true` and therefore skipped
+  # on any box without a primed timestamp — including every cloud-init audit run
+  # as the target user. The gate was simply wrong: debconf's ANSWER database
+  # (/var/cache/debconf/config.dat) is 0644, so `debconf-show` reads it as any
+  # user. What needs root is passwords.dat (0600), which debconf-show warns about
+  # on stderr and then carries on without — hence 2>/dev/null, which discards a
+  # warning rather than hiding a failure.
+  # Why it matters: cursor's postinst rewrites cursor.sources back to both arches
+  # on every upgrade unless this answer is false, which would undo the arch pin
+  # asserted just above. That check says "correct now"; this one says "stays
+  # correct".
+  check "cursor debconf opt-out preseeded (postinst leaves cursor.sources alone)" \
+    bash -c 'debconf-show cursor 2>/dev/null | grep -q "add-cursor-repo: false"'
   # v_terminfo proves the SYSTEM entry exists for every account. It cannot see
   # the other half: earlier revisions of step 36 wrote ~/.terminfo/a/alacritty,
   # ncurses searches that FIRST, and `env -i` deliberately hides it — so the
