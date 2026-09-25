@@ -43,27 +43,19 @@ source "$HERE/boot-pkgs.sh"   # is_boot_pkg — the same list step 10 refuses to
 # nothing when its tool is absent. Versions are trimmed to the bare version
 # token where a tool prints prose (rustc, cargo, kitty, claude).
 
-_dpkg_versions() {  # <pkg...> -> lines for the ones actually installed
-  local p st
-  for p in "$@"; do
-    st="$(dpkg-query -W -f='${Status}\t${Version}' "$p" 2>/dev/null)" || continue
-    # "install ok installed" or "hold ok installed" — a held package is still
-    # installed and belongs in the record (round-2 review).
-    case "$st" in
-      *" ok installed"*) printf '%s\t%s\n' "$p" "${st#*	}" ;;
-    esac
-  done
-}
-
-# dpkg-query answers 1 both for "not installed" and for "I am broken", so a
-# broken dpkg used to look like "nothing installed" and emit wrote a valid-looking
-# lock with ZERO apt/deb rows, exit 0 (round-2 review). Ask once about a package
-# that is always there; if that fails, stop instead of recording nothing.
-_require_dpkg() {
-  command -v dpkg-query >/dev/null 2>&1 || return 0   # no dpkg at all: apt/deb kinds are simply absent
-  dpkg-query -W dpkg >/dev/null 2>&1 && return 0
-  echo "dpkg-query is present but not working — refusing to record a lock with no packages in it" >&2
-  exit 2
+# ONE dpkg-query over all packages, then pick the named ones. One call means one
+# exit status: if dpkg cannot be read, that is an error (exit 2) — never "not
+# installed". The per-package loop this replaces turned every failure into
+# "absent", so a broken dpkg produced a valid-looking lock with no packages in it
+# (round-2 and round-3 reviews). ${db:Status-Status} is only the installed state,
+# so held and reinstreq packages that ARE installed are counted.
+_dpkg_versions() {  # <pkg...> -> "name<TAB>version" for the ones installed
+  local all
+  all="$(dpkg-query -W -f='${Package}\t${db:Status-Status}\t${Version}\n' 2>/dev/null)" \
+    || { echo "dpkg-query failed — refusing to record a lock with packages missing from it" >&2; exit 2; }
+  awk -F'\t' -v names="$*" '
+    BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
+    ($1 in want) && $2 == "installed" { print $1 "\t" $3 }' <<<"$all"
 }
 
 src_system() {
@@ -190,8 +182,12 @@ emit_header() {
 }
 
 emit_body() {
-  { src_system; src_apt; src_deb; src_brew; src_flatpak; src_rustup; src_cargo
-    src_claude; src_kitty; src_mise; src_git; } \
+  # `|| exit 2` on the two dpkg sources: a command group's status is its LAST
+  # command's, so without it a dpkg failure inside src_apt was lost the moment
+  # src_brew ran — and emit wrote a lock with no apt rows (round-3 review).
+  # Other sources return 0 when their tool is absent; only dpkg is authoritative.
+  { src_system; src_apt || exit 2; src_deb || exit 2; src_brew; src_flatpak; src_rustup
+    src_cargo; src_claude; src_kitty; src_mise; src_git; } \
     | awk -F'\t' 'NF==3 && $3!="" {print}' | LC_ALL=C sort -u
 }
 
@@ -203,12 +199,18 @@ cmd_emit() {
       *) usage ;;
     esac
   done
-  _require_dpkg    # before anything is written, so a broken dpkg leaves no file behind
   if [ -n "$out" ]; then
-    { emit_header; emit_body; } > "$out" || { echo "could not write $out" >&2; exit 2; }
+    # Write beside the target and rename only on success: a failed emit leaves
+    # the previous lock untouched instead of an empty or half-written one, and
+    # a rename replaces a planted symlink rather than following it.
+    local tmp="$out.tmp.$$"
+    if ! { emit_header; emit_body; } > "$tmp"; then
+      rm -f -- "$tmp"; echo "emit failed — $out left unchanged" >&2; exit 2
+    fi
+    mv -f -- "$tmp" "$out" || { rm -f -- "$tmp"; echo "could not write $out" >&2; exit 2; }
     echo "wrote $out ($(grep -vc '^#' "$out") entries)"
   else
-    emit_header; emit_body
+    emit_header; emit_body || exit 2
   fi
 }
 
@@ -225,7 +227,6 @@ _drop_boot_rows() { local k n v; while IFS=$'\t' read -r k n v; do _is_boot_row 
 # unattended-upgrades bumps them minutes after a fresh boot. A first-boot audit
 # wants provisioning's drift, not Ubuntu's — everything else still counts.
 cmd_check() {
-  _require_dpkg    # a broken dpkg would otherwise read as "every apt row removed"
   local lock="" brief=0 ignore_boot=0
   # Options and the lock path in any order — `check --brief LOCK` and
   # `check LOCK --brief` both work (the first draft took $1 as the path
@@ -244,7 +245,7 @@ cmd_check() {
   # (and `set -u` would then abort the cleanup itself).
   CHECK_NOW="$(mktemp)"; trap 'rm -f "$CHECK_NOW"' EXIT
   local now="$CHECK_NOW"
-  emit_body > "$now"
+  emit_body > "$now" || { echo "cannot read this box's versions — check aborted" >&2; exit 2; }
   # Compare by (kind, name). Both files are sorted TSV without headers here.
   local old; old="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u)"
   local nb=0

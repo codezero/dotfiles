@@ -349,15 +349,28 @@ cmd_dry() {
        && ! is_boot_pkg curl && ! is_boot_pkg util-linux && ! is_boot_pkg flatpak ); then
     ok "boot-pkgs.sh — is_boot_pkg: kernel/grub/shim/efibootmgr yes; curl/util-linux/flatpak no"
   else bad "boot-pkgs.sh — is_boot_pkg misclassifies"; fi
-  # A BROKEN dpkg must stop emit, not produce an empty lock. dpkg-query answers
-  # 1 both for "not installed" and for "broken", so it used to write a
-  # valid-looking lock with zero apt/deb rows and exit 0 (round-2 review).
+  # A broken dpkg must stop emit and check, never produce a lock with missing
+  # packages. dpkg-query answers 1 for "not installed" AND for "broken", so the
+  # old per-package loop turned a failure into "absent" (round-2 review); and a
+  # one-off health probe did not help, because the probe can pass while the
+  # queries that produce the rows fail (round-3 review). Both shapes tested:
   local dshim; dshim="$(mktemp -d)"
+  cp "$vlt/a.lock" "$vlt/keep.lock"
+  #  (1) always failing
   printf '#!/bin/sh\nexit 9\n' > "$dshim/dpkg-query"; chmod +x "$dshim/dpkg-query"
   PATH="$dshim:$PATH" bash "$vl" emit -o "$vlt/broken.lock" >/dev/null 2>&1; vrc=$?
   if [ "$vrc" = 2 ] && [ ! -e "$vlt/broken.lock" ]; then
     ok "versions.lock — a broken dpkg-query stops emit (exit 2, no lock written)"
   else bad "versions.lock — broken dpkg-query gave exit $vrc$([ -e "$vlt/broken.lock" ] && echo ', and a lock was written')"; fi
+  #  (2) the reviewers' shim: answers a `-W dpkg` health probe, fails everything else
+  printf '#!/bin/sh\n[ "$*" = "-W dpkg" ] && exit 0\nexit 9\n' > "$dshim/dpkg-query"
+  PATH="$dshim:$PATH" bash "$vl" emit -o "$vlt/keep.lock" >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ] && cmp -s "$vlt/keep.lock" "$vlt/a.lock"; then
+    ok "versions.lock — dpkg failing AFTER a health check still stops emit, and the previous lock is kept"
+  else bad "versions.lock — post-probe dpkg failure gave exit $vrc$(cmp -s "$vlt/keep.lock" "$vlt/a.lock" || echo ', and the previous lock was overwritten')"; fi
+  PATH="$dshim:$PATH" bash "$vl" check "$vlt/a.lock" --brief >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ]; then ok "versions.lock — check with a failing dpkg is an error (exit 2), not drift"
+  else bad "versions.lock — check with a failing dpkg gave exit $vrc (want 2; 1 means it called it drift)"; fi
   rm -rf "$dshim"
 
   # ── provenance is fail-closed for a golden (external review, 2026-09-25) ───

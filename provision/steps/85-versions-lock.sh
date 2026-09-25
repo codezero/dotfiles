@@ -66,11 +66,8 @@ elif ! repo_is_clean "$DOTFILES_ROOT"; then   # edits, untracked (golden: also i
   REPO_SHA="$REPO_SHA (dirty)"
   soft_fail "the repo at $DOTFILES_ROOT has uncommitted changes — '$(printf %.7s "$REPO_SHA") (dirty)' names a tree nobody else can reproduce"
 fi
-# rm FIRST, and AS THE USER (external review, 2026-09-25, F4). rm does not
-# follow a leaf symlink, so the old root-side `$SUDO rm -f` was not an
-# escalation — but it was a root operation on a path inside $TARGET_HOME, which
-# CLAUDE.md forbids absolutely, and the dry tier's guard did not scan this step
-# and so could not see it. Removing and writing in ONE user-context call is
-# both narrower and simpler: the user cannot escalate against their own home.
-as_user "rm -f '$LOCK_FILE'; PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
+# As the user, and no `rm` first: emit writes a temp file and renames it, which
+# replaces a planted symlink instead of following it, and a FAILED emit now
+# leaves the last good lock in place rather than none (round-3 review).
+as_user "PROVISION_REPO_SHA='$REPO_SHA' PROVISION_FLAGS='$FLAGS' bash '$TOOL' emit -o '$LOCK_FILE'" \
   || soft_fail "could not write $LOCK_FILE"
