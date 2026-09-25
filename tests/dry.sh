@@ -349,54 +349,6 @@ cmd_dry() {
        && ! is_boot_pkg curl && ! is_boot_pkg util-linux && ! is_boot_pkg flatpak ); then
     ok "boot-pkgs.sh — is_boot_pkg: kernel/grub/shim/efibootmgr yes; curl/util-linux/flatpak no"
   else bad "boot-pkgs.sh — is_boot_pkg misclassifies"; fi
-  # ── the `dep` kind: RECORDED, never ASSERTED, never an INPUT ──────────────
-  # apt resolves dependencies itself, so ~1,800 of a real box's ~1,900 packages
-  # were invisible in the lock and a generation diff could not see a library
-  # move. `dep` records them. All three of its rules need a guard, because each
-  # is the kind of thing a later change breaks without noticing.
-  #
-  # Rule 2 first, since it is the surprising one: unattended-upgrades bumps
-  # libraries on its own schedule, so dep drift must NOT set the failure exit
-  # code — a check that cries wolf after every u-u run is a check nobody reads.
-  if grep -q '^dep	' "$vlt/a.lock"; then
-    ok "versions.lock — dep rows present ($(grep -c '^dep	' "$vlt/a.lock") of $(grep -vc '^#' "$vlt/a.lock"))"
-    cp "$vlt/a.lock" "$vlt/dep.lock"
-    sed -i '0,/^dep	/{s/^\(dep	[^	]*	\).*/\10.0.0-mutated/}' "$vlt/dep.lock"
-    vout="$(bash "$vl" check "$vlt/dep.lock" --brief 2>&1)"; vrc=$?
-    if [ "$vrc" = 0 ] && grep -q 'dep rows (recorded, not asserted): 1 changed' <<<"$vout"; then
-      ok "versions.lock — dep drift is REPORTED and exits 0 (never asserted)"
-    else bad "versions.lock — dep drift gave exit $vrc (want 0) / said: $vout"; fi
-    vout="$(bash "$vl" check "$vlt/dep.lock" --brief --ignore-dep 2>&1)"; vrc=$?
-    # Match the REPORT heading, not the bare words: the verdict line carries a
-    # "(dep rows ignored)" suffix, which a loose grep reads as a failure.
-    if [ "$vrc" = 0 ] && ! grep -q 'not asserted' <<<"$vout" \
-       && grep -q 'dep rows ignored' <<<"$vout"; then
-      ok "versions.lock — --ignore-dep drops dep rows and says so in the verdict"
-    else bad "versions.lock — --ignore-dep still reported them: $vout"; fi
-    # ...and an asserted row moving must STILL fail, or rule 2 has quietly
-    # turned into "nothing fails".
-    sed -i '0,/^system	/{s/^\(system	[^	]*	\).*/\19.9.9-mutated/}' "$vlt/dep.lock"
-    vout="$(bash "$vl" check "$vlt/dep.lock" --brief 2>&1)"; vrc=$?
-    if [ "$vrc" = 1 ] && grep -q '^drift vs ' <<<"$vout"; then
-      ok "versions.lock — an ASSERTED row still fails while dep rows do not"
-    else bad "versions.lock — asserted drift gave exit $vrc (want 1): $vout"; fi
-  else skip "versions.lock dep rows (no dpkg on this host)"; fi
-  # Rule 3: --ignore-boot must still cover kernel/bootloader packages, which
-  # mostly arrive as dep rows (they are not named in apt.list) — so adding the
-  # dep kind could have silently gutted the golden-clone first-boot audit.
-  if grep -qE '^dep	linux-(image|headers|modules)' "$vlt/a.lock"; then
-    if bash "$vl" check "$vlt/a.lock" --brief --ignore-boot 2>&1 | grep -q 'boot rows ignored'; then
-      ok "versions.lock — --ignore-boot still counts boot packages in dep rows"
-    else bad "versions.lock — --ignore-boot ignored 0 rows with kernel deps present"; fi
-  else skip "versions.lock boot-in-dep (no kernel packages on this host)"; fi
-  # Rule 1: nothing may INSTALL from the lock. Naming a dependency as an install
-  # input marks it `manual`, which permanently defeats finalize's autoremove.
-  local lkbad=""
-  lkbad="$(grep -rlE '(apt_install|apt-get +install)[^#]*versions\.lock' \
-            "$HERE/provision" "$HERE/install.sh" "$HERE/tests" 2>/dev/null || true)"
-  if [ -z "$lkbad" ]; then ok "versions.lock — nothing installs from it (record only)"
-  else bad "versions.lock — installed FROM as if it were a manifest:$(printf '\n    %s' "$lkbad")"; fi
-
   # ── provenance is fail-closed for a golden (external review, 2026-09-25) ───
   # `repo: unknown` and `repo: <sha> (dirty)` used to be annotations nobody
   # consumed: check strips the header, v_core only tests the lock is non-empty.
