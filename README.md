@@ -47,8 +47,8 @@ Every flag, its default, and how they interact:
 prints the recipes above at the point of use.
 
 No *tool* here is version-pinned (Homebrew can't be), so every run **records**
-the versions of the packages and tools it names instead (not their
-dependencies): `~/versions.lock` on the box, and
+what is installed instead — for apt only the packages the repo names, for
+brew, flatpak and mise everything they installed: `~/versions.lock` on the box, and
 `provision/versions.lock` in the repo for the latest golden. Re-runs print what
 moved; a clone is audited for zero drift against its image's lock. See
 [**Versions — recorded, not pinned**](provision/README.md#versions--recorded-not-pinned).

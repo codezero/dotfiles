@@ -235,13 +235,18 @@ claim for a golden is **"SHA X built on DATE produced these versions."** The
 record that makes the claim checkable is `versions.lock`:
 
 - **Every run writes `~/versions.lock`** (step 85, as the target user): sorted
-  `kind  name  version` lines for what the repo *names* — the apt manifests, the
-  third-party debs, brew formulae and casks, flatpaks, the rustup toolchain, the
-  cargo-built Alacritty, Claude, kitty, mise's global tools, and the commit of
-  each git clone. No hostnames, usernames, paths or tokens. Its header records
+  `kind  name  version` lines. What it covers, exactly:
+  - **apt** — only the packages the manifests *name*. Their dependencies are
+    Ubuntu's to resolve and are not recorded.
+  - **deb** — the third-party packages from step 20's vendor repos.
+  - **brew, cask, flatpak, mise** — *everything* installed through them,
+    dependencies included. These tools manage their own dependency trees, so a
+    moved dependency there is real drift.
+  - the rustup toolchain, the cargo-built Alacritty, Claude, kitty, and the
+    commit of each pinned git clone. No hostnames, usernames, paths or tokens. Its header records
   when, from which repo SHA, and with which flags.
 - **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
-  clone boots with its own record of the named packages and tools, and `verify` on a
+  clone boots with its own lock, and `verify` on a
   clone asserts **zero drift** against it — with `--ignore-boot`. Two rows are
   Ubuntu's, not provisioning's: `system kernel` is `uname -r` *at emit time*,
   which inside a golden build is the **build box's** running kernel (step 85

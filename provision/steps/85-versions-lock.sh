@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Step 85 — record what this run landed: ~/versions.lock, written as the target
+# Step 85 — record installed versions: ~/versions.lock, written as the target
 # user by provision/versions-lock.sh (every source it reads — brew, rustup,
 # claude, mise, the git clones — is per-user). Runs after step 80 and before
 # finalize; finalize leaves $HOME alone, so every GOLDEN carries its own lock and
-# every clone boots with its own record of the named packages and tools.
+# every clone boots with its own lock. What it covers: provision/README.md#versions--recorded-not-pinned.
 #
 # Before overwriting, an existing lock from the previous run is compared and the
 # drift is logged — so a bring-to-latest re-run SAYS what moved (TODO J's
@@ -22,7 +22,7 @@ FLAGS="PROFILE=$PROFILE HEADLESS=${HEADLESS:-0} INSTALL_DESKTOP=${INSTALL_DESKTO
 GOLDEN_IMAGE=${GOLDEN_IMAGE:-0} DOTFILES_COPY=$COPY_EFF \
 DOCKER_ROOTLESS=${DOCKER_ROOTLESS:-0} APT_UPGRADE=${APT_UPGRADE:-0}"
 
-log "versions.lock: recording the versions of what this repo names -> $LOCK_FILE"
+log "versions.lock: recording installed versions -> $LOCK_FILE"
 
 if dry; then
   would "(as $TARGET_USER) if $LOCK_FILE exists: versions-lock.sh check it and log the drift since the previous run"
