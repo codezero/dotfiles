@@ -371,6 +371,19 @@ cmd_dry() {
   PATH="$dshim:$PATH" bash "$vl" check "$vlt/a.lock" --brief >/dev/null 2>&1; vrc=$?
   if [ "$vrc" = 2 ]; then ok "versions.lock — check with a failing dpkg is an error (exit 2), not drift"
   else bad "versions.lock — check with a failing dpkg gave exit $vrc (want 2; 1 means it called it drift)"; fi
+  #  emit -o writes EXACTLY its target (round-4 review): a symlink to a
+  #  directory used to swallow the file (exit 0, file inside the dir); a real
+  #  directory must be an error, with no temp file left behind.
+  mkdir -p "$vlt/tgt"; ln -sfn "$vlt/tgt" "$vlt/link.lock"
+  bash "$vl" emit -o "$vlt/link.lock" >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 0 ] && [ -f "$vlt/link.lock" ] && [ ! -L "$vlt/link.lock" ] && [ -z "$(ls -A "$vlt/tgt")" ]; then
+    ok "versions.lock — emit onto a symlink-to-dir replaces the link with the lock file"
+  else bad "versions.lock — symlink-to-dir target: exit $vrc, link=$([ -L "$vlt/link.lock" ] && echo kept || echo gone), dir has: $(ls -A "$vlt/tgt" | tr '\n' ' ')"; fi
+  mkdir -p "$vlt/dir.lock"
+  bash "$vl" emit -o "$vlt/dir.lock" >/dev/null 2>&1; vrc=$?
+  if [ "$vrc" = 2 ] && [ -z "$(find "$vlt" -maxdepth 2 -name '*.tmp.*')" ]; then
+    ok "versions.lock — emit onto an existing directory is an error (exit 2), no temp file left"
+  else bad "versions.lock — directory target gave exit $vrc$([ -n "$(find "$vlt" -maxdepth 2 -name '*.tmp.*')" ] && echo ', temp file left')"; fi
   #  (3) ONE read of the dpkg database per emit, so the apt and deb rows always
   #      describe the same moment (round-4 review: two reads could straddle a
   #      package change and produce a lock that never existed).

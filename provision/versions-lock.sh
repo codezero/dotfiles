@@ -196,7 +196,12 @@ cmd_emit() {
     if ! { emit_header; emit_body; } > "$tmp"; then
       rm -f -- "$tmp"; echo "emit failed — $out left unchanged" >&2; exit 2
     fi
-    mv -f -- "$tmp" "$out" || { rm -f -- "$tmp"; echo "could not write $out" >&2; exit 2; }
+    # -T: rename onto exactly $out. Without it GNU mv treats a symlink-to-dir
+    # (or a real directory) at $out as a DIRECTORY and drops the file inside it,
+    # while emit still reported success (round-4 review). With -T a planted
+    # symlink is replaced, and a real directory makes mv fail.
+    mv -fT -- "$tmp" "$out" 2>/dev/null || { rm -f -- "$tmp"; echo "could not write $out" >&2; exit 2; }
+    [ -f "$out" ] && [ ! -L "$out" ] || { echo "could not write $out as a regular file" >&2; exit 2; }
     echo "wrote $out ($(grep -vc '^#' "$out") entries)"
   else
     emit_header; emit_body || exit 2
