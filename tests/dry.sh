@@ -624,6 +624,17 @@ cmd_dry() {
   if [ "$brc" = 2 ] && cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" && [ -z "$(ls -A "$bt/tmp")" ]; then
     ok "pins.sh bump — a bad name changes nothing and leaves no temp file (exit 2)"
   else bad "pins.sh bump — 'brew-installer bogus' gave exit $brc$(cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" || echo ', rewrote a pin')$([ -z "$(ls -A "$bt/tmp")" ] || echo ', left a temp file')"; fi
+  # (6) `all` must be alone: `all bogus` used to drop `bogus` unvalidated, run
+  #     every worker and exit 0 (round-4 review). Stub every worker so this is
+  #     offline, and make one of them rewrite a pin: nothing may change.
+  cp "$HERE/provision/pins.sh" "$bt/pins.sh"
+  bout="$( cd "$bt" && bash -c 'source ./pins.sh
+    _bump_clone() { return 0; }; _bump_claude() { return 0; }; _bump_rustup() { return 0; }
+    _bump_brew() { _pin_set HOMEBREW_INSTALL_COMMIT deadbeefdeadbeefdeadbeefdeadbeefdeadbeef stub; return 3; }
+    bump all bogus' 2>&1 )"; brc=$?
+  if [ "$brc" = 2 ] && cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh"; then
+    ok "pins.sh bump — 'all' with another name is refused, nothing changed (exit 2)"
+  else bad "pins.sh bump — 'all bogus' gave exit $brc$(cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" || echo ', rewrote a pin')"; fi
   # (4) the safety copy cannot be made (mktemp fails): stop before any worker
   #     runs — exit 1 and pins.sh untouched (round-2 review).
   cp "$HERE/provision/pins.sh" "$bt/pins.sh"; mkdir -p "$bt/shim"

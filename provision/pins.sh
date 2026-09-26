@@ -234,7 +234,13 @@ bump() {
   # from a worker's exit code.
   local pf snap=""; pf="$(_pins_file)"
   [ -n "$what" ] || { echo "usage: pins.sh bump [--check] omz|p10k|alacritty-theme|brew-installer|claude-bootstrap|rustup|all" >&2; return 2; }
-  [ "$what" = all ] && set -- omz p10k alacritty-theme brew-installer claude-bootstrap rustup
+  # `all` means all, alone: expanding it used to throw away any other names
+  # before they were validated, so `bump all bogus` ran every worker and
+  # exited 0 (round-4 review).
+  if [ "$what" = all ]; then
+    [ $# -eq 1 ] || { echo "bump: 'all' cannot be combined with other names" >&2; return 2; }
+    set -- omz p10k alacritty-theme brew-installer claude-bootstrap rustup
+  fi
   # Every name is checked BEFORE the snapshot and before any worker runs, so a
   # bad argument changes nothing and leaves nothing behind (round-3 review:
   # `bump bogus` leaked the snapshot, `bump brew-installer bogus` rewrote a pin
