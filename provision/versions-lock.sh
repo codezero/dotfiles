@@ -44,21 +44,6 @@ source "$HERE/boot-pkgs.sh"   # is_boot_pkg — the same list step 10 refuses to
 # nothing when its tool is absent. Versions are trimmed to the bare version
 # token where a tool prints prose (rustc, cargo, kitty, claude).
 
-# ONE dpkg-query over all packages, then pick the named ones. One call means one
-# exit status: if dpkg cannot be read, that is an error (exit 2) — never "not
-# installed". The per-package loop this replaces turned every failure into
-# "absent", so a broken dpkg produced a valid-looking lock with no packages in it
-# (round-2 and round-3 reviews). ${db:Status-Status} is only the installed state,
-# so held and reinstreq packages that ARE installed are counted.
-_dpkg_versions() {  # <pkg...> -> "name<TAB>version" for the ones installed
-  local all
-  all="$(dpkg-query -W -f='${Package}\t${db:Status-Status}\t${Version}\n' 2>/dev/null)" \
-    || { echo "dpkg-query failed — refusing to record a lock with packages missing from it" >&2; exit 2; }
-  awk -F'\t' -v names="$*" '
-    BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
-    ($1 in want) && $2 == "installed" { print $1 "\t" $3 }' <<<"$all"
-}
-
 src_system() {
   local id ver
   # shellcheck disable=SC1091
@@ -75,23 +60,26 @@ src_system() {
 DEB_PKGS="docker-ce docker-ce-cli containerd.io docker-buildx-plugin
 docker-compose-plugin docker-ce-rootless-extras codium cursor"
 
-# Only what the repo NAMES (decided): the union of the apt manifests. Base-image
-# packages are the Ubuntu release's business and would drown the tool drift.
-src_apt() {
+# apt + deb rows from ONE `dpkg-query -W` — one read of the dpkg database, so
+# the two kinds always describe the same moment (round-4 review: two reads could
+# straddle a package change and produce a lock that never existed). One call
+# also means one exit status: if dpkg cannot be read, that is an error (exit 2),
+# never "not installed". ${db:Status-Status} is only the installed state, so held
+# and reinstreq packages that ARE installed count.
+#   apt rows: the packages the apt manifests NAME (minus the vendor debs).
+#   deb rows: the step-20 vendor packages in DEB_PKGS.
+src_dpkg() {
   command -v dpkg-query >/dev/null 2>&1 || return 0
-  local names
+  local all names
+  all="$(dpkg-query -W -f='${Package}\t${db:Status-Status}\t${Version}\n' 2>/dev/null)" \
+    || { echo "dpkg-query failed — refusing to record a lock with packages missing from it" >&2; return 2; }
   names="$(cat "$PKG_DIR/apt.list" "$PKG_DIR/apt.minimal.list" 2>/dev/null \
-           | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | sort -u \
-           | grep -vxF -f <(tr ' ' '\n' <<<"$DEB_PKGS"))"
-  [ -n "$names" ] || return 0
-  # shellcheck disable=SC2086
-  _dpkg_versions $names | sed 's/^/apt\t/'
-}
-
-src_deb() {
-  command -v dpkg-query >/dev/null 2>&1 || return 0
-  # shellcheck disable=SC2086
-  _dpkg_versions $DEB_PKGS | sed 's/^/deb\t/'
+           | sed 's/#.*//; s/[[:space:]]//g' | grep -v '^$' | tr '\n' ' ')"
+  awk -F'\t' -v apt="$names" -v deb="$DEB_PKGS" '
+    BEGIN { n = split(deb, d, /[ \n]+/); for (i = 1; i <= n; i++) if (d[i] != "") D[d[i]] = 1
+            n = split(apt, a, /[ \n]+/); for (i = 1; i <= n; i++) if (a[i] != "" && !(a[i] in D)) A[a[i]] = 1 }
+    $2 == "installed" && ($1 in D) { print "deb\t" $1 "\t" $3; next }
+    $2 == "installed" && ($1 in A) { print "apt\t" $1 "\t" $3 }' <<<"$all"
 }
 
 _brew() { /home/linuxbrew/.linuxbrew/bin/brew "$@"; }
@@ -183,11 +171,11 @@ emit_header() {
 }
 
 emit_body() {
-  # `|| exit 2` on the two dpkg sources: a command group's status is its LAST
-  # command's, so without it a dpkg failure inside src_apt was lost the moment
-  # src_brew ran — and emit wrote a lock with no apt rows (round-3 review).
+  # `|| exit 2` on the dpkg source: a command group's status is its LAST
+  # command's, so without it a dpkg failure was lost the moment src_brew ran —
+  # and emit wrote a lock with no apt rows (round-3 review).
   # Other sources return 0 when their tool is absent; only dpkg is authoritative.
-  { src_system; src_apt || exit 2; src_deb || exit 2; src_brew; src_flatpak; src_rustup
+  { src_system; src_dpkg || exit 2; src_brew; src_flatpak; src_rustup
     src_cargo; src_claude; src_kitty; src_mise; src_git; } \
     | awk -F'\t' 'NF==3 && $3!="" {print}' | LC_ALL=C sort -u
 }

@@ -371,6 +371,16 @@ cmd_dry() {
   PATH="$dshim:$PATH" bash "$vl" check "$vlt/a.lock" --brief >/dev/null 2>&1; vrc=$?
   if [ "$vrc" = 2 ]; then ok "versions.lock — check with a failing dpkg is an error (exit 2), not drift"
   else bad "versions.lock — check with a failing dpkg gave exit $vrc (want 2; 1 means it called it drift)"; fi
+  #  (3) ONE read of the dpkg database per emit, so the apt and deb rows always
+  #      describe the same moment (round-4 review: two reads could straddle a
+  #      package change and produce a lock that never existed).
+  if [ -x /usr/bin/dpkg-query ]; then
+    printf '#!/bin/sh\necho x >> "%s/calls"\nexec /usr/bin/dpkg-query "$@"\n' "$dshim" > "$dshim/dpkg-query"
+    : > "$dshim/calls"
+    PATH="$dshim:$PATH" bash "$vl" emit >/dev/null 2>&1
+    if [ "$(wc -l < "$dshim/calls")" = 1 ]; then ok "versions.lock — emit reads the dpkg database exactly once"
+    else bad "versions.lock — emit read the dpkg database $(wc -l < "$dshim/calls") times (want 1)"; fi
+  else skip "versions.lock single dpkg read (no /usr/bin/dpkg-query)"; fi
   rm -rf "$dshim"
 
   # ── provenance is fail-closed for a golden (external review, 2026-09-25) ───
