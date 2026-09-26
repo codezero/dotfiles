@@ -120,7 +120,8 @@ silently breaks `--dry-run`.
   any symlinked parent); kitty extracts and swaps as the user; step 80 pipes its text through
   `as_user`'s stdin; finalize scrubs each home **as that home's owner**. Root may *read* a home
   (finalize's verify) but never writes one, and never executes a user-owned binary. The dry
-  tier greps the steps for `$SUDO` + a home path on one line and fails on any.
+  tier runs a best-effort text scan of every step for root writes into a home — a lint for
+  common mistakes, not a proof (SECURITY.md says so too).
 - `run <cmd>` — run it, or print `[would] …` under dry-run.
 - `apt_get <args>` / `apt_install <pkgs>` — non-interactive apt (real status / tolerant),
   wrapped in `env` so noninteractive + needrestart survive `sudo`, with `--force-conf*` and

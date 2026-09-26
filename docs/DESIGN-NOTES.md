@@ -219,6 +219,14 @@ paranoid. What they changed:
   any credential, private key, dotfile backup or registry auth left anywhere under `/home` or
   `/root`. Proven against planted credentials in a container, including a private key outside
   every list, which the whole-image sweep caught.
+- **Two checks guard against mistakes, not adversaries.** The golden build's clean-checkout
+  check and the dry tier's scan for root writes into a home went through four review rounds,
+  and every round found one more way around them — git can be told to look away from a file,
+  and a text pattern can't fully understand shell. The lesson was to say what they are for:
+  catching a forgotten commit, a stray file, a careless line. The builder is root on the build
+  box anyway; SECURITY.md puts deliberate evasion out of scope. A real guarantee for the
+  second would need every home write to go through one owner-context function — noted, not
+  built.
 - **A pin means the code, not the label.** A checkout sitting at the pinned commit with locally
   modified tracked files is refused rather than silently accepted or silently reset.
 

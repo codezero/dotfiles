@@ -49,6 +49,12 @@ The provisioning path, roughly in order of how much I care:
 - **"It installs software as root."** That is the stated purpose. Report a way to make it
   install *something else*, not the fact that it installs.
 - **Anything requiring that you already have root** on the box being provisioned.
+- **Deliberately getting past a check that exists to catch mistakes.** The golden
+  build's clean-checkout check and the dry tier's scan for root writes into a home
+  catch honest errors — a forgotten commit, a stray file, a careless line in a step.
+  Hiding changes from git on your own build box, or writing shell specifically to
+  dodge a text pattern, is not what they are for. Report a way to make provisioning
+  *itself* do something unintended instead — that is in scope.
 - **The owner's own configuration choices** — which packages are installed, that the tracked
   `.gitconfig` carries a placeholder identity, that Docker's rootful socket is root-equivalent.
 

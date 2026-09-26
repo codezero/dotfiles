@@ -834,11 +834,14 @@ cmd_dry() {
   # No root WRITE into a home, in any step. Steps run as root — lib.sh sets
   # SUDO="" then — so a write is a root write whether or not it says $SUDO, and
   # the old `$SUDO`-only pattern missed bare `rm "$TARGET_HOME/x"` as well as the
-  # braced `${TARGET_HOME}` form (round-2 review). This is a TEXT SCAN, not a
-  # proof: it catches the common shapes — a mutating command, bare or after
-  # $SUDO, then/do/else, ; & | ( — aimed at $VAR or ${VAR} of a home path, plus
-  # redirects into one. as_user/as_owner calls are skipped: they run as the
-  # owner. Root may still READ a home (finalize's verify pass does).
+  # braced `${TARGET_HOME}` form (round-2 review). This is a LINT for common
+  # mistakes, not a proof: it catches a mutating command (bare, after $SUDO,
+  # then/do/else, or after ; && || ) aimed at $VAR or ${VAR} of a home path,
+  # plus redirects into one. as_user/as_owner pieces are skipped, since they run
+  # as the owner. Known blind spots, accepted: a redirect, pipe, `&` or $(…)
+  # attached to an as_user call (the outer shell runs those as root), and a
+  # command split across lines. Deliberately dodging it is out of scope
+  # (SECURITY.md). Root may still READ a home (finalize's verify pass does).
   # Home aliases are derived per file from assignments off TARGET_HOME.
   # Capture, never `{ … } | grep -q .` — under pipefail that could not fail.
   local rh rhit=0 rcode ralias rpat ra rwrites

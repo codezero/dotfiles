@@ -158,6 +158,14 @@ cloud-init example don't get mixed up:
   the provision manifests target 26.04 and a 24.04 golden has not been
   qualified.
 
+**The clean-checkout check guards against mistakes, not against the builder.**
+A golden build refuses a checkout with uncommitted edits, untracked or ignored
+files, files git was told to skip (assume-unchanged / skip-worktree), or a
+failing `git status`. That catches a forgotten commit, a stray file, a sparse
+checkout. It is not meant to stop someone deliberately hiding changes from git:
+whoever builds a golden is root on the build box and could change the image
+directly anyway. A fresh clone at a reviewed commit is what the recipe assumes.
+
 ### Take-path: fresh Ubuntu 26.04 → image
 
 ```bash
