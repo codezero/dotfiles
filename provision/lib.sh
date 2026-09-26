@@ -111,7 +111,13 @@ repo_is_clean() {
   [ "${GOLDEN_IMAGE:-0}" = 1 ] && ign="--ignored"
   # shellcheck disable=SC2086
   out="$(git -C "$1" status --porcelain --untracked-files=all $ign 2>/dev/null)" || return 1
-  [ -z "$out" ]
+  [ -z "$out" ] || return 1
+  # Index flags tell git status to look away from a file ON PURPOSE:
+  # assume-unchanged (a lowercase tag in `ls-files -v`) and skip-worktree (S).
+  # An edited file carrying either reads as clean (round-4 review). A sparse
+  # checkout sets skip-worktree without anyone meaning harm, so refuse both.
+  out="$(git -C "$1" ls-files -v 2>/dev/null)" || return 1
+  ! grep -q '^[a-zS] ' <<<"$out"
 }
 
 # --- target user resolution -------------------------------------------------

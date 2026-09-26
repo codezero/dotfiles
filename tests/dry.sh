@@ -451,6 +451,17 @@ cmd_dry() {
   rm -f "$gt/fonts/MesloLGS-NF/untracked-extra.ttf"; git -C "$gt" config --unset status.showUntrackedFiles
   #  - git status itself failing (corrupt index) — it prints nothing, so it
   #    used to read as clean
+  #  - index flags that make git status look away from an edited file
+  #    (round-4 review): assume-unchanged, and skip-worktree (sparse checkouts
+  #    set it without anyone meaning harm)
+  printf '\n-- probe\n' >> "$gt/.config/nvim/init.lua"
+  git -C "$gt" update-index --assume-unchanged .config/nvim/init.lua
+  _golden_refuses "an edited file marked assume-unchanged"
+  git -C "$gt" update-index --no-assume-unchanged .config/nvim/init.lua
+  git -C "$gt" update-index --skip-worktree .config/nvim/init.lua
+  _golden_refuses "an edited file marked skip-worktree"
+  git -C "$gt" update-index --no-skip-worktree .config/nvim/init.lua
+  git -C "$gt" checkout -q -- .config/nvim/init.lua
   # Control: a truly clean tree must get PAST the gate (it then stops at the
   # root check, since this tier is not root). Without this, a gate that refused
   # everything would pass every assertion above.
