@@ -1,0 +1,61 @@
+name: smoke
+on:
+  push:
+  pull_request:
+
+# Least privilege for GITHUB_TOKEN — the tiers only need to read the repo.
+permissions:
+  contents: read
+
+env:
+  # The version the tree is kept clean against (brew's, on the dev box). Pinned
+  # rather than "whatever the runner image ships this month": a newer shellcheck
+  # adds checks, so an unpinned CI goes red on a commit that changed nothing.
+  SHELLCHECK_VERSION: v0.11.0
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The repo targets arm64; the arm runner is the faithful one. x86_64
+          # is kept because both tiers are arch-agnostic by design and a
+          # contributor's laptop usually isn't arm.
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            sha256: 12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588
+          - runner: ubuntu-24.04
+            arch: x86_64
+            sha256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Pinned to commit SHAs (not mutable tags) — same rule as gitleaks.yml.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+
+      # Official release binary, checksum-pinned. Upstream publishes no
+      # checksum file, so these are trust-on-first-use pins recorded when the
+      # version was adopted — the same model as the kitty signing key: a
+      # silent swap of the asset fails closed. Re-pin both when bumping.
+      - name: Install shellcheck ${{ env.SHELLCHECK_VERSION }} (pinned)
+        run: |
+          set -euo pipefail
+          f="shellcheck-${SHELLCHECK_VERSION}.linux.${{ matrix.arch }}.tar.xz"
+          curl -fsSL --max-time 120 -o "$f" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/$f"
+          echo "${{ matrix.sha256 }}  $f" | sha256sum -c -
+          tar -xJf "$f"
+          # Prepend, so this build shadows the runner image's own shellcheck.
+          echo "$PWD/shellcheck-${SHELLCHECK_VERSION}" >> "$GITHUB_PATH"
+
+      - name: shellcheck is the pinned build
+        run: |
+          shellcheck --version | grep -Fx "version: ${SHELLCHECK_VERSION#v}"
+
+      # The two re-runnable tiers, exactly as documented for the dev box. No
+      # sudo, no root, no network — that constraint is what makes them CI-able.
+      - name: lint tier (shellcheck, warning severity)
+        run: bash smoke-test.sh lint
+
+      - name: dry tier (--dry-run flag matrix + marker assertions)
+        run: bash smoke-test.sh dry

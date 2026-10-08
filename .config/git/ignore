@@ -1,0 +1,30 @@
+# ~/.config/git/ignore — global safety net (core.excludesFile in ~/.gitconfig;
+# shipped by dotfiles.list). Project .gitignore files still own build output;
+# this catches OS/editor/secret junk in every repo on the box (2026-09-13
+# on-box audit). `.vscode/` is deliberately NOT here — many projects commit it.
+# Check what applies: git check-ignore -v <path>
+# OS
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+# Editors
+*.swp
+*.swo
+*~
+.idea/
+# Secrets / local env
+.env
+.env.*
+!.env.example
+# AI tooling — per-machine state, never shared
+.claude/settings.local.json
+CLAUDE.local.md
+# Runtime / language local state
+.direnv/
+mise.local.toml
+.mise.local.toml
+node_modules/
+__pycache__/
+*.pyc
+.venv/

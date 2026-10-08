@@ -1,0 +1,6 @@
+# ~/.config/bat/config — theme is NOT set here: .zshrc exports BAT_THEME so
+# delta (which honours the same variable) matches. Paging stays "auto" so a
+# direct `bat file` still pages; the `cat` alias in .zshrc passes
+# --paging=never. (2026-09-13 on-box audit.)
+--style="numbers,changes,header"
+--italic-text=always

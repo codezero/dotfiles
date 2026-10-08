@@ -1,0 +1,7 @@
+# Known false positives in history, by exact fingerprint (commit:file:rule:line).
+# Keep each one explained; never add a line without reading the finding.
+#
+# 072534e — tests/dry.sh wrote fake PEM headers ("-----BEGIN RSA PRIVATE KEY-----"
+# followed by "xx") as literal text, to check that finalize's key sweep finds a
+# planted key. Not a key. The test now assembles the header at run time.
+072534e05bb28592d035ef1ca7e3b8ab10ff2915:tests/dry.sh:private-key:876

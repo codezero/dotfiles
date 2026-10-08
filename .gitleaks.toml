@@ -1,0 +1,18 @@
+# gitleaks config — extends the built-in ruleset, then allowlists public,
+# non-secret identifiers that live in this repo so they don't block commits.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public (non-secret) identifiers committed on purpose"
+regexes = [
+  # Public GPG key fingerprints pinned in step 20 (not secrets).
+  '''9DC858229FC7DD38854AE2D88D81803C0EBFCD88''',   # Docker
+  '''380FF4BCDC34A4BD92A3565342A1772E62E492D6''',   # Cursor (Anysphere)
+  '''1302DE60231889FE1EBACADC54678CF75A278D9C''',   # VSCodium
+]
+# Vendored binary fonts (MesloLGS NF) — not secrets; skip so the content
+# scanner doesn't false-positive on high-entropy bytes in the TTFs.
+paths = [
+  '''fonts/.*\.ttf$''',
+]

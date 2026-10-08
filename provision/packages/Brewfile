@@ -1,0 +1,30 @@
+brew "atuin"       # shell history: fuzzy Ctrl-R, cwd/exit/duration; .zshrc guards on it; finalize scrubs its DB
+brew "bat"
+brew "btop"
+brew "curl"
+brew "dive"        # explore a Docker image layer by layer (wasted bytes, efficiency score)
+brew "eza"
+brew "fastfetch"
+brew "fd"
+brew "fio"
+brew "fzf"
+brew "gh"
+brew "glab"        # GitLab CLI — brew is current with upstream; apt is 2y stale + ESM-gated; finalize scrubs its token
+brew "git"
+brew "git-delta"   # binary is `delta` (cf. bat/batcat) — .gitconfig guards on it
+brew "gitleaks"
+brew "httpie"
+brew "jj"
+brew "jq"
+brew "k9s"
+brew "ktop"        # top-like TUI for a k8s cluster (needs metrics-server); lighter read-only view beside k9s
+brew "lazydocker"
+brew "lazygit"
+brew "neovim"
+brew "mise"        # runtimes (node/python/go/ruby…); global source ~/.config/mise/config.toml; replaced nvm 2026-09-11 — .zshrc guards on it
+brew "ripgrep"
+brew "shellcheck"
+brew "socat"
+brew "tmux"
+brew "zoxide"
+cask "codex"
