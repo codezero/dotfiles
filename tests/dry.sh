@@ -299,6 +299,18 @@ cmd_dry() {
   if grep -q 'PROVISION_REPO_SHA=' "$HERE/provision/steps/85-versions-lock.sh"; then
     ok "versions.lock — step 85 hands the repo SHA down to the user-context emit"
   else bad "versions.lock — step 85 no longer passes PROVISION_REPO_SHA; cloud-init locks lose provenance"; fi
+  # Several installed versions of one mise tool must be ONE row: check keys on
+  # (kind, name), so two rows made a lock disagree with itself (Gen-5, go
+  # 1.27.1 + 1.27.2). A fake mise on PATH keeps this independent of the box.
+  mkdir -p "$vlt/fakebin"
+  printf '%s\n' '#!/bin/sh' 'printf "Tool  Version  Source  Requested\ngo    1.27.2   ~/.config/mise/config.toml  latest\ngo    1.27.1\nnode  24.21.0  ~/.config/mise/config.toml  lts\ngo    1.9.0\n"' > "$vlt/fakebin/mise"
+  chmod +x "$vlt/fakebin/mise"
+  local vmise vdup
+  vmise="$(PATH="$vlt/fakebin:$PATH" bash "$vl" emit 2>/dev/null | grep '^mise' | tr '\t' ' ' | tr '\n' '|')"
+  vdup="$(PATH="$vlt/fakebin:$PATH" bash "$vl" emit 2>/dev/null | grep -v '^#' | cut -f1,2 | LC_ALL=C sort | uniq -d)"
+  if [ "$vmise" = "mise go 1.9.0,1.27.1,1.27.2|mise node 24.21.0|" ] && [ -z "$vdup" ]; then
+    ok "versions.lock — one row per mise tool, versions comma-joined in version order; no duplicate (kind, name)"
+  else bad "versions.lock — mise rows wrong or duplicated: [$vmise] dup=[$vdup]"; fi
   vout="$(bash "$vl" check "$vlt/a.lock" 2>&1)"; vrc=$?
   if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — check against its own emit: no drift, exit 0"
   else bad "versions.lock — self-check gave exit $vrc: $vout"; fi

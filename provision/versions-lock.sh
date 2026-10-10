@@ -132,7 +132,14 @@ src_mise() {
   [ -n "$bin" ] || bin="/home/linuxbrew/.linuxbrew/bin/mise"
   [ -x "$bin" ] || return 0
   # Columns: Tool Version [Source Requested]. Header line filtered by name.
-  "$bin" ls --installed 2>/dev/null | awk '$1!="Tool" && NF>=2 {print "mise\t"$1"\t"$2}'
+  # ONE row per tool, like brew: when several versions of a tool are installed
+  # (a project pin next to the global one, or an old version waiting to be
+  # pruned after `go@latest` moved) they are joined with "," in version order.
+  # `check` compares rows by (kind, name), so two rows for one name made a lock
+  # disagree with ITSELF — seen live on Gen-5 with go 1.27.1 and 1.27.2.
+  "$bin" ls --installed 2>/dev/null \
+    | awk '$1!="Tool" && NF>=2 {print $1"\t"$2}' | LC_ALL=C sort -t$'\t' -k1,1 -k2,2V \
+    | awk -F'\t' '{ if ($1 in v) v[$1] = v[$1] "," $2; else v[$1] = $2 } END { for (t in v) print "mise\t" t "\t" v[t] }'
 }
 
 # The three pinned clones (pins.sh, TODO J). Recording the SHA that actually
