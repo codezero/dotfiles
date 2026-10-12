@@ -311,6 +311,28 @@ cmd_dry() {
   if [ "$vmise" = "mise go 1.9.0,1.27.1,1.27.2|mise node 24.21.0|" ] && [ -z "$vdup" ]; then
     ok "versions.lock — one row per mise tool, versions comma-joined in version order; no duplicate (kind, name)"
   else bad "versions.lock — mise rows wrong or duplicated: [$vmise] dup=[$vdup]"; fi
+  # `check` must compare in the collation its inputs are sorted in (bytes). Under
+  # en_US.UTF-8 `join` ignored "-" and "." and silently paired the wrong rows:
+  # names that differ only by punctuation, from a fake mise so the live side is
+  # known. Truth: ab changed, a.c added, nothing removed.
+  mkdir -p "$vlt/fakepunct"
+  printf '%s\n' '#!/bin/sh' 'printf "Tool Version\na-b 1\nab 1\na.c 1\nac 1\n"' > "$vlt/fakepunct/mise"
+  chmod +x "$vlt/fakepunct/mise"
+  PATH="$vlt/fakepunct:$PATH" bash "$vl" emit 2>/dev/null \
+    | sed -e '/^mise	a\.c	/d' -e 's/^\(mise	ab	\).*/\10/' > "$vlt/punct.lock"
+  if locale -a 2>/dev/null | grep -qix 'en_US\.utf-\?8'; then
+    vout="$(PATH="$vlt/fakepunct:$PATH" LC_ALL=en_US.UTF-8 bash "$vl" check "$vlt/punct.lock" 2>&1)"
+    if grep -q '1 changed, 1 added, 0 removed' <<<"$vout" && grep -q 'changed  mise/ab ' <<<"$vout" \
+       && grep -q 'added    mise/a\.c ' <<<"$vout" && ! grep -q 'not sorted\|not in sorted order' <<<"$vout"; then
+      ok "versions.lock — check pairs rows in byte order, whatever the caller's locale (en_US.UTF-8)"
+    else bad "versions.lock — wrong drift under en_US.UTF-8: $(grep -E '^drift|mise/|sorted' <<<"$vout" | tr '\n' ' ')"; fi
+  else skip "versions.lock — locale en_US.UTF-8 not installed here; the collation test needs it"; fi
+  # A lock with no data rows: everything on the box is "added", nothing is
+  # "removed" — no phantom "removed /" from an empty line.
+  head -2 "$vlt/a.lock" > "$vlt/empty.lock"
+  vout="$(bash "$vl" check "$vlt/empty.lock" 2>&1)"
+  if grep -q ' 0 removed' <<<"$vout" && ! grep -q 'removed  /' <<<"$vout"; then ok "versions.lock — a lock with no rows reports no phantom 'removed /'"
+  else bad "versions.lock — empty lock: $(grep -E '^drift|removed  /' <<<"$vout" | tr '\n' ' ')"; fi
   vout="$(bash "$vl" check "$vlt/a.lock" 2>&1)"; vrc=$?
   if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — check against its own emit: no drift, exit 0"
   else bad "versions.lock — self-check gave exit $vrc: $vout"; fi

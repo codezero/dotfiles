@@ -258,13 +258,17 @@ cmd_check() {
     old="$(_drop_boot_rows <<<"$old")"
     nb="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u | _boot_rows | grep -c .)"
   fi
+  # Keyed "kind/name<TAB>version" on both sides. `join` must compare in the
+  # SAME collation the inputs were sorted in: under en_US.UTF-8 it ignored the
+  # "-" and "." that sort -C orders on, and silently paired the wrong rows
+  # (a real drift of 1 changed + 1 added came out as 1 changed + 2 added).
+  # NF==3 drops the blank line printf emits for an empty lock, which used to
+  # surface as a phantom "removed /" row.
+  _keyed() { awk -F'\t' 'NF==3 {print $1"/"$2"\t"$3}' | LC_ALL=C sort; }
   local added removed changed
-  added="$(join -t $'\t' -v 2 -j1 <(printf '%s\n' "$old" | awk -F'\t' '{print $1"/"$2"\t"$3}' | LC_ALL=C sort) \
-                              <(awk -F'\t' '{print $1"/"$2"\t"$3}' "$now" | LC_ALL=C sort))"
-  removed="$(join -t $'\t' -v 1 -j1 <(printf '%s\n' "$old" | awk -F'\t' '{print $1"/"$2"\t"$3}' | LC_ALL=C sort) \
-                                <(awk -F'\t' '{print $1"/"$2"\t"$3}' "$now" | LC_ALL=C sort))"
-  changed="$(join -t $'\t' -j1 <(printf '%s\n' "$old" | awk -F'\t' '{print $1"/"$2"\t"$3}' | LC_ALL=C sort) \
-                            <(awk -F'\t' '{print $1"/"$2"\t"$3}' "$now" | LC_ALL=C sort) \
+  added="$(LC_ALL=C join -t $'\t' -v 2 -j1 <(printf '%s\n' "$old" | _keyed) <(_keyed < "$now"))"
+  removed="$(LC_ALL=C join -t $'\t' -v 1 -j1 <(printf '%s\n' "$old" | _keyed) <(_keyed < "$now"))"
+  changed="$(LC_ALL=C join -t $'\t' -j1 <(printf '%s\n' "$old" | _keyed) <(_keyed < "$now") \
              | awk -F'\t' '$2!=$3')"
   local na nr nc
   na="$(printf '%s' "$added"   | grep -c .)"; nr="$(printf '%s' "$removed" | grep -c .)"
