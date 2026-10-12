@@ -177,6 +177,17 @@ emit_header() {
   printf '\n'
 }
 
+# Never a local path in the lock (the header's rule: names and versions only).
+# A version is a release string; one containing "/" is a location — mise's
+# `path:/home/<user>/…` or `ref:` forms — and would put a home directory, i.e.
+# a username, into a file that gets committed. Keep the scheme, drop the rest:
+# `path:/home/u/node` → `path:<local>`. Also drops malformed and empty rows.
+_no_paths() {
+  awk -F'\t' -v OFS='\t' 'NF==3 && $3!="" {
+    if (index($3, "/")) { s = index($3, ":"); $3 = (s ? substr($3, 1, s) : "") "<local>" }
+    print }'
+}
+
 # One row per (kind, name). A name can legitimately have several installed
 # versions — a mise tool with a project pin beside the global one, a formula
 # brew has not cleaned up yet, a Flatpak app in both the system and the user
@@ -186,7 +197,7 @@ emit_header() {
 # and comma-joined. Applied to the emit AND to the lock `check` reads, so a
 # lock written before this rule still compares cleanly.
 _merge_dups() {
-  awk -F'\t' 'NF==3 && $3!=""' | LC_ALL=C sort -t$'\t' -k1,1 -k2,2 -k3,3V -u \
+  _no_paths | LC_ALL=C sort -t$'\t' -k1,1 -k2,2 -k3,3V -u \
     | awk -F'\t' '{ k = $1 "\t" $2
                     if (k == pk) { v = v "," $3; next }
                     if (pk != "") print pk "\t" v

@@ -320,6 +320,13 @@ cmd_dry() {
   vout="$(PATH="$vlt/fakebin:$PATH" bash "$vl" check "$vlt/multi.lock" 2>&1)"; vrc=$?
   if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — a lock with multi-version names checks clean against its own box"
   else bad "versions.lock — multi-version self-check gave exit $vrc: $vout"; fi
+  # No local path may reach the lock: a mise `path:` version names a home dir.
+  mkdir -p "$vlt/fakepath"
+  printf '%s\n' '#!/bin/sh' 'printf "Tool Version\nnode path:/home/someone/src/node\ngo /opt/go-custom\n"' > "$vlt/fakepath/mise"
+  chmod +x "$vlt/fakepath/mise"
+  vout="$(PATH="$vlt/fakepath:$PATH" bash "$vl" emit 2>/dev/null | grep '^mise' | tr '\t' ' ' | tr '\n' '|')"
+  if [ "$vout" = "mise go <local>|mise node path:<local>|" ]; then ok "versions.lock — a version that is a local path is recorded as <local>, never the path"
+  else bad "versions.lock — a local path reached the lock: [$vout]"; fi
   # A lock written BEFORE the merge rule (one row per version) must compare
   # clean too, not as "2 changed" for one tool.
   { grep -v '^mise	go	' "$vlt/multi.lock"; printf 'mise\tgo\t1.27.2\nmise\tgo\t1.9.0\nmise\tgo\t1.27.1\n'; } > "$vlt/oldfmt.lock"
