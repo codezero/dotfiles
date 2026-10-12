@@ -299,18 +299,33 @@ cmd_dry() {
   if grep -q 'PROVISION_REPO_SHA=' "$HERE/provision/steps/85-versions-lock.sh"; then
     ok "versions.lock — step 85 hands the repo SHA down to the user-context emit"
   else bad "versions.lock — step 85 no longer passes PROVISION_REPO_SHA; cloud-init locks lose provenance"; fi
-  # Several installed versions of one mise tool must be ONE row: check keys on
-  # (kind, name), so two rows made a lock disagree with itself (Gen-5, go
-  # 1.27.1 + 1.27.2). A fake mise on PATH keeps this independent of the box.
+  # Several installed versions of one name must be ONE row: check pairs rows on
+  # (kind, name), so two rows made a lock disagree with itself (Gen-5, go 1.27.1
+  # + 1.27.2). The merge is shared by every source — a fake mise AND a fake
+  # flatpak (one app in both installations) on PATH keep this independent of
+  # the box, and one emit serves every assertion below.
   mkdir -p "$vlt/fakebin"
-  printf '%s\n' '#!/bin/sh' 'printf "Tool  Version  Source  Requested\ngo    1.27.2   ~/.config/mise/config.toml  latest\ngo    1.27.1\nnode  24.21.0  ~/.config/mise/config.toml  lts\ngo    1.9.0\n"' > "$vlt/fakebin/mise"
-  chmod +x "$vlt/fakebin/mise"
-  local vmise vdup
-  vmise="$(PATH="$vlt/fakebin:$PATH" bash "$vl" emit 2>/dev/null | grep '^mise' | tr '\t' ' ' | tr '\n' '|')"
-  vdup="$(PATH="$vlt/fakebin:$PATH" bash "$vl" emit 2>/dev/null | grep -v '^#' | cut -f1,2 | LC_ALL=C sort | uniq -d)"
-  if [ "$vmise" = "mise go 1.9.0,1.27.1,1.27.2|mise node 24.21.0|" ] && [ -z "$vdup" ]; then
-    ok "versions.lock — one row per mise tool, versions comma-joined in version order; no duplicate (kind, name)"
-  else bad "versions.lock — mise rows wrong or duplicated: [$vmise] dup=[$vdup]"; fi
+  printf '%s\n' '#!/bin/sh' 'printf "Tool  Version  Source  Requested\ngo    1.27.2   ~/.config/mise/config.toml  latest\ngo    1.27.1\nnode  24.21.0  ~/.config/mise/config.toml  lts\ngo    1.9.0\ngo    1.27.2\n"' > "$vlt/fakebin/mise"
+  printf '%s\n' '#!/bin/sh' 'printf "org.example.App\t1.1\norg.example.App\t1.0\n"' > "$vlt/fakebin/flatpak"
+  chmod +x "$vlt/fakebin/mise" "$vlt/fakebin/flatpak"
+  local vemit vmise vflat vdup
+  vemit="$(PATH="$vlt/fakebin:$PATH" bash "$vl" emit 2>/dev/null)"
+  vmise="$(grep '^mise' <<<"$vemit" | tr '\t' ' ' | tr '\n' '|')"
+  vflat="$(grep '^flatpak' <<<"$vemit" | tr '\t' ' ' | tr '\n' '|')"
+  vdup="$(grep -v '^#' <<<"$vemit" | cut -f1,2 | LC_ALL=C sort | uniq -d)"
+  if [ "$vmise" = "mise go 1.9.0,1.27.1,1.27.2|mise node 24.21.0|" ] && [ "$vflat" = "flatpak org.example.App 1.0,1.1|" ] && [ -z "$vdup" ]; then
+    ok "versions.lock — one row per name from any source, versions de-duplicated and comma-joined in version order"
+  else bad "versions.lock — rows wrong or duplicated: mise=[$vmise] flatpak=[$vflat] dup=[$vdup]"; fi
+  printf '%s\n' "$vemit" > "$vlt/multi.lock"
+  vout="$(PATH="$vlt/fakebin:$PATH" bash "$vl" check "$vlt/multi.lock" 2>&1)"; vrc=$?
+  if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — a lock with multi-version names checks clean against its own box"
+  else bad "versions.lock — multi-version self-check gave exit $vrc: $vout"; fi
+  # A lock written BEFORE the merge rule (one row per version) must compare
+  # clean too, not as "2 changed" for one tool.
+  { grep -v '^mise	go	' "$vlt/multi.lock"; printf 'mise\tgo\t1.27.2\nmise\tgo\t1.9.0\nmise\tgo\t1.27.1\n'; } > "$vlt/oldfmt.lock"
+  vout="$(PATH="$vlt/fakebin:$PATH" bash "$vl" check "$vlt/oldfmt.lock" 2>&1)"; vrc=$?
+  if [ "$vrc" = 0 ] && grep -q '^no drift' <<<"$vout"; then ok "versions.lock — an old one-row-per-version lock is merged before comparing: no drift"
+  else bad "versions.lock — old-format lock gave exit $vrc: $vout"; fi
   # `check` must compare in the collation its inputs are sorted in (bytes). Under
   # en_US.UTF-8 `join` ignored "-" and "." and silently paired the wrong rows:
   # names that differ only by punctuation, from a fake mise so the live side is

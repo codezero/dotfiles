@@ -28,8 +28,10 @@
 # rule either way: names and versions only, no hostnames, usernames, paths or
 # tokens.
 #
-# Format: sorted TSV, one line per item — `kind<TAB>name<TAB>version` — under
-# a `#` header. Line-oriented so `diff`/`comm` work and no parser is needed.
+# Format: sorted TSV, one line per (kind, name) — `kind<TAB>name<TAB>version` —
+# under a `#` header. When one name has several installed versions the version
+# field lists them all, comma-joined in version order (see _merge_dups).
+# Line-oriented so `diff`/`comm` work and no parser is needed.
 # A kind whose tool is absent is simply omitted (valid on a minimal box, a
 # headless box, a bare CI runner).
 # ============================================================================
@@ -87,12 +89,14 @@ src_dpkg() {
 _brew() { /home/linuxbrew/.linuxbrew/bin/brew "$@"; }
 src_brew() {
   [ -x /home/linuxbrew/.linuxbrew/bin/brew ] || return 0
-  # `brew list --versions` prints "name v1 v2" when several versions are kept;
-  # the LAST is the active one.
+  # `brew list --versions` prints "name v1 v2 …" when several versions are kept
+  # (an upgrade before `brew cleanup`). Their order is directory order, so the
+  # last one is NOT reliably the active one — every kept version becomes a row
+  # and _merge_dups joins them, the same rule as every other source.
   HOMEBREW_NO_AUTO_UPDATE=1 _brew list --formula --versions 2>/dev/null \
-    | awk '{print "brew\t"$1"\t"$NF}'
+    | awk '{for (i = 2; i <= NF; i++) print "brew\t" $1 "\t" $i}'
   HOMEBREW_NO_AUTO_UPDATE=1 _brew list --cask --versions 2>/dev/null \
-    | awk '{print "cask\t"$1"\t"$NF}'
+    | awk '{for (i = 2; i <= NF; i++) print "cask\t" $1 "\t" $i}'
 }
 
 src_flatpak() {
@@ -132,14 +136,8 @@ src_mise() {
   [ -n "$bin" ] || bin="/home/linuxbrew/.linuxbrew/bin/mise"
   [ -x "$bin" ] || return 0
   # Columns: Tool Version [Source Requested]. Header line filtered by name.
-  # ONE row per tool, like brew: when several versions of a tool are installed
-  # (a project pin next to the global one, or an old version waiting to be
-  # pruned after `go@latest` moved) they are joined with "," in version order.
-  # `check` compares rows by (kind, name), so two rows for one name made a lock
-  # disagree with ITSELF — seen live on Gen-5 with go 1.27.1 and 1.27.2.
-  "$bin" ls --installed 2>/dev/null \
-    | awk '$1!="Tool" && NF>=2 {print $1"\t"$2}' | LC_ALL=C sort -t$'\t' -k1,1 -k2,2V \
-    | awk -F'\t' '{ if ($1 in v) v[$1] = v[$1] "," $2; else v[$1] = $2 } END { for (t in v) print "mise\t" t "\t" v[t] }'
+  # One row per installed version; _merge_dups joins a tool's versions.
+  "$bin" ls --installed 2>/dev/null | awk '$1!="Tool" && NF>=2 {print "mise\t"$1"\t"$2}'
 }
 
 # The three pinned clones (pins.sh, TODO J). Recording the SHA that actually
@@ -179,14 +177,31 @@ emit_header() {
   printf '\n'
 }
 
+# One row per (kind, name). A name can legitimately have several installed
+# versions — a mise tool with a project pin beside the global one, a formula
+# brew has not cleaned up yet, a Flatpak app in both the system and the user
+# installation. `check` pairs rows by (kind, name), so two rows for one name
+# made a lock disagree with ITSELF (seen live on Gen-5: go 1.27.1 + 1.27.2).
+# Each such name becomes ONE row, its versions de-duplicated, version-sorted
+# and comma-joined. Applied to the emit AND to the lock `check` reads, so a
+# lock written before this rule still compares cleanly.
+_merge_dups() {
+  awk -F'\t' 'NF==3 && $3!=""' | LC_ALL=C sort -t$'\t' -k1,1 -k2,2 -k3,3V -u \
+    | awk -F'\t' '{ k = $1 "\t" $2
+                    if (k == pk) { v = v "," $3; next }
+                    if (pk != "") print pk "\t" v
+                    pk = k; v = $3 }
+                  END { if (pk != "") print pk "\t" v }' \
+    | LC_ALL=C sort
+}
+
 emit_body() {
   # `|| exit 2` on the dpkg source: a command group's status is its LAST
   # command's, so without it a dpkg failure was lost the moment src_brew ran —
   # and emit wrote a lock with no apt rows (round-3 review).
   # Other sources return 0 when their tool is absent; only dpkg is authoritative.
   { src_system; src_dpkg || exit 2; src_brew; src_flatpak; src_rustup
-    src_cargo; src_claude; src_kitty; src_mise; src_git; } \
-    | awk -F'\t' 'NF==3 && $3!="" {print}' | LC_ALL=C sort -u
+    src_cargo; src_claude; src_kitty; src_mise; src_git; } | _merge_dups
 }
 
 cmd_emit() {
@@ -250,7 +265,7 @@ cmd_check() {
   local now="$CHECK_NOW"
   emit_body > "$now" || { echo "cannot read this box's versions — check aborted" >&2; exit 2; }
   # Compare by (kind, name). Both files are sorted TSV without headers here.
-  local old; old="$(grep -v '^#' "$lock" | awk -F'\t' 'NF==3' | LC_ALL=C sort -u)"
+  local old; old="$(grep -v '^#' "$lock" | _merge_dups)"
   local nb=0
   if [ "$ignore_boot" = 1 ]; then
     local cur

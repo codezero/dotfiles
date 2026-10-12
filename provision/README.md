@@ -252,9 +252,11 @@ record that makes the claim checkable is `versions.lock`:
   - **deb** — the third-party packages from step 20's vendor repos.
   - **brew, cask, mise** — *everything* installed through them, dependencies
     included. These tools manage their own dependency trees, so a moved
-    dependency there is real drift. One row per tool: brew records the active
-    version; a mise tool with several installed versions (say, a project's pin
-    beside the global one) lists them comma-joined, `mise go 1.27.1,1.27.2`.
+    dependency there is real drift. One row per name: when a name has several
+    installed versions — a mise tool with a project's pin beside the global one,
+    a formula brew has not cleaned up yet, a Flatpak app installed both
+    system-wide and per-user — the row lists them all, comma-joined in version
+    order (`mise go 1.27.1,1.27.2`).
   - **flatpak** — the installed *applications* (`flatpak list --app`); their
     runtimes are not recorded.
   - the rustup toolchain, the cargo-built Alacritty, Claude, kitty, and the
