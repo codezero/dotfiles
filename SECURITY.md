@@ -68,9 +68,10 @@ Each of these was raised, investigated and closed with a reason:
 - **The loose version glob in the kitty step** (`[0-9]*.[0-9]*.[0-9]*`) does accept a traversal
   string, but `curl -o` creates no intermediate directories, so it dies on `ENOENT` before any
   write; the value is quoted everywhere and never `eval`ed. Anchoring it is hygiene, not a fix.
-- **`verify_keyring` compares only the first key in a file** — which is why the kitty step
-  *also* passes the pinned fingerprint to `gpg --assert-signer`, binding the signature to that
-  key. Without the second check an appended attacker key would have validated a tarball; with
-  it, it does not.
+- **`verify_keyring` used to compare only the first key in a file**, while apt and gpg trust
+  every key in it — so a key appended after the real one passed the pin. The kitty step closed
+  that for kitty by also passing the pinned fingerprint to `gpg --assert-signer`; since
+  2026-10-12 `verify_keyring` itself refuses a file with more than one primary key, which
+  closes it for the Docker, VSCodium and Cursor repos too.
 
 If you think one of those was closed wrongly, say so — that is a fine report.

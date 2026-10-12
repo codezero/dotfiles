@@ -147,7 +147,8 @@ silently breaks `--dry-run`.
   sources, installed system-wide.
 - **kitty (step 38) is installed from upstream's signed `.txz`**, verified two ways: the
   fail-closed `verify_keyring` fingerprint pin, **plus** `gpg --verify --assert-signer
-  "$KITTY_FP"` on the tarball. The second is not redundant — see the design notes. A mismatch
+  "$KITTY_FP"` on the tarball. The second binds the signature to that key independently of the
+  first (which refuses any key file with more than one primary key) — see the design notes. A mismatch
   **skips** the install; it never falls back to unverified. An old gpg without
   `--assert-signer` refuses rather than verifying unbound.
 - Both **pin the font themselves** (`alacritty.toml`, `kitty.conf`) — kitty does not read

@@ -262,17 +262,28 @@ apt_get() {
 }
 apt_install() { apt_get install -y "$@" || soft_fail "apt: some of [$*] failed to install"; }
 
-# Validate a keyring file holds a usable GPG key before we trust its repo. If
-# `expected_fp` is non-empty, the primary-key fingerprint must match it. Returns
-# non-zero (so callers can GATE the repo add) on an empty/garbage key or a
-# fingerprint mismatch — prevents adding a repo behind a failed/tampered key.
+# verify_keyring FILE EXPECTED_FP — gate a repo add on its signing-key file:
+# exactly ONE primary key, and its fingerprint must equal the pin. Non-zero on
+# anything else, so callers skip the vendor instead of trusting a bad key.
+#   - Exactly one: apt (signed-by) and gpg trust EVERY key in the file, but
+#     this used to compare only the FIRST fingerprint. A key appended after the
+#     real one on a compromised vendor server passed the pin and was then
+#     trusted — Docker serves its key and its packages from the same host, so
+#     one compromise sufficed. All four vendor files hold one key (2026-10-12).
+#   - A pin is required: an empty EXPECTED_FP used to accept any key. Every
+#     caller passes a literal, and the dry tier keeps them literal, but the
+#     gate should not depend on that.
 verify_keyring() {
-  local kr="$1" want="${2:-}" got
+  local kr="$1" want="${2:-}" cols npub got
+  [ -n "$want" ] || { warn "GPG keyring $kr: no expected fingerprint given — refusing (a pin is required)"; return 1; }
   [ -s "$kr" ] || { warn "GPG keyring $kr is empty/missing"; return 1; }
-  got="$(gpg --show-keys --with-colons "$kr" 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}')"
-  [ -n "$got" ] || { warn "no GPG key found in $kr"; return 1; }
-  if [ -n "$want" ] && [ "$got" != "$want" ]; then
-    warn "GPG fingerprint mismatch in $kr: got $got expected $want"
+  cols="$(gpg --show-keys --with-colons "$kr" 2>/dev/null)"
+  npub="$(grep -c '^pub:' <<<"$cols")"
+  [ "$npub" -ge 1 ] || { warn "no GPG key found in $kr"; return 1; }
+  [ "$npub" -eq 1 ] || { warn "GPG keyring $kr holds $npub primary keys — expected exactly one (every key in it would be trusted)"; return 1; }
+  got="$(awk -F: '$1=="pub" {p=1; next} p && $1=="fpr" {print $10; exit}' <<<"$cols")"
+  if [ "$got" != "$want" ]; then
+    warn "GPG fingerprint mismatch in $kr: got ${got:-none} expected $want"
     return 1
   fi
   return 0

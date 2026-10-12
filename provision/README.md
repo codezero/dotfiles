@@ -428,8 +428,9 @@ Goldens: rebuild from the reviewed SHA, commit the clone's lock as
   use their official **signed apt repos** (Cursor moved off the old download-URL
   API to `downloads.cursor.com/aptrepo`).
 - **Signing keys are verified + gated.** Each repo add + install only proceeds
-  after `verify_keyring` confirms a valid, non-empty GPG key landed (no
-  half-configured repo behind a failed/tampered key). Docker, Cursor, and
+  after `verify_keyring` confirms the file holds **exactly one** GPG key and
+  that its fingerprint matches the pin (apt trusts every key in the file, so an
+  extra one is refused; no half-configured repo behind a failed/tampered key). Docker, Cursor, and
   VSCodium fingerprints are all **pinned** (each verified against the live key).
   A failed/mismatched key skips just that vendor (never bricks).
 - **Arch-aware.** Docker codename auto-falls back to `noble` if the repo lacks

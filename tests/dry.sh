@@ -844,6 +844,29 @@ cmd_dry() {
   if [ -z "$fpbad" ] && [ "$(grep -c . <<<"$fps")" -ge 4 ]; then
     ok "key pins — every *_FP in the steps is a fixed fingerprint (Docker, Cursor, VSCodium, kitty)"
   else bad "key pins — not a fixed 40-hex fingerprint, or fewer than four found:$(printf '\n    %s' "$fpbad")"; fi
+  # verify_keyring gates every vendor repo (step 20) and kitty (step 38): ONE
+  # primary key, equal to the pin. apt and gpg trust every key in the file, but
+  # it used to compare only the first — a key appended after the real one on a
+  # compromised vendor server passed and was trusted. Fixtures are PUBLIC keys
+  # already on every Ubuntu box (ubuntu-keyring); nothing is generated.
+  local ukr=/usr/share/keyrings/ubuntu-archive-keyring.gpg kg kf1 kf2 kone
+  if [ -r "$ukr" ] && [ "$(gpg --show-keys --with-colons "$ukr" 2>/dev/null | grep -c '^pub:')" -ge 2 ]; then
+    kg="$(mktemp -d)"; chmod 700 "$kg"; kone="$kg/one.gpg"
+    kf1="$(gpg --show-keys --with-colons "$ukr" 2>/dev/null | awk -F: '$1=="pub"{p=1;next} p&&$1=="fpr"{print $10; p=0}' | sed -n 1p)"
+    kf2="$(gpg --show-keys --with-colons "$ukr" 2>/dev/null | awk -F: '$1=="pub"{p=1;next} p&&$1=="fpr"{print $10; p=0}' | sed -n 2p)"
+    gpg --homedir "$kg" --batch --quiet --import "$ukr" 2>/dev/null
+    gpg --homedir "$kg" --batch --export "$kf1" > "$kone" 2>/dev/null
+    : > "$kg/empty.gpg"
+    _vk() { env DRY_RUN=1 PROVISION_USER="$(id -un)" bash -c 'source "$1"/provision/lib.sh 2>/dev/null; verify_keyring "$2" "$3"' _ "$HERE" "$1" "$2" >/dev/null 2>&1; echo $?; }
+    local ka kb kc kd ke
+    ka="$(_vk "$kone" "$kf1")"; kb="$(_vk "$kone" "$kf2")"; ke="$(_vk "$kg/empty.gpg" "$kf1")"
+    kc="$(_vk "$ukr" "$kf1")"; kd="$(_vk "$kone" "")"
+    if [ "$ka" = 0 ] && [ "$kb" = 1 ] && [ "$ke" = 1 ]; then ok "verify_keyring — accepts the one pinned key; rejects a wrong fingerprint and an empty file"
+    else bad "verify_keyring — single-key cases gave pinned=$ka wrong-fp=$kb empty=$ke (want 0/1/1)"; fi
+    if [ "$kc" = 1 ] && [ "$kd" = 1 ]; then ok "verify_keyring — rejects a file with a second key appended (pin still first), and an empty pin"
+    else bad "verify_keyring — appended-key file gave $kc, empty pin gave $kd (want 1/1)"; fi
+    gpgconf --homedir "$kg" --kill all >/dev/null 2>&1; rm -rf "$kg"; unset -f _vk
+  else skip "verify_keyring — $ukr missing or holds <2 keys; the appended-key fixture needs it"; fi
 
   # install.sh supports Homebrew at ONE place. A brew elsewhere on PATH must stop
   # the run before [0/7] — it used to count as installed, then [2/7] failed to

@@ -222,6 +222,8 @@ paranoid. What they changed:
   pinned fingerprint is passed to `gpg --assert-signer` at the call site. Without that, a key
   file with the real key *first* and an attacker key **appended** passed the pin and then
   validated a tarball signed by the appended key — the pin would have constrained nothing.
+  The three apt vendors had the same shape (apt trusts every key in a `signed-by` file) until
+  `verify_keyring` began refusing any key file with more than one primary key.
 - **Nothing root-side writes into `$HOME`.** A root `chown`/`cp`/`rm`/`tar` through a path the
   user controls follows a planted symlink (`~/.config → /etc` turns `chown user ~/.config`
   into `chown user /etc`). Every write into a home goes through the user; `dotfiles-install.sh`
