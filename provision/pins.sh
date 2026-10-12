@@ -34,7 +34,7 @@
 # shellcheck disable=SC2034  # values are consumed by the scripts that source this file
 
 # ── git clones that ship code run by every shell ─────────────────────────────
-OMZ_SHA=42a4ccb1b14dbeffe81259105a5243b4f4cb618e     # omz HEAD 2026-10-10 (bumped 2026-10-10 from 9f9b28a: 3 commits, log reviewed via `pins.sh bump`)
+OMZ_SHA=106f9874a22ec8cfa1e69ae8e1143d8720f087dc     # omz HEAD 2026-10-12 (bumped 2026-10-12 from 42a4ccb: 6 commits, log reviewed via `pins.sh bump`)
 P10K_SHA=d05a1b00f9a61f9578bf9dc19b8451942dde8734                # romkatv/powerlevel10k      HEAD 2026-09-06
 ALACRITTY_THEME_SHA=ab88d5a80d676b5dc6157e91aba8067f2078dc94     # alacritty/alacritty-theme  HEAD 2026-09-11
 OMZ_URL=https://github.com/ohmyzsh/ohmyzsh
@@ -44,7 +44,7 @@ ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
 # ── installer scripts / binaries executed once ───────────────────────────────
 # Homebrew/install: the raw URL is pinned to a COMMIT (not HEAD) and the file
 # is verified against the hash recorded here before it runs.
-HOMEBREW_INSTALL_COMMIT=8ab1549dfa1189fd4d818a2116592d8f0ee06d8c     # 2026-10-07 (bumped from 0a396a4e; diff reviewed via `pins.sh bump`)
+HOMEBREW_INSTALL_COMMIT=7a3f48c7e498d7df3237fd41c30f4d492857edf4     # 2026-10-11 (bumped from 8ab1549d; diff reviewed via `pins.sh bump`)
 HOMEBREW_INSTALL_SHA256=5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148     # sha256 of install.sh at that commit
 HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBREW_INSTALL_COMMIT/install.sh"
 
