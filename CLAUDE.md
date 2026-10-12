@@ -295,7 +295,8 @@ when editing code:
   - **Bumping a pin is a commit, never a run-time fetch.** `bash provision/pins.sh bump
     [--check] <name>|all` is that act as one command: it prints the review (upstream log /
     script diff / version), rewrites the pin line, converges the local checkout and stages the
-    file — you read it and commit.
+    file — you read it and commit. It refuses to start while `pins.sh` has uncommitted changes,
+    so each review covers exactly what the next commit holds.
   - `clone_pinned` is idempotent and **converging**: a no-op at the pin, otherwise it moves the
     checkout to the pin (untracked content such as omz's `custom/` survives); it refuses a
     checkout whose *tracked* files were edited, and refuses (never wipes) a non-checkout dir.

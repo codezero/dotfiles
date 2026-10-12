@@ -359,6 +359,9 @@ bottle and checks its attestation.
    rustup (its hashes come from upstream's `.sha256` files, recorded here so
    they are no longer same-host) — rewrites the pin line, converges this box's
    checkout, and **stages** `pins.sh`. **Read what it printed, then commit.**
+   It refuses to start while `pins.sh` still holds an uncommitted bump: the
+   review covers old..new from the pin in the file, so a second bump on top
+   of the first would review only its own step. Commit the first one.
    That commit is the control; `bump` only makes it as cheap as a tool's own
    updater. On a pinned box `omz update` is routed to this (`.zshrc`) — omz's
    updater would be a second owner of code the pin owns, and it fails on a

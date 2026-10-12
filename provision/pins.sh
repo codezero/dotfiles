@@ -260,6 +260,17 @@ bump() {
       *) echo "bump: unknown pin '$w'" >&2; return 2 ;;
     esac
   done
+  # Start from the COMMITTED pins. A bump reviews old..new where "old" is the
+  # pin in the file; if pins.sh already holds an uncommitted bump, the next one
+  # reviews only its own step. Two bumps on 2026-10-09/10 left a commit
+  # holding six upstream commits whose review — and message — covered three.
+  # --check only reads, so it may run on a dirty file; outside a git checkout
+  # there is nothing to compare against and the stage step reports that.
+  if [ "$CHECK" = 0 ] && git -C "$(dirname "$pf")" rev-parse --git-dir >/dev/null 2>&1 \
+     && ! git -C "$(dirname "$pf")" diff --quiet HEAD -- "$pf" 2>/dev/null; then
+    echo "bump: $pf has uncommitted changes (an earlier bump?) — commit or discard them first, so this bump is reviewed against the committed pin" >&2
+    return 2
+  fi
   # The snapshot is how the outcome is judged, so no snapshot means no bump:
   # stop BEFORE any worker can change the file (round-2 review — it used to
   # carry on with snap="", skip the check, and return 0 after a rewrite).

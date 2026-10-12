@@ -709,6 +709,26 @@ cmd_dry() {
   if [ "$brc" = 2 ] && cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" && grep -q 'not root' <<<"$bout"; then
     ok "pins.sh bump — refuses to run as root, nothing changed (exit 2)"
   else bad "pins.sh bump — as root gave exit $brc$(cmp -s "$bt/pins.sh" "$HERE/provision/pins.sh" || echo ', rewrote a pin')"; fi
+  # (8) an uncommitted pins.sh (an earlier bump not yet committed) is refused:
+  #     the next bump would review only its own step (2026-10-10: a commit held
+  #     six upstream commits, its review covered three). --check may still run;
+  #     once committed, bump works. A throwaway git repo holds the copy.
+  local gr; gr="$(mktemp -d)"; cp "$HERE/provision/pins.sh" "$gr/pins.sh"
+  git -C "$gr" init -q && git -C "$gr" add pins.sh \
+    && git -C "$gr" -c user.name=t -c user.email=t@t.invalid commit -qm base
+  printf '# an earlier, uncommitted bump\n' >> "$gr/pins.sh"; cp "$gr/pins.sh" "$gr/dirty.copy"
+  local stub='_bump_brew() { _pin_set HOMEBREW_INSTALL_COMMIT deadbeefdeadbeefdeadbeefdeadbeefdeadbeef stub; return 3; }'
+  bout="$( cd "$gr" && bash -c "source ./pins.sh; $stub; bump brew-installer" 2>&1 )"; brc=$?
+  local untouched=no; cmp -s "$gr/pins.sh" "$gr/dirty.copy" && untouched=yes
+  local chk; chk="$( cd "$gr" && bash -c "source ./pins.sh; _bump_brew() { echo stub-check; return 0; }; bump --check brew-installer" 2>&1 )"
+  git -C "$gr" checkout -q -- pins.sh
+  local cout crc; cout="$( cd "$gr" && bash -c "source ./pins.sh; $stub; bump brew-installer" 2>&1 )"; crc=$?
+  if [ "$brc" = 2 ] && grep -q 'uncommitted changes' <<<"$bout" && [ "$untouched" = yes ] \
+     && grep -q 'stub-check' <<<"$chk" && ! grep -q 'uncommitted' <<<"$chk" \
+     && [ "$crc" = 0 ] && grep -q 'rewritten and staged' <<<"$cout"; then
+    ok "pins.sh bump — refuses while pins.sh has uncommitted changes (exit 2); --check still runs; clean bump works"
+  else bad "pins.sh bump — dirty-pins guard: dirty exit $brc untouched=$untouched [$(printf %.80s "$bout")] check [$(printf %.60s "$chk")] clean exit $crc"; fi
+  rm -rf "$gr"
   # (4) the safety copy cannot be made (mktemp fails): stop before any worker
   #     runs — exit 1 and pins.sh untouched (round-2 review).
   cp "$HERE/provision/pins.sh" "$bt/pins.sh"; mkdir -p "$bt/shim"
