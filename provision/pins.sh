@@ -44,7 +44,7 @@ ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
 # ── installer scripts / binaries executed once ───────────────────────────────
 # Homebrew/install: the raw URL is pinned to a COMMIT (not HEAD) and the file
 # is verified against the hash recorded here before it runs.
-HOMEBREW_INSTALL_COMMIT=7a3f48c7e498d7df3237fd41c30f4d492857edf4     # 2026-10-11 (bumped from 8ab1549d; diff reviewed via `pins.sh bump`)
+HOMEBREW_INSTALL_COMMIT=be041513824fd2666a0e93cf5c3b0ca3bb0eb4b6     # 2026-10-17 (bumped from 7a3f48c7; diff reviewed via `pins.sh bump`)
 HOMEBREW_INSTALL_SHA256=5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148     # sha256 of install.sh at that commit
 HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBREW_INSTALL_COMMIT/install.sh"
 
