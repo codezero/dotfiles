@@ -50,8 +50,9 @@ that outlive any one line of code. This file holds the rules; that one holds the
   keep invariants from regressing: no `curl | sh`, no raw `git clone`, no bare `apt-get`, no
   root-side write into `$TARGET_HOME`, no commit SHAs in the docs, both CI files present and
   running both tiers.
-- **verify** — the on-box audit. Contradictory token combos (`full minimal`, `plain copy`,
-  `installsh full`, `plain golden-clone`) are **refused with exit 2** before anything runs.
+- **verify** — the on-box audit. Contradictory token combos (`plain copy`, `plain golden-clone`,
+  `full minimal`, `headless desktop`, and `installsh` with `full`, `minimal` or `golden-clone`)
+  are **refused with exit 2** before anything runs.
   Never calls an Electron app's `--version` (hangs headless). `golden-clone` is a **first-boot**
   audit: a credential path passes only if it was born after the clone's first boot (measured by
   `/etc/machine-id`'s mtime, which finalize empties and systemd rewrites), and the lock must
@@ -321,11 +322,11 @@ tasks, and points to that log. Both travel between machines by hand, with
 **No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware.
 
 What remains is **verification debt, not unfinished work** — changes that are correct by
-construction and by the tiers, but have not yet run on a real box. A commit says so in its own
-body when it applies. None is standing across the tree right now: the last one, finalize's
-fail-closed rewrite, ran on a real desktop build box in the Gen-5 rehearsal (2026-10-08) and
-its clone passed `verify S8` with nothing failed or skipped. Treat a "not verified live" line in
-a commit message as a claim someone still has to collect.
+construction and by the tiers, but have not yet run on a real box. Each commit says so in its own
+body ("Not verified: …"), so the standing debt is whatever those lines name since the newest
+golden: `git log "$(git describe --tags --abbrev=0 --match 'golden/*')"..HEAD`. This file keeps
+no list of it, because a list here goes stale with the next commit. Treat a "not verified live"
+line in a commit message as a claim someone still has to collect.
 
 ## Project direction & philosophy
 

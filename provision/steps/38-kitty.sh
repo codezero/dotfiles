@@ -11,7 +11,8 @@
 #             taking it here would leave the two terminals inconsistent.
 #   flatpak — kitty is not on Flathub (both plausible app-IDs 404), and a
 #             sandboxed terminal would run the user's shell inside the sandbox.
-#   snap    — this machine has no snapd by design (see step 36).
+#   snap    — provisioning installs no snap and needs no snapd (see step 36);
+#             a stock desktop image keeps its own snapd.
 #
 # The interesting difference from Alacritty: upstream ships NO Linux binary for
 # Alacritty (v0.17.0's assets are Windows/macOS plus man pages and completions),
@@ -138,7 +139,7 @@ if ! gpg --batch --quiet --import "$tmp/kovid.gpg" 2>/dev/null \
 fi
 log "kitty: signature verified against pinned key $KITTY_FP"
 
-# Install AS THE USER (2026-09-22, external assessment #1): until then root
+# Install AS THE USER (2026-09-22, external assessment #2): until then root
 # ran rm -rf/mkdir/tar/cp/chown -R straight into ~/.local — the same
 # symlinked-parent escalation step 60 had. Nothing here needs root: the
 # verified tarball is handed to the user (root's mktemp dir is 0700, so open

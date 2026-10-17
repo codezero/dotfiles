@@ -960,7 +960,7 @@ cmd_dry() {
   done < <(grep -vE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list")
   [ "$mmiss" = 0 ] && ok "dotfiles.list — every entry exists in the repo ($(grep -cvE '^[[:space:]]*(#|$)' "$HERE/dotfiles.list") entries)"
   # ── dotfiles-install.sh: the ONE dotfile installer (install.sh + step 60) ──
-  # Runs as the user into a scratch HOME (2026-09-22, assessment #1: step 60
+  # Runs as the user into a scratch HOME (2026-09-22, assessment #2: step 60
   # used to do this as root through user-controlled paths). Symlink mode, copy
   # mode, backup exactly once, identical content untouched, a symlinked parent
   # REFUSED (never followed), root refused.
