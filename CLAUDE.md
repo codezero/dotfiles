@@ -7,7 +7,8 @@ Bash + config files only — no build system. The checks are `smoke-test.sh`'s t
 
 **The *why* behind most of this lives in [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md)** — the
 golden-image generations, the live-test record, what was tried and declined, and the gotchas
-that outlive any one line of code. This file holds the rules; that one holds the reasons.
+that outlive any one line of code. This file holds the rules; that one holds the reasons. It is
+imported at the end of this file, so Claude Code loads it in every session — keep it accurate.
 
 ## Commands
 
@@ -345,3 +346,9 @@ line in a commit message as a claim someone still has to collect.
   bring-to-latest layer over an existing image.
 - **No creds/PII ever** — enforced by `.gitignore`, the names-only package lists and versions lock, and
   finalize's fail-closed audit.
+
+## Design notes (imported)
+
+Claude Code expands the line below into the full text of `docs/DESIGN-NOTES.md` at launch.
+
+@docs/DESIGN-NOTES.md

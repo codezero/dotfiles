@@ -271,6 +271,12 @@ cmd_dry() {
   if [ -s "$HERE/docs/DESIGN-NOTES.md" ] && grep -q 'DESIGN-NOTES' "$HERE/CLAUDE.md" && grep -q 'DESIGN-NOTES' "$HERE/README.md"; then
     ok "docs — DESIGN-NOTES.md exists and both CLAUDE.md and README.md point at it"
   else bad "docs — DESIGN-NOTES.md missing, or the entry points no longer link it"; fi
+  # ...and CLAUDE.md imports it (a line of its own), so Claude Code loads the
+  # reasons and declined decisions in every session, not only when it happens
+  # to open the file (owner's decision, 2026-10-17).
+  if grep -qx '@docs/DESIGN-NOTES.md' "$HERE/CLAUDE.md"; then
+    ok "docs — CLAUDE.md imports docs/DESIGN-NOTES.md (loaded every session)"
+  else bad "docs — CLAUDE.md no longer imports docs/DESIGN-NOTES.md (@docs/DESIGN-NOTES.md on its own line)"; fi
 
   # ── versions.lock: emit + check, self-contained ────────────────────────────
   # No shims, no brew needed: every source is optional, so the emitter is valid
