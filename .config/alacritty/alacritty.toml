@@ -3,8 +3,10 @@ XCURSOR_THEME = "Yaru"
 XCURSOR_SIZE = "24"
 
 [general]
-# Reload on save (live_config_reload) and expose the IPC socket so
-# `alacritty msg` + the CreateNewWindow keybinding below work.
+# Reload on save (live_config_reload) and expose the IPC socket for
+# `alacritty msg`. Both are Alacritty's defaults, set here to be explicit; the
+# CreateNewWindow keybinding below does not need IPC (it opens the window
+# in-process).
 live_config_reload = true
 ipc_socket = true
 import = [
