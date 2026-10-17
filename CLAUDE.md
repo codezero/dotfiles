@@ -231,9 +231,11 @@ when editing code:
   every GUI install, with `no_gui_reason` supplying the skip marker. A new GUI step needs one
   line: `gui_wanted || { log "x: skipped ($(no_gui_reason))"; exit 0; }`. Conflicts with
   `INSTALL_DESKTOP=1` (die).
-- `DOCKER_ROOTLESS=1` — rootless Docker for the target user (step 25). Needs unprivileged user
-  namespaces; soft-fails where AppArmor restricts them (rootful still works). Do **not** also
-  `usermod -aG docker` — that is the root-equivalent path.
+- `DOCKER_ROOTLESS=1` — rootless Docker for the target user (step 25). Today step 25's preflight
+  soft-fails whenever `kernel.apparmor_restrict_unprivileged_userns=1` (rootful still works), but
+  that premise is under review: rootlesskit's own AppArmor profile lets it run with the setting
+  at 1 (design notes, user-namespace gotcha). Do **not** also `usermod -aG docker` — that is the
+  root-equivalent path.
 - **Failure handling:** tolerant helpers call `soft_fail` → warn + record; a normal run
   finishes every step but exits non-zero if any soft failure occurred. Under `STRICT`/
   `GOLDEN_IMAGE` a soft failure **dies** immediately. `lib.sh` refuses a uid-0 target user.
@@ -321,7 +323,9 @@ keeps a private, append-only engineering log outside the repo, read on demand. `
 tasks, and points to that log. Both travel between machines by hand, with
 `~/.claude/projects/…/memory/`.
 
-**No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware.
+**One open item:** step 25's userns preflight, and the docs that assume the AppArmor relaxation,
+wait for one live `DOCKER_ROOTLESS=1` run on a fresh box (design notes, user-namespace gotcha).
+Every scenario in `smoke-test.sh scenarios` has run on real hardware.
 
 What remains is **verification debt, not unfinished work** — changes that are correct by
 construction and by the tiers, but have not yet run on a real box. Each commit says so in its own
