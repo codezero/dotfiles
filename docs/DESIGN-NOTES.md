@@ -6,9 +6,11 @@ also why so much of the code is commented with a *reason* rather than a descript
 
 `CLAUDE.md` and `provision/README.md` hold the **rules** — what a change must not break.
 This file holds the **record**: what was built, what it cost to get right, and what was
-deliberately not done. It exists because the repo was re-published from its last state
-(2026-09) without its commit history; four months of `git log` and the owner's engineering
-log are in a private archive, and everything below is what was worth carrying out of them.
+deliberately not done. It exists because the public repo carries no history before its
+parentless root commit (re-exported 2026-10-08; first re-published 2026-09-23). The full
+history since 2026-05-24 — every older commit, and the `golden/gen-3` and `gen-4` tags — lives
+in the owner's private archive repo, and the owner's engineering log is a separate untracked
+file. Everything below is what was worth carrying out of them.
 
 ---
 
@@ -33,9 +35,9 @@ value is what it proved and what it broke.
 
 | Gen | When | Built with | What it proved / found |
 |---|---|---|---|
-| **Gen-1** | 2026-05-25 → 05-27 | `GOLDEN_IMAGE=1`, later `+INSTALL_DESKTOP=1` | First strict build. Both the pass *and* the abort proven: an unreadable credential (`chattr +i`) made finalize `die` instead of capturing a dirty image. Found three live-only bugs — `as_user` corrupting exit status through a login shell, dry-run text leaking into a real run, completions installed 0600 so `compinit` refused them. |
-| **Gen-2** | 2026-06-07 | re-run *on* a Gen-1 clone | The iterate-on-golden path: a re-run reaches `Finalize done`, the post-provision notes survive the wipe, copies stay copies. The trap it taught: a manual re-run on a golden **must** keep `GOLDEN_IMAGE=1`/`DOTFILES_COPY=1`, or it symlinks over the copies. |
-| **Gen-3** | 2026-09-12 | `+INSTALL_DESKTOP=1` | First image whose clone was audited live rather than by hand: 67/70. The dock lacked Alacritty because the GNOME favourites still named the *snap* id from a box that no longer existed — the exact drift the dogfooding exists to kill. Also: the SSH-host-key check assumed sshd, and `~/.gnupg`/atuin are legitimately recreated at first login. 84/84 after the fixes. |
+| **Gen-1** | 2026-05-25 → 05-27 | `GOLDEN_IMAGE=1`, later `+INSTALL_DESKTOP=1` | First strict build. Both the pass *and* the abort proven: an un-removable credential (`chattr +i`) made finalize `die` instead of capturing a dirty image. Found three live-only bugs — `as_user` corrupting exit status through a login shell, the real run's follow-up text printed under `--dry-run`, completions installed 0600 so `compinit` refused them. |
+| **Gen-2** | 2026-06-07 | re-run *on* a Gen-1 clone | The iterate-on-golden path: a re-run reaches `Finalize done`, the post-provision notes survive the wipe, copies stay copies. The trap it taught: a re-run on a golden clone must keep `DOTFILES_COPY=1` — without it, every copy that differs from the checkout is backed up and replaced by a symlink into a repo path the image may not keep (identical copies are left alone). `GOLDEN_IMAGE=1` belongs only on a throwaway clone that is building the next image, never on a VM in use: it scrubs every account. |
+| **Gen-3** | 2026-09-12 | `+INSTALL_DESKTOP=1` | First image whose clone was audited live rather than by hand: 67/70. The dock lacked Alacritty because the GNOME favourites still named the *snap* id of the old dev box's Alacritty — the exact drift the dogfooding exists to kill. Also: the SSH-host-key check assumed sshd, and `~/.gnupg`/atuin are legitimately recreated at first login. 84/84 after the fixes. |
 | **Gen-4** | 2026-09-13 | `+APT_UPGRADE=1 +GOLDEN_POWEROFF=1` | First image with the versions lock emitted **in-build** and every install-time script pinned. First clone to pass its first-boot audit clean: 95/95, zero drift against the lock written inside the build. It took two attempts — see the needrestart and atuin entries under Gotchas. |
 | **Gen-5** | 2026-10-08 | `+APT_UPGRADE=1 +GOLDEN_POWEROFF=1`, from the public repo's root commit | First with the 2026-09-22 security model (nothing root-side writes `$HOME`; finalize fail-closed for every account), and the first built from the re-exported public history — its lock's `repo:` is that root commit. Three rehearsal builds first; the first two stopped on key-sweep false alarms (see *Skip by where*). Clone `verify S8` 106/0/0, the first with nothing skipped. Lock vs Gen-4: 47 versions moved, 3 rows added (the two inbound-ssh terminfo packages and a new Homebrew OpenSSL), none removed. |
 
@@ -57,10 +59,10 @@ runbook and the audit each one maps to. The point of the table is what each *fou
 | S1 | lint + dry tier | (the pre-commit gate itself) |
 | S2/S3 | plain run, then re-run | idempotence; a non-login `as_user` shell is required — a login shell runs `~/.bash_logout`, which fails without a tty and corrupts the step's exit status |
 | S4 | desktop | `apt_preflight`'s wait for the background updaters was **unbounded** and could hang longer than the problem it solved; the Nerd Font was installed but GNOME's `monospace-font-name` never pointed at it, so the stock terminal drew tofu while Alacritty looked fine |
-| S5 | rootless Docker | a context *named* `rootless` proves nothing — the audit has to read `docker info` (`SecurityOptions`, `DockerRootDir`) |
+| S5 | rootless Docker | a failed rootless setup still switched the Docker context and broke even rootful use, so the switch is now gated on success; and (proved in S14) a context *named* `rootless` proves nothing — the audit reads `docker info` (`SecurityOptions`, `DockerRootDir`) |
 | S6 | copy mode | "the run logged the word copy" is not evidence; only a byte-for-byte comparison is |
 | S7/S8 | golden, golden-desktop | see the generations above |
-| S9 | iterate on a golden | the keep-the-flag trap (Gen-2) |
+| S9 | iterate on a golden | the keep-`DOTFILES_COPY` trap (Gen-2) |
 | S10 | `install.sh` | a redirected run parked on an **invisible** sudo prompt (sudo reads the tty, prints to stderr) — hence the explicit `[0/7]` priming; and the tmux plugin nagged on every shell start because the bootstrap shipped `.tmux.conf` without tmux. Re-proven bare-metal later: **it needs its own box** — Homebrew is one owner per prefix, so a second user on someone else's provisioned box cannot get past `[5/7]` |
 | S11/S14 | `PROFILE=minimal`, ± rootless | the lean box keeps Docker on purpose; `command -v` guards in `.zshrc` are what make it start silently |
 | S12 | `APT_UPGRADE=1` | "N packages can be upgraded" never reaches zero, by design — see Gotchas |
@@ -68,10 +70,12 @@ runbook and the audit each one maps to. The point of the table is what each *fou
 | S13×S11 | cloud-init **and** `PROFILE=minimal`, one box | the versions lock had **no `repo:` field**: it is emitted as the target user, and git refuses to parse a repo owned by someone else — under cloud-init the repo is root-owned in `/opt`, so the one field saying *which commit produced this* silently vanished. Only this path could show it; four months of desktop runs never did |
 | S15 | `HEADLESS=1` | the full CLI set with every GUI install skipped — one `gui_wanted` gate, not a third profile |
 
-**Every scenario in that table has now run on real hardware**, most recently the two that had
-drifted furthest behind the code (cloud-init and `install.sh`, 2026-09-24). The pattern worth
-keeping: each live run since has found exactly one defect, and never the one that was expected —
-which is the argument for running them at all rather than reasoning about them.
+**Every scenario in that table has run on real hardware at least once.** The last full runs
+were cloud-init and `install.sh` (2026-09-24) and the Gen-5 build (S8, 2026-10-08). Commits
+since then that no box has run yet say so in their own bodies — debt still to collect, not
+proof. The pattern worth keeping: a live run usually finds a defect no tier could see, and
+rarely the one that was expected — which is the argument for running them at all rather than
+reasoning about them.
 
 A second pattern produced most of the guards in `tests/`: **writing a rule down precisely is
 what exposes that nothing enforces it.** It happened at least six times — two flags documented
@@ -119,24 +123,37 @@ gets written down, check the same commit that something goes red when it stops b
   either. *Reopen if*: the lists must track a machine automatically rather than be chosen — in
   which case it needs `LC_ALL=C` on every sort and a pruning pass, not a revert.
 
-- **Dependencies are not in the lock.** A `dep` row per installed package was tried in 2026-09
-  and removed a day later. It made the lock wrong by construction — the lock is written before
-  `apt-get autoremove`, and dependencies are exactly what autoremove deletes — and its report
-  got swallowed by the audit. The lock records what the repo *names*; to see dependency drift,
-  diff `dpkg-query -W` output between two boxes. *Reopen if*: dependency drift has to be
+- **apt dependencies are not in the lock.** A `dep` row per installed package was tried in
+  2026-09 and removed the same day. It made the lock wrong by construction — the lock is written
+  before `apt-get autoremove`, and dependencies are exactly what autoremove deletes — and its
+  report got swallowed by the audit. For apt, the lock records the packages the repo *names*;
+  brew, cask and mise rows include dependencies, because those tools manage their own trees. To
+  see apt dependency drift, diff `dpkg-query -W` output between two boxes. *Reopen if*: dependency drift has to be
   audited routinely — then emit it after the last package change, as its own file.
-- **The git identity stays in the tracked `.gitconfig`.** It is the owner's, and a placeholder
-  that refuses to commit would only add ceremony. Anyone else's goes in `~/.gitconfig.local`,
-  which the tracked file includes last: `~/.gitconfig` is managed, so an identity typed into it
-  was quietly put back to the placeholder by the next re-run — the on-box notes had been
+- **The tracked `.gitconfig` carries a placeholder identity** — the owner's handle and an
+  address that receives no mail — so commits work on a fresh box; a placeholder that refuses to
+  commit would only add ceremony. A real identity, the owner's included, goes in
+  `~/.gitconfig.local`, which the tracked file includes last: `~/.gitconfig` is managed, so an
+  identity typed into it was quietly put back by the next re-run — the on-box notes had been
   telling people to do exactly that.
 - **No tmux session persistence, no btop config.** Persistence would add two more pinned clones
   and a footgun (its autosave can recreate files *after* the golden scrub) for something the
   terminal's own tabs cover; btop rewrites its config on every exit, which would make a
   symlinked repo copy churn.
-- **No snap.** Alacritty — the one thing that wanted it — is built with `cargo install`, so the
-  machine needs no snapd at all. A pleasing side effect: snap's confinement was what blocked
-  the AI agent's sandbox on the old box.
+- **No snap from provisioning.** Alacritty — the one thing that wanted it — is built with
+  `cargo install`, so provisioning needs no snapd. It does not remove snapd either: stock
+  desktop images ship it, and the dock pins the Firefox, Thunderbird and App Center snaps on
+  purpose. Snap's confinement was also the best explanation for the AI agent's sandbox failing
+  on the old box (not provable once that box was retired).
+- **Docker: root-run in provisioning and in every golden; rootless is each VM's own opt-in.**
+  Whoever uses a VM — a person or an agent — is encouraged to switch it to rootless, the more
+  secure mode, with the recipe in `~/PROVISION-NEXT-STEPS.md` or `DOCKER_ROOTLESS=1` on a
+  normal run; never with the `docker` group, which is root-equivalent. Golden images stay
+  rootful so each clone chooses. The reason long given for that — rootless needs a host-wide
+  AppArmor relaxation that every clone would inherit — does not hold on the daily box, where
+  rootless has run since 2026-10-09 with the restriction on (see the user-namespace gotcha).
+  Step 25 and the docs still assume the relaxation until one `DOCKER_ROOTLESS=1` run on a fresh
+  box confirms otherwise.
 - **No `KEEP_AUTHORIZED_KEYS` escape hatch.** A golden keeps no access material for any
   account. A cloud clone gets its keys back from cloud-init; a local clone is logged into at
   the console first.
@@ -145,20 +162,28 @@ gets written down, check the same commit that something goes red when it stops b
 
 ## Gotchas that outlive the code
 
-- **A bare `apt-get` is interactive.** With a newer kernel installed than the one running,
-  needrestart draws a dialog — into `/dev/null` if stdin was detached — and the build hangs
-  forever. Everything goes through the `apt_get` wrapper; the dry tier rejects `apt-get` in
-  command position in any step.
+- **A bare `apt-get` is interactive.** When `apt-get autoremove` drops the old kernel after an
+  upgrade installed a new one, needrestart asks "restart services?" — its output sent to
+  `/dev/null`, its stdin still on the tty — and the build waits forever. Everything goes through
+  the `apt_get` wrapper, which sets noninteractive mode and `NEEDRESTART_MODE=a` and detaches
+  stdin; the dry tier rejects `apt-get` in command position in any step.
 - **`apt-get upgrade` never installs a new package *name*,** so a kernel ABI bump (a new
   `linux-image-…` name every time) is held back by design, and Ubuntu's phased updates hold
   back another slice. "N can be upgraded" reaching zero is not the goal.
 - **A shell with `atuin` records at pre-exec** — including the `poweroff` you type after the
   scrub, which recreates the history database *inside* the image. `unset HISTFILE` never
   covered that. `GOLDEN_POWEROFF=1` exists so nothing is typed after finalize at all.
-- **`unshare --user --map-root-user true` is a false OK** for user namespaces on 24.04+:
-  Ubuntu ships an AppArmor profile for `unshare`, and the restriction strips capabilities
-  *inside* the namespace rather than denying its creation. Read
-  `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` instead.
+- **Probe the program that matters, not a stand-in.** `kernel.apparmor_restrict_unprivileged_userns=1`
+  (the default since Ubuntu 24.04) does not stop a program from creating a user namespace: an
+  unconfined program is moved into AppArmor's `unprivileged_userns` profile, which strips its
+  capabilities inside it. On 26.04 `unshare --user true` therefore succeeds and
+  `unshare --user --map-root-user true` fails (`write failed /proc/self/uid_map`). A program
+  whose own AppArmor profile grants `userns` is exempt, and the apparmor package ships such a
+  profile for `/usr/bin/rootlesskit` — so Docker's packaged rootless mode runs with the setting
+  at 1 (on the daily box since 2026-10-09; Docker's docs say the same for the deb install on
+  24.04+). An earlier note here called the `unshare` test a false OK and concluded that rootless
+  needs the setting relaxed; neither held up on 26.04, and the second was inferred, never
+  observed.
 - **Never run an Electron app's `--version` in a headless audit** (VSCodium, Cursor) — it can
   hang with no output. Use `dpkg-query -W`.
 - **`gh`'s token lives in the system keyring,** not in `~/.config/gh`. Copying that directory
@@ -174,11 +199,13 @@ gets written down, check the same commit that something goes red when it stops b
   there fail with "unknown terminal type" — `less`, `vim`, `clear`, and the prompt's own
   probing. What a box needs is therefore decided by the *client*, and is independent of which
   terminal (if any) the box has: it belongs in the apt lists, not in a terminal's install step.
-  The first fix missed this twice — it reached for `kitty-terminfo` while the signature-verified
-  kitty tarball already carried a newer copy, and it left `install.sh`, the entry point most
-  likely to be run on a box you only ever ssh into. `ncurses-term` turned out to cover
-  alacritty, wezterm and foot already; Ubuntu has no ghostty entry at all, and never will for
-  whatever ships next — that case is the client's (`infocmp -x … | ssh host 'tic -x -'`).
+  The first fix missed this twice — `kitty-terminfo` alone covers kitty clients and nothing else
+  (the copy inside the kitty tarball is reachable only through kitty's own `$TERMINFO`), and it
+  left `install.sh`, the entry point most likely to be run on a box you only ever ssh into.
+  `ncurses-term` turned out to cover alacritty, wezterm and foot already, so both packages ship
+  on every profile. Ubuntu ships a `ghostty` entry but not `xterm-ghostty`, Ghostty's default
+  `TERM`, and will never cover whatever ships next — that case is the client's
+  (`infocmp -x … | ssh host 'tic -x -'`).
 - **An audit that *replaces* another inherits none of its later checks.** `verify installsh`
   deliberately does not run `v_core` — install.sh installs about nine fewer things — so a check
   added to `v_core` silently does not apply to an install.sh box, which is the shape most likely
@@ -231,16 +258,18 @@ paranoid. What they changed:
   Root may *read* a home (the finalize audit) but never writes one, and never executes a
   user-owned binary.
 - **Finalize is fail-closed and covers every account** — each uid ≥ 1000 plus root, scrubbed as
-  its own owner, `authorized_keys` always removed, and a verify pass that fails the build on
-  any credential, private key, dotfile backup or registry auth left anywhere under `/home` (bar
-  the software folders this repo installs there, whose docs contain example keys) or
-  `/root`. Proven against planted credentials in a container, including a private key outside
-  every list, which the whole-image sweep caught — then on a real desktop build box in the Gen-5
-  rehearsals (2026-10-08), where it took three runs (see *Skip by where*).
+  its own owner, `authorized_keys` always removed, and a verify pass that fails the build on any
+  listed credential store, dotfile backup or registry auth left in a home, and on any private
+  key anywhere under `/home` (bar the software folders this repo installs there, whose docs
+  contain example keys) or `/root`. Proven against planted credentials in a container, including
+  a private key outside every list, which the whole-image sweep caught — then on a real desktop
+  build box in the Gen-5 rehearsals (2026-09-26 to 10-08), where it took three runs (see *Skip
+  by where*).
 - **Two checks guard against mistakes, not adversaries.** The golden build's clean-checkout
-  check and the dry tier's scan for root writes into a home went through four review rounds,
-  and every round found one more way around them — git can be told to look away from a file,
-  and a text pattern can't fully understand shell. The lesson was to say what they are for:
+  check and the dry tier's scan for root writes into a home went through five review rounds;
+  each of the first four found one more way around them — git can be told to look away from a
+  file, and a text pattern can't fully understand shell — and the fifth was accepted once their
+  purpose was written down. The lesson was to say what they are for:
   catching a forgotten commit, a stray file, a careless line. The builder is root on the build
   box anyway; SECURITY.md puts deliberate evasion out of scope. A real guarantee for the
   second would need every home write to go through one owner-context function — noted, not
