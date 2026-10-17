@@ -47,7 +47,8 @@ hide_when_typing = true
 # Let apps (nvim, tmux) WRITE the system clipboard via OSC 52 — the big win for
 # yanking over SSH. "OnlyCopy" (not "CopyPaste") deliberately refuses OSC 52
 # clipboard *reads*, so a program/remote host can't exfiltrate your clipboard by
-# emitting a read query. Pairs with tmux `allow-passthrough on`.
+# emitting a read query. Inside tmux this needs `set -g set-clipboard on`
+# (.tmux.conf); `allow-passthrough` alone does not carry OSC 52.
 osc52 = "OnlyCopy"
 
 [terminal.shell]

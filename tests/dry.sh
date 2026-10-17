@@ -1087,6 +1087,12 @@ cmd_dry() {
     tmo="$(command tmux -L smoke-dry -f /dev/null start-server \; source-file "$HERE/.tmux.conf" \; kill-server 2>&1)"
     if [ -z "$tmo" ]; then ok "dotfiles — .tmux.conf sources with no errors (headless server)"
     else bad "dotfiles — .tmux.conf errors: $tmo"; fi
+    # OSC 52 from programs reaches the clipboard only with set-clipboard on:
+    # tmux's default `external` drops it, and allow-passthrough covers only
+    # DCS-wrapped sequences (2026-10-17, reproduced on a private server).
+    tmo="$(command tmux -L smoke-dry -f /dev/null start-server \; source-file "$HERE/.tmux.conf" \; show -gv set-clipboard \; kill-server 2>&1)"
+    if [ "$tmo" = on ]; then ok "dotfiles — .tmux.conf passes programs' OSC 52 copies on (set-clipboard on)"
+    else bad "dotfiles — .tmux.conf set-clipboard is '$tmo', not on: OSC 52 from nvim/ssh never reaches the clipboard"; fi
   else skip "dotfiles — .tmux.conf parse (tmux not installed here)"; fi
   # The modern-defaults keys and the global ignore hook (2026-09-13). One
   # representative from each concern: a behaviour key, the ignore file the
