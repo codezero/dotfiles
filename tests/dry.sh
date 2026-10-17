@@ -327,6 +327,19 @@ cmd_dry() {
   vout="$(PATH="$vlt/fakepath:$PATH" bash "$vl" emit 2>/dev/null | grep '^mise' | tr '\t' ' ' | tr '\n' '|')"
   if [ "$vout" = "mise go <local>|mise node path:<local>|" ]; then ok "versions.lock — a version that is a local path is recorded as <local>, never the path"
   else bad "versions.lock — a local path reached the lock: [$vout]"; fi
+  # rustup's OWN version is a row, not only the toolchain it manages: pins.sh
+  # pins the installer, and rustup can update itself past it. A fake HOME with
+  # fake rustup/rustc/cargo keeps this independent of the box (CI has none);
+  # rustup's real --version also prints an info line on stderr, mimicked here.
+  mkdir -p "$vlt/rhome/.cargo/bin"
+  printf '%s\n' '#!/bin/sh' 'case "$1" in --version) echo "rustup 9.8.7 (0000000 2026-01-01)"; echo "info: this is the version for the rustup toolchain manager" >&2 ;; show) echo "stable-x-unknown-linux-gnu (default)" ;; esac' > "$vlt/rhome/.cargo/bin/rustup"
+  printf '%s\n' '#!/bin/sh' 'echo "rustc 1.2.3 (0000000 2026-01-01)"' > "$vlt/rhome/.cargo/bin/rustc"
+  printf '%s\n' '#!/bin/sh' 'echo "cargo 1.2.4 (0000000 2026-01-01)"' > "$vlt/rhome/.cargo/bin/cargo"
+  chmod +x "$vlt/rhome/.cargo/bin/rustup" "$vlt/rhome/.cargo/bin/rustc" "$vlt/rhome/.cargo/bin/cargo"
+  vout="$(HOME="$vlt/rhome" PATH="/usr/bin:/bin" bash "$vl" emit 2>/dev/null | grep '^rustup' | tr '\t' ' ' | tr '\n' '|')"
+  if [ "$vout" = "rustup cargo 1.2.4|rustup rustc 1.2.3|rustup rustup 9.8.7|rustup toolchain stable-x-unknown-linux-gnu|" ]; then
+    ok "versions.lock — records rustup's own version beside the toolchain, rustc and cargo"
+  else bad "versions.lock — rustup rows wrong: [$vout]"; fi
   # A lock written BEFORE the merge rule (one row per version) must compare
   # clean too, not as "2 changed" for one tool.
   { grep -v '^mise	go	' "$vlt/multi.lock"; printf 'mise\tgo\t1.27.2\nmise\tgo\t1.9.0\nmise\tgo\t1.27.1\n'; } > "$vlt/oldfmt.lock"

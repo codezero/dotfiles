@@ -110,6 +110,10 @@ src_rustup() {
   local tc
   tc="$("$HOME/.cargo/bin/rustup" show active-toolchain 2>/dev/null | awk 'NR==1{print $1}')"
   [ -n "$tc" ] && printf 'rustup\ttoolchain\t%s\n' "$tc"
+  # rustup itself: pins.sh pins only the installer (rustup-init), and rustup
+  # can update itself after that (auto-self-update defaults to enable), so the
+  # installed version is recorded rather than assumed to be RUSTUP_VERSION.
+  printf 'rustup\trustup\t%s\n' "$("$HOME/.cargo/bin/rustup" --version 2>/dev/null | awk 'NR==1{print $2}')"
   printf 'rustup\trustc\t%s\n' "$("$HOME/.cargo/bin/rustc" --version 2>/dev/null | awk '{print $2}')"
   printf 'rustup\tcargo\t%s\n' "$("$HOME/.cargo/bin/cargo" --version 2>/dev/null | awk '{print $2}')"
 }

@@ -259,7 +259,8 @@ record that makes the claim checkable is `versions.lock`:
     order (`mise go 1.27.1,1.27.2`).
   - **flatpak** — the installed *applications* (`flatpak list --app`); their
     runtimes are not recorded.
-  - the rustup toolchain, the cargo-built Alacritty, Claude, kitty, and the
+  - the rustup toolchain and rustup's own version (it can update itself past
+    the pinned installer), the cargo-built Alacritty, Claude, kitty, and the
     commit of each pinned git clone. No hostnames, usernames, paths or tokens. Its header records
   when, from which repo SHA, and with which flags.
 - **A golden carries its own lock** — finalize leaves `$HOME` alone — so every
