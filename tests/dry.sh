@@ -249,8 +249,9 @@ cmd_dry() {
   # Tracked docs must carry no commit SHAs. The repo was re-published from its
   # last state without history (2026-09-22), so a "fixed in abc1234" points at
   # nothing a reader can open; the record that survived the export is
-  # docs/DESIGN-NOTES.md. Tracked *.md only — CLAUDE.local.md is the owner's
-  # gitignored log and keeps its SHAs, which resolve in the private archive.
+  # docs/DESIGN-NOTES.md. Tracked *.md only — CLAUDE.local.md and the owner's
+  # engineering log are untracked and keep their SHAs, which resolve in the
+  # private archive.
   # Uppercase key fingerprints and 64-char sha256s are not matched.
   local mdf mdhit=0 mdbad
   while IFS= read -r mdf; do

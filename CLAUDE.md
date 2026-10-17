@@ -312,9 +312,11 @@ when editing code:
 
 ## Open TODOs
 
-Closed work is summarized in [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md); the owner also
-keeps a verbatim log in `CLAUDE.local.md` (gitignored — hand-carried between machines with
-`~/.claude/projects/…/memory/`).
+Closed work is summarized in [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md). The owner also
+keeps a private, append-only engineering log outside the repo, read on demand. `CLAUDE.local.md`
+(gitignored, loaded every session) holds only the owner's current machine state and open local
+tasks, and points to that log. Both travel between machines by hand, with
+`~/.claude/projects/…/memory/`.
 
 **No open TODOs.** Every scenario in `smoke-test.sh scenarios` has run on real hardware.
 
