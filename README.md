@@ -178,12 +178,14 @@ the repo can then be deleted, but edits no longer flow back). Note the asymmetry
   `.backup.<timestamp>` being minted on every re-run. To go back, remove the files
   first (e.g. `rm ~/.zshrc` — or delete each entry in `dotfiles.list`), then re-run.
 
-Provision has the mirror-image trap: a re-run **on** a golden image must keep
-`GOLDEN_IMAGE=1` or `DOTFILES_COPY=1`, or it will symlink over the copies.
+Provision uses the same installer, so the same rule holds on a golden clone: a
+re-run without `DOTFILES_COPY=1` leaves identical copies alone but replaces any
+copy that differs from the checkout with a backup and a symlink into it. On a
+clone you use, keep `DOTFILES_COPY=1` — never `GOLDEN_IMAGE=1`, which scrubs every
+account and belongs only on a throwaway box building the next image.
 
-A `~/.zshrc.backup.<timestamp>` on a fresh box is expected once: oh-my-zsh's
-installer writes a template `.zshrc` before ours is installed, and that template
-gets backed up rather than deleted.
+A fresh box gets no `*.backup.<timestamp>` files: oh-my-zsh is cloned at its pin
+rather than installed by its own script, so no template `.zshrc` is written first.
 
 ## License
 

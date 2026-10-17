@@ -103,9 +103,12 @@ and in `--help` are just common combinations of it.
 - **`GOLDEN_IMAGE=1` + `DOCKER_ROOTLESS=1` is deliberately unsupported.** Rootless
   needs a host-wide AppArmor relaxation (below), which would bake into the image
   and be inherited by every clone. Build the image without it; each clone opts in.
-- **Copy mode is sticky.** A re-run *on* a golden image must carry `GOLDEN_IMAGE=1`
-  or `DOTFILES_COPY=1`, or step 60 replaces the copies with symlinks into a repo
-  path the image may not keep.
+- **Copy mode is sticky.** On a golden clone, keep `DOTFILES_COPY=1` on every
+  re-run: without it, step 60 leaves identical copies alone but replaces any copy
+  that differs from the checkout with a backup and a symlink into a repo path the
+  image may not keep. `GOLDEN_IMAGE=1` belongs only on a throwaway clone that is
+  building the next image — never on a VM in use, because finalize scrubs every
+  account (VM-LIFECYCLE.md).
 - **Flags are UPPERCASE.** A lowercase `golden_image=1` is not the same variable,
   so the run warns about the likely typo rather than silently doing a default run.
 - **The examples use `sudo env VAR=… bash provision.sh`, not `sudo VAR=…`.** Both
@@ -228,7 +231,7 @@ actually came up gets a "nothing to do" note instead of the setup recipe.
 
 > **Destructive by design:** `GOLDEN_IMAGE=1` wipes host keys, machine-id, logs,
 > shell history, and credential stores (`.aws`/`.gnupg`/`.config/{gh,gcloud}`/
-> `.kube`/`.npmrc`/SSH keys/…) from the target user **and** root — only run it on
+> `.kube`/`.npmrc`/SSH keys/…) from **every account** (each uid ≥ 1000, plus root) — only run it on
 > a throwaway build box, never your daily machine. Keep the repo clone **and** any
 > run logs under `/tmp` — finalize wipes `/tmp` last, so they're removed from the
 > image automatically. Don't tee a golden build to `/var/log` (finalize truncates

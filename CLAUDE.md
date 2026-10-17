@@ -142,10 +142,11 @@ silently breaks `--dry-run`.
 ### Terminals — two, installed differently on purpose
 
 - **Alacritty (step 36) is built** with `cargo install --locked`: upstream ships no Linux
-  binary at all. Its terminfo, `.desktop`, icon and shell completions come from the **crate**
-  — re-fetched from crates.io and verified against the sha256 in the sparse index (the same
+  binary at all. Its `.desktop`, icon and shell completions come from the **crate** —
+  re-fetched from crates.io and verified against the sha256 in the sparse index (the same
   checksum cargo used), never from a raw GitHub URL: the zsh completion is code every shell
-  sources, installed system-wide.
+  sources, installed system-wide. Its terminfo comes from `ncurses-term`, system-wide, for every
+  account and profile; step 36 no longer writes `~/.terminfo`.
 - **kitty (step 38) is installed from upstream's signed `.txz`**, verified two ways: the
   fail-closed `verify_keyring` fingerprint pin, **plus** `gpg --verify --assert-signer
   "$KITTY_FP"` on the tarball. The second binds the signature to that key independently of the

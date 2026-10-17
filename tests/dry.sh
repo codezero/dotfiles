@@ -246,10 +246,10 @@ cmd_dry() {
     else bad "CI config missing — $wf"; fi
   done
 
-  # Tracked docs must carry no commit SHAs. The repo was re-published from its
-  # last state without history (2026-09-22), so a "fixed in abc1234" points at
-  # nothing a reader can open; the record that survived the export is
-  # docs/DESIGN-NOTES.md. Tracked *.md only — CLAUDE.local.md and the owner's
+  # Tracked docs must carry no commit SHAs. The public repo has no history
+  # before its parentless root (re-exported 2026-10-08), so a "fixed in abc1234"
+  # points at nothing a reader of this repo can open; the record that matters is
+  # docs/DESIGN-NOTES.md, the full history is in the owner's private archive. Tracked *.md only — CLAUDE.local.md and the owner's
   # engineering log are untracked and keep their SHAs, which resolve in the
   # private archive.
   # Uppercase key fingerprints and 64-char sha256s are not matched.
@@ -267,7 +267,7 @@ cmd_dry() {
      && grep -q 'security/advisories/new' "$HERE/SECURITY.md"; then
     ok "docs — SECURITY.md (private reporting channel) and CONTRIBUTING.md are present"
   else bad "docs — SECURITY.md/CONTRIBUTING.md missing, or SECURITY.md lost its private channel"; fi
-  # The design note is the one place the pre-export history survives.
+  # The design note is the one place in this repo the pre-export history survives.
   if [ -s "$HERE/docs/DESIGN-NOTES.md" ] && grep -q 'DESIGN-NOTES' "$HERE/CLAUDE.md" && grep -q 'DESIGN-NOTES' "$HERE/README.md"; then
     ok "docs — DESIGN-NOTES.md exists and both CLAUDE.md and README.md point at it"
   else bad "docs — DESIGN-NOTES.md missing, or the entry points no longer link it"; fi
