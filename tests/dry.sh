@@ -1053,7 +1053,11 @@ cmd_dry() {
            alice/.local/kitty.app/lib/c.txt alice/.config/alacritty/themes/d.toml; do
     printf -- 'PRIVATE_KEY="-----BEGIN RSA %s-----\n%s\n-----END RSA %s-----"\n' "$kpk" "$kbody" "$kpk" > "$kb/$f"
   done
-  khits="$(bash -c 'source "$1"/provision/lib.sh 2>/dev/null; kd=(); while IFS= read -r d; do kd+=("$d"); done < <(key_sweep_dirs "$2"); key_sweep_files "${kd[@]}"' _ "$HERE" "$kb" \
+  # PROVISION_USER pins lib.sh's target-user resolution, like every other
+  # non-dry `source lib.sh` here. Without it, under rootless Docker the host's
+  # loginuid reads 0 inside the container, `logname` says root, lib.sh refuses
+  # to load, and this test printed "found []" on any tree (2026-10-17).
+  khits="$(PROVISION_USER="$(id -un)" bash -c 'source "$1"/provision/lib.sh 2>/dev/null; kd=(); while IFS= read -r d; do kd+=("$d"); done < <(key_sweep_dirs "$2"); key_sweep_files "${kd[@]}"' _ "$HERE" "$kb" \
            | sed "s|^$kb/||" | LC_ALL=C sort | tr '\n' ' ')"
   if [ "$khits" = "..archive/key.pem .orphan/id alice/Downloads/sa.json alice/app.env alice/notes/key.pem alice/projects/themes/key.pem linuxbrew/notes/key.pem loose-key.pem " ]; then
     ok "finalize key sweep — keys found in PEM files, .env values, JSON, loose /home files, ..name entries, beside the Homebrew prefix; installed software skipped"
