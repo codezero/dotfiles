@@ -47,7 +47,7 @@ v_core() {
 .oh-my-zsh/custom/themes/powerlevel10k	$P10K_SHA
 .config/alacritty/themes	$ALACRITTY_THEME_SHA
 EOF
-  check "zsh starts clean"         zsh -ic true
+  check "zsh starts clean (no output under a pty)" zsh_starts_clean
   # Every entry in dotfiles.list — step 60 installs the whole set on every
   # profile, and the list is the single owner of what that set is.
   local f
@@ -207,7 +207,7 @@ v_installsh() {
   v_terminfo
   check "oh-my-zsh present"      test -f "$HOME/.oh-my-zsh/oh-my-zsh.sh"
   check "p10k theme present"     test -f "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme"
-  check "zsh starts clean"       zsh -ic true
+  check "zsh starts clean (no output under a pty)" zsh_starts_clean
   check "default shell = zsh"    bash -c '[ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ]'
   # Dotfile set from the shared manifest — same source of truth install.sh reads,
   # so the audit can't drift from what was deployed.

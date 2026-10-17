@@ -18,6 +18,23 @@ check()  { local d="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$d"; else bad 
 # checkno <description> <command...> — inverted: pass when the command FAILS.
 checkno() { local d="$1"; shift; if "$@" >/dev/null 2>&1; then bad "$d"; else ok "$d"; fi; }
 
+# zsh_starts_clean — an interactive zsh exits 0 AND prints nothing. It runs under
+# a pty (`script`): without a tty, p10k's gitstatus and fzf's --zsh integration
+# print errors a real terminal never shows, while `zsh -ic true` still exits 0 —
+# so the old exit-status-only check passed with errors on screen (2026-10-17).
+# A clean start emits no bytes at all; control sequences are stripped anyway in
+# case a theme sets a window title. Without `script`, only the exit status counts.
+zsh_starts_clean() {
+  command -v script >/dev/null 2>&1 || { zsh -ic true; return; }
+  local out
+  out="$(timeout 30 script -qec 'zsh -ic true' /dev/null 2>&1)" || return 1
+  out="$(printf '%s' "$out" \
+    | sed -e 's/\x1b\[[0-9;?<>=]*[@-~]//g' -e 's/\x1b\][^\x07\x1b]*\(\x07\|\x1b\\\)//g' \
+          -e 's/\x1b[=>()][0-9A-Za-z]\{0,1\}//g' \
+    | tr -d '[:space:]')"
+  [ -z "$out" ]
+}
+
 summary() {
   printf '\n\033[1m%d passed, %d failed, %d skipped\033[0m\n' "$PASS" "$FAIL" "$SKIP"
   # A skipped check is NOT a passing one — it means the property was never

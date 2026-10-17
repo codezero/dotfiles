@@ -1094,6 +1094,20 @@ cmd_dry() {
     if [ "$tmo" = on ]; then ok "dotfiles — .tmux.conf passes programs' OSC 52 copies on (set-clipboard on)"
     else bad "dotfiles — .tmux.conf set-clipboard is '$tmo', not on: OSC 52 from nvim/ssh never reaches the clipboard"; fi
   else skip "dotfiles — .tmux.conf parse (tmux not installed here)"; fi
+  # verify's "zsh starts clean" must judge the output, not just the exit status:
+  # a fake zsh that prints an error and exits 0 has to fail it, a silent one has
+  # to pass (2026-10-17 — the old check passed with errors on screen).
+  if command -v script >/dev/null 2>&1; then
+    local zfake; zfake="$(mktemp -d)"
+    mkdir -p "$zfake/noisy" "$zfake/quiet"
+    printf '%s\n' '#!/bin/sh' 'echo "zsh: something went wrong" >&2' 'exit 0' > "$zfake/noisy/zsh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$zfake/quiet/zsh"
+    chmod +x "$zfake/noisy/zsh" "$zfake/quiet/zsh"
+    if ! PATH="$zfake/noisy:$PATH" zsh_starts_clean && PATH="$zfake/quiet:$PATH" zsh_starts_clean; then
+      ok "verify — 'zsh starts clean' fails a start that prints an error and passes a silent one"
+    else bad "verify — 'zsh starts clean' cannot tell a noisy start from a silent one"; fi
+    rm -rf "$zfake"
+  else skip "verify — zsh-starts-clean helper (script(1) not installed here)"; fi
   # The modern-defaults keys and the global ignore hook (2026-09-13). One
   # representative from each concern: a behaviour key, the ignore file the
   # manifest ships, and the delta feature lazygit's config selects by name.
