@@ -34,7 +34,7 @@
 # shellcheck disable=SC2034  # values are consumed by the scripts that source this file
 
 # ── git clones that ship code run by every shell ─────────────────────────────
-OMZ_SHA=0650a250405af1e480b1ecf8c33bc960b9f333f5     # omz HEAD 2026-10-20 (bumped 2026-10-20 from 964ddf7: 5 commits, log reviewed via `pins.sh bump`)
+OMZ_SHA=2100c630ba4bd67bb48802c3e7da893a4fdaa1a0     # omz HEAD 2026-10-22 (bumped 2026-10-22 from 0650a25: 3 commits, log reviewed via `pins.sh bump`)
 P10K_SHA=d05a1b00f9a61f9578bf9dc19b8451942dde8734                # romkatv/powerlevel10k      HEAD 2026-09-06
 ALACRITTY_THEME_SHA=ab88d5a80d676b5dc6157e91aba8067f2078dc94     # alacritty/alacritty-theme  HEAD 2026-09-11
 OMZ_URL=https://github.com/ohmyzsh/ohmyzsh
@@ -44,7 +44,7 @@ ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
 # ── installer scripts / binaries executed once ───────────────────────────────
 # Homebrew/install: the raw URL is pinned to a COMMIT (not HEAD) and the file
 # is verified against the hash recorded here before it runs.
-HOMEBREW_INSTALL_COMMIT=be041513824fd2666a0e93cf5c3b0ca3bb0eb4b6     # 2026-10-17 (bumped from 7a3f48c7; diff reviewed via `pins.sh bump`)
+HOMEBREW_INSTALL_COMMIT=a2fe82ef3a9ec7a5c72a559c09676256d6f354f6     # 2026-10-22 (bumped from be041513; diff reviewed via `pins.sh bump`)
 HOMEBREW_INSTALL_SHA256=5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148     # sha256 of install.sh at that commit
 HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBREW_INSTALL_COMMIT/install.sh"
 
@@ -52,9 +52,9 @@ HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBR
 # current). The versioned binary from static.rust-lang.org/rustup/archive, whose
 # hash is recorded HERE — upstream's .sha256 file is same-host and is only used
 # when bumping, to fill these in.
-RUSTUP_VERSION=1.29.1
-RUSTUP_INIT_SHA256_aarch64=15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433
-RUSTUP_INIT_SHA256_x86_64=dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71
+RUSTUP_VERSION=1.29.2     # 2026-10-22 (bumped from 1.29.1 via `pins.sh bump`)
+RUSTUP_INIT_SHA256_aarch64=a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697     # from upstream .sha256, 1.29.2
+RUSTUP_INIT_SHA256_x86_64=5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4     # from upstream .sha256, 1.29.2
 rustup_init_url() { echo "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$(uname -m)-unknown-linux-gnu/rustup-init"; }
 rustup_init_sha256() { local v; v="RUSTUP_INIT_SHA256_$(uname -m)"; echo "${!v:-}"; }
 
