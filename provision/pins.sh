@@ -34,9 +34,9 @@
 # shellcheck disable=SC2034  # values are consumed by the scripts that source this file
 
 # ── git clones that ship code run by every shell ─────────────────────────────
-OMZ_SHA=2100c630ba4bd67bb48802c3e7da893a4fdaa1a0     # omz HEAD 2026-10-22 (bumped 2026-10-22 from 0650a25: 3 commits, log reviewed via `pins.sh bump`)
+OMZ_SHA=d2b7f557cceaddb16ba89bbf8200d8a8df35c4d8     # omz HEAD 2026-10-26 (bumped 2026-10-26 from 2100c63: 2 commits, log reviewed via `pins.sh bump`)
 P10K_SHA=d05a1b00f9a61f9578bf9dc19b8451942dde8734                # romkatv/powerlevel10k      HEAD 2026-09-06
-ALACRITTY_THEME_SHA=ab88d5a80d676b5dc6157e91aba8067f2078dc94     # alacritty/alacritty-theme  HEAD 2026-09-11
+ALACRITTY_THEME_SHA=a7c1c8b318520e28a7cb3c2e8c5c348931919080     # alacritty-theme HEAD 2026-10-26 (bumped 2026-10-26 from ab88d5a: 1 commits, log reviewed via `pins.sh bump`)
 OMZ_URL=https://github.com/ohmyzsh/ohmyzsh
 P10K_URL=https://github.com/romkatv/powerlevel10k
 ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
