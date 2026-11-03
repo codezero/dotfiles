@@ -34,9 +34,9 @@
 # shellcheck disable=SC2034  # values are consumed by the scripts that source this file
 
 # ── git clones that ship code run by every shell ─────────────────────────────
-OMZ_SHA=17a2b4c3a5855524ad4772a17ada0dc474e2fdf3     # omz HEAD 2026-10-27 (bumped 2026-10-27 from d2b7f55: 1 commits, log reviewed via `pins.sh bump`)
+OMZ_SHA=b509b1c6ed0c1ba37de12cbd37f30b2b2f61193a     # omz HEAD 2026-11-03 (bumped 2026-11-03 from 17a2b4c: 2 commits, log reviewed via `pins.sh bump`)
 P10K_SHA=d05a1b00f9a61f9578bf9dc19b8451942dde8734                # romkatv/powerlevel10k      HEAD 2026-09-06
-ALACRITTY_THEME_SHA=a7c1c8b318520e28a7cb3c2e8c5c348931919080     # alacritty-theme HEAD 2026-10-26 (bumped 2026-10-26 from ab88d5a: 1 commits, log reviewed via `pins.sh bump`)
+ALACRITTY_THEME_SHA=95615789c5eddee1c5407a520cd9959a86fa4716     # alacritty-theme HEAD 2026-11-03 (bumped 2026-11-03 from a7c1c8b: 1 commits, log reviewed via `pins.sh bump`)
 OMZ_URL=https://github.com/ohmyzsh/ohmyzsh
 P10K_URL=https://github.com/romkatv/powerlevel10k
 ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
@@ -44,7 +44,7 @@ ALACRITTY_THEME_URL=https://github.com/alacritty/alacritty-theme
 # ── installer scripts / binaries executed once ───────────────────────────────
 # Homebrew/install: the raw URL is pinned to a COMMIT (not HEAD) and the file
 # is verified against the hash recorded here before it runs.
-HOMEBREW_INSTALL_COMMIT=85d1a3fc80d8a63932f632aca8f787de11d14a64     # 2026-10-24 (bumped from a2fe82ef; diff reviewed via `pins.sh bump`)
+HOMEBREW_INSTALL_COMMIT=8c82c081753d4263da0cfe615ef8d9433425f22b     # 2026-11-03 (bumped from 85d1a3fc; diff reviewed via `pins.sh bump`)
 HOMEBREW_INSTALL_SHA256=5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148     # sha256 of install.sh at that commit
 HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/$HOMEBREW_INSTALL_COMMIT/install.sh"
 
